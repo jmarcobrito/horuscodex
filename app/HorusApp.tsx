@@ -45,6 +45,8 @@ const requestRows = [
 ];
 
 const sectionNames: Record<Section, string> = { overview: "Visão geral", entries: "Lançamentos", balance: "Banco de horas", requests: "Solicitações", team: "Equipe", reports: "Relatórios" };
+const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const weekDays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
 function minutesBetween(start: string, end: string, breakMinutes: number) {
   const [sh, sm] = start.split(":").map(Number);
@@ -129,7 +131,58 @@ export function HorusApp({ user }: { user: User }) {
 }
 
 function RhOverview({ onNavigate }: { onNavigate: (section: Section) => void }) {
-  return <><section className="page-heading overview-heading"><div><span className="eyebrow">QUINTA-FEIRA, 16 DE JULHO</span><h1>Bom dia, Marina.</h1><p>Veja o que precisa da sua atenção hoje.</p></div><button className="primary-button" onClick={() => onNavigate("reports")}><span>↗</span> Exportar relatório</button></section>
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [periodMode, setPeriodMode] = useState<"month" | "range">("month");
+  const [periodLabel, setPeriodLabel] = useState("Julho de 2026");
+  const [periodKind, setPeriodKind] = useState("Mês completo");
+  const [calendarMonth, setCalendarMonth] = useState(6);
+  const [calendarYear, setCalendarYear] = useState(2026);
+  const [selectedMonth, setSelectedMonth] = useState(6);
+  const [rangeStart, setRangeStart] = useState("2026-07-01");
+  const [rangeEnd, setRangeEnd] = useState("2026-07-16");
+  const firstWeekDay = new Date(calendarYear, calendarMonth, 1).getDay();
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+
+  function moveCalendar(direction: number) {
+    const next = new Date(calendarYear, calendarMonth + direction, 1);
+    setCalendarMonth(next.getMonth());
+    setCalendarYear(next.getFullYear());
+  }
+
+  function dateForDay(day: number) {
+    return `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  function selectRangeDay(day: number) {
+    const date = dateForDay(day);
+    if (!rangeStart || rangeEnd) {
+      setRangeStart(date);
+      setRangeEnd("");
+    } else if (date < rangeStart) {
+      setRangeStart(date);
+    } else {
+      setRangeEnd(date);
+    }
+  }
+
+  function formatDate(date: string) {
+    if (!date) return "";
+    const [year, month, day] = date.split("-").map(Number);
+    return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(year, month - 1, day)).replace(" de ", " ").replace(" de ", " ");
+  }
+
+  function applyPeriod() {
+    if (periodMode === "month") {
+      setPeriodLabel(`${monthNames[selectedMonth]} de ${calendarYear}`);
+      setPeriodKind("Mês completo");
+    } else if (rangeStart && rangeEnd) {
+      setPeriodLabel(`${formatDate(rangeStart)} – ${formatDate(rangeEnd)}`);
+      setPeriodKind("Intervalo personalizado");
+    }
+    setPickerOpen(false);
+  }
+
+  return <><section className="page-heading overview-heading"><div><span className="eyebrow">{periodKind.toUpperCase()}</span><h1>Bom dia, Marina.</h1><p>Indicadores consolidados para {periodLabel.toLowerCase()}.</p></div><div className="period-actions"><div className="period-picker-wrap"><button className="period-button" onClick={() => setPickerOpen((open) => !open)} aria-haspopup="dialog" aria-expanded={pickerOpen}><span className="period-calendar-icon">▦</span><span><small>PERÍODO</small><strong>{periodLabel}</strong></span><b>⌄</b></button>{pickerOpen && <><button className="period-dismiss" aria-label="Fechar seleção de período" onClick={() => setPickerOpen(false)} /><section className="period-popover" role="dialog" aria-label="Selecionar período"><div className="period-popover-head"><div><span>FILTRO DE DADOS</span><h2>Selecionar período</h2></div><button onClick={() => setPickerOpen(false)} aria-label="Fechar">×</button></div><div className="period-mode-tabs"><button className={periodMode === "month" ? "active" : ""} onClick={() => setPeriodMode("month")}>Por mês</button><button className={periodMode === "range" ? "active" : ""} onClick={() => setPeriodMode("range")}>Intervalo de datas</button></div>{periodMode === "month" ? <div className="month-picker"><div className="calendar-navigation"><button onClick={() => setCalendarYear((year) => year - 1)} aria-label="Ano anterior">←</button><strong>{calendarYear}</strong><button onClick={() => setCalendarYear((year) => year + 1)} aria-label="Próximo ano">→</button></div><div className="month-grid">{monthNames.map((month, index) => <button key={month} className={selectedMonth === index ? "selected" : ""} onClick={() => setSelectedMonth(index)}>{month.slice(0, 3)}</button>)}</div></div> : <div className="range-picker"><div className="range-fields"><label>Data inicial<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><span>→</span><label>Data final<input type="date" min={rangeStart} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label></div><div className="calendar-navigation"><button onClick={() => moveCalendar(-1)} aria-label="Mês anterior">←</button><strong>{monthNames[calendarMonth]} {calendarYear}</strong><button onClick={() => moveCalendar(1)} aria-label="Próximo mês">→</button></div><div className="calendar-weekdays">{weekDays.map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-days">{Array.from({ length: firstWeekDay }, (_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: daysInMonth }, (_, index) => index + 1).map((day) => { const date = dateForDay(day); const selected = date === rangeStart || date === rangeEnd; const inRange = Boolean(rangeStart && rangeEnd && date > rangeStart && date < rangeEnd); return <button key={day} className={`${selected ? "selected" : ""} ${inRange ? "in-range" : ""}`} onClick={() => selectRangeDay(day)} aria-label={`Selecionar dia ${day}`}>{day}</button>; })}</div></div>}<div className="period-popover-footer"><button className="period-cancel" onClick={() => setPickerOpen(false)}>Cancelar</button><button className="period-apply" onClick={applyPeriod} disabled={periodMode === "range" && (!rangeStart || !rangeEnd)}>Aplicar período</button></div></section></>}</div><button className="primary-button" onClick={() => onNavigate("reports")}><span>↗</span> Exportar relatório</button></div></section>
     <section className="metric-grid"><MetricCard label="PRESTADORES ATIVOS" value="12" meta="Todos com competência aberta" icon="◎" trend="+2 este mês" tone="violet" /><MetricCard label="HORAS REALIZADAS" value="1.284:30" meta="de 1.944:00 previstas" icon="◷" progress={66} tone="blue" /><MetricCard label="SALDO POSITIVO" value="+42:15" meta="7 prestadores com crédito" icon="↗" trend="+6:30 no mês" tone="green" /><MetricCard label="SALDO NEGATIVO" value="−18:40" meta="3 prestadores com déficit" icon="↘" trend="2 vencem em 30 dias" tone="amber" /></section>
     <section className="attention-banner"><div className="attention-icon">!</div><div><strong>7 itens precisam da sua atenção</strong><p>3 lançamentos atrasados, 2 solicitações de folga e 2 autorizações pendentes.</p></div><button onClick={() => onNavigate("requests")}>Revisar pendências <span>→</span></button></section>
     <section className="dashboard-grid"><div className="panel discipline-panel"><PanelHeading eyebrow="DISCIPLINA DE PREENCHIMENTO" title="Acompanhamento da equipe" action="Ver equipe completa" onAction={() => onNavigate("team")} /><div className="table-scroll"><table><thead><tr><th>Prestador</th><th>Último lançamento</th><th>Atraso</th><th>Dias pendentes</th><th>Preenchimento</th></tr></thead><tbody>{contractors.map((person) => <tr key={person.name}><td><div className="person-cell"><span className={`mini-avatar ${person.tone}`}>{person.initials}</span><div><strong>{person.name}</strong>{person.batch && <small>Retroativo em lote</small>}</div></div></td><td><strong>{person.last}</strong><small>às {person.pending > 2 ? "18:42" : "09:18"}</small></td><td><span className={person.delay === "0 dias" ? "quiet-status" : "delay-status"}>{person.delay}</span></td><td><span className={person.pending ? "pending-days" : "zero-days"}>{person.pending}</span></td><td><div className="fill-cell"><div className="mini-progress"><span style={{ width: `${person.fill}%` }} /></div><b>{person.fill}%</b></div></td></tr>)}</tbody></table></div></div>
