@@ -17,14 +17,16 @@ test("ships product metadata, database migration and no starter preview", async 
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
-    readFile(new URL("../drizzle/0000_huge_omega_flight.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260716120000_initial_horus_schema.sql", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /Horus — Controle de horas técnicas/);
   assert.match(layout, /og\.png/);
   assert.match(page, /HorusApp/);
-  assert.match(hosting, /"d1": "DB"/);
-  assert.match(migration, /CREATE TABLE `time_entries`/);
-  assert.match(migration, /CREATE TABLE `hour_balance_lots`/);
+  assert.match(hosting, /"d1": null/);
+  assert.match(migration, /create table if not exists public\.time_entries/i);
+  assert.match(migration, /create table if not exists public\.hour_balance_lots/i);
+  assert.match(migration, /create or replace function public\.upsert_time_entry/i);
+  assert.match(migration, /enable row level security/i);
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });

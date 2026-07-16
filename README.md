@@ -1,31 +1,39 @@
-# vinext-starter
+# Horus — Controle de Horas Técnicas
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Aplicação de controle de horas, banco de horas e solicitações para prestadores
+PJ e equipes de RH. O frontend roda com vinext/OpenAI Sites e os dados
+persistentes ficam em um projeto Supabase PostgreSQL.
 
-## Prerequisites
+## Requisitos
 
 - Node.js `>=22.13.0`
+- um projeto Supabase
+- Supabase CLI autenticada para aplicar migrações
 
-## Quick Start
+## Configuração local
 
 ```bash
 npm install
+cp .env.example .env.local
+npx supabase login
+npx supabase link --project-ref SEU_PROJECT_REF
+npm run db:push
 npm run dev
-npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+Preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` em `.env.local`. A chave
+`service_role` é exclusiva do servidor: nunca use o prefixo `NEXT_PUBLIC_` e
+nunca faça commit do valor real.
 
-## Included Shape
+## Banco de dados
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+- as migrações PostgreSQL ficam em `supabase/migrations/`;
+- o lançamento diário usa a função transacional `upsert_time_entry`;
+- tabelas públicas têm RLS habilitado e não possuem políticas para `anon` ou
+  `authenticated`;
+- o backend acessa o banco com a chave `service_role`, armazenada como segredo
+  no ambiente de produção;
+- o acesso de cada usuário continua vinculado à identidade fornecida pelo Sites.
 
 ## Workspace Auth Headers
 
@@ -90,9 +98,11 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
 - `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+- `npm run db:push`: apply pending migrations to the linked Supabase project
+- `npm run db:types`: regenerate TypeScript database types from Supabase
 
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+- [Supabase database migrations](https://supabase.com/docs/guides/deployment/database-migrations)
+- [Supabase JavaScript client](https://supabase.com/docs/reference/javascript/initializing)
