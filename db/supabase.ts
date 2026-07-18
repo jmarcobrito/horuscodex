@@ -1,7 +1,4 @@
-import { env } from "cloudflare:workers";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-type RuntimeEnvironment = Record<string, string | undefined>;
 
 let adminClient: SupabaseClient | undefined;
 
@@ -13,8 +10,7 @@ export class SupabaseConfigurationError extends Error {
 }
 
 function runtimeValue(name: string): string | undefined {
-  const workerEnvironment = env as unknown as RuntimeEnvironment;
-  const value = workerEnvironment[name] ?? process.env[name];
+  const value = process.env[name];
   return value?.trim() || undefined;
 }
 

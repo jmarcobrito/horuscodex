@@ -46,3 +46,7 @@ const worker = {
 };
 
 export default worker;
+interface Fetcher {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+}
+
