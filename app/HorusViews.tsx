@@ -44,14 +44,40 @@ function statusTone(status: string) {
 }
 
 export function Overview({ data, loading, onNavigate, onPeriod }: { data: DashboardData; loading: boolean; onNavigate: (section: Section) => void; onPeriod: (query: string) => void }) {
-  const [mode, setMode] = useState<"month" | "range">(data.period.year ? "month" : "range");
   const [year, setYear] = useState(data.period.year ?? new Date().getFullYear()); const [month, setMonth] = useState(data.period.month ?? new Date().getMonth() + 1);
   const [from, setFrom] = useState(data.period.from); const [to, setTo] = useState(data.period.to);
-  function apply() { void onPeriod(mode === "month" ? new URLSearchParams({ year: String(year), month: String(month) }).toString() : new URLSearchParams({ from, to }).toString()); }
+  const visibleMonth = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
+  function moveMonth(offset: number) {
+    const next = new Date(year, month - 1 + offset, 1);
+    const nextYear = next.getFullYear();
+    const nextMonth = next.getMonth() + 1;
+    setYear(nextYear);
+    setMonth(nextMonth);
+    void onPeriod(new URLSearchParams({ year: String(nextYear), month: String(nextMonth) }).toString());
+  }
+  function applyRange() { void onPeriod(new URLSearchParams({ from, to }).toString()); }
   const pending = data.metrics.pendingRequests + data.metrics.pendingOccurrences + data.metrics.pendingAuthorizations;
   return <>
     <section className="page-heading overview-heading"><div><span className="eyebrow">VISÃO CONSOLIDADA</span><h1>Visão geral</h1><p>{monthLabel(data.period)} · dados reais da organização</p></div>{pending > 0 && <button className="secondary-button" onClick={() => onNavigate("requests")}>{pending} pendência(s)</button>}</section>
-    <section className="period-panel panel" aria-label="Selecionar período"><div className="period-mode-tabs" role="tablist"><button role="tab" className={mode === "month" ? "active" : ""} onClick={() => setMode("month")} aria-selected={mode === "month"}>Selecionar mês</button><button role="tab" className={mode === "range" ? "active" : ""} onClick={() => setMode("range")} aria-selected={mode === "range"}>Intervalo de datas</button></div><div className="period-inline">{mode === "month" ? <><label>Mês<select value={month} onChange={(event) => setMonth(Number(event.target.value))}>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index}>{new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(2026, index, 1))}</option>)}</select></label><label>Ano<input type="number" min="2000" max="2200" value={year} onChange={(event) => setYear(Number(event.target.value))} /></label></> : <><label>Data inicial<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>Data final<input type="date" min={from} value={to} onChange={(event) => setTo(event.target.value)} /></label></>}<button className="primary-button" onClick={apply} disabled={loading || (mode === "range" && (!from || !to || from > to))}>Aplicar período</button></div></section>
+    <section className="period-panel panel" aria-label="Selecionar período">
+      <div className="month-selector">
+        <span className="period-section-label">NAVEGAR POR MÊS</span>
+        <div className="month-selector-controls">
+          <button type="button" onClick={() => moveMonth(-1)} disabled={loading} aria-label="Voltar para o mês anterior">←</button>
+          <strong aria-live="polite">{visibleMonth}</strong>
+          <button type="button" onClick={() => moveMonth(1)} disabled={loading} aria-label="Avançar para o próximo mês">→</button>
+        </div>
+      </div>
+      <div className="period-divider" aria-hidden="true" />
+      <div className="custom-period-selector">
+        <span className="period-section-label">INTERVALO DE DATAS</span>
+        <div className="period-inline">
+          <label>Data inicial<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
+          <label>Data final<input type="date" min={from} value={to} onChange={(event) => setTo(event.target.value)} /></label>
+          <button className="primary-button" type="button" onClick={applyRange} disabled={loading || !from || !to || from > to}>Aplicar período</button>
+        </div>
+      </div>
+    </section>
     <section className="metric-grid"><Metric label="PRESTADORES ATIVOS" value={String(data.metrics.activeContractors)} meta="Cadastros PJ ativos" tone="violet" /><Metric label="HORAS REALIZADAS" value={formatMinutes(data.metrics.workedMinutes)} meta={"Meta " + formatMinutes(data.metrics.requiredMinutes)} tone="blue" /><Metric label="SALDO POSITIVO" value={formatMinutes(data.metrics.positiveBalanceMinutes, true)} meta="Créditos em aberto" tone="green" /><Metric label="SALDO NEGATIVO" value={formatMinutes(-data.metrics.negativeBalanceMinutes, true)} meta="Déficits em aberto" tone="amber" /></section>
     <section className="dashboard-grid"><div className="panel discipline-panel"><PanelHeading eyebrow="DISCIPLINA DE PREENCHIMENTO" title="Acompanhamento da equipe" action="Ver equipe completa" onAction={() => onNavigate("team")} />{data.contractors.filter((person) => person.status === "ACTIVE").length ? <div className="table-scroll"><table><thead><tr><th>Prestador</th><th>Último lançamento</th><th>Atraso médio</th><th>Retroativos</th><th>Preenchimento</th></tr></thead><tbody>{data.contractors.filter((person) => person.status === "ACTIVE").map((person) => <tr key={person.id}><td><div className="person-cell"><span className="mini-avatar violet">{person.initials}</span><div><strong>{person.name}</strong><small>{person.email}</small></div></div></td><td>{person.lastEntryDate ? formatDate(person.lastEntryDate) : "Sem lançamentos"}</td><td>{person.averageDelayDays} dia(s)</td><td>{person.retroactiveEntries}</td><td><div className="fill-cell"><div className="mini-progress"><span style={{ width: person.fillPercentage + "%" }} /></div><b>{person.fillPercentage}%</b></div></td></tr>)}</tbody></table></div> : <Empty text="Nenhum prestador ativo encontrado." />}</div>
       <div className="panel balance-panel"><PanelHeading eyebrow="BANCO DE HORAS" title="Saldos mais antigos" action="Ver extrato" onAction={() => onNavigate("balance")} />{data.balanceLots.length ? <div className="lot-list">{data.balanceLots.slice(0, 5).map((lot) => <article className="lot-row" key={lot.id}><div className="lot-top"><div><strong>{lot.contractorName}</strong><span>{formatDate(lot.originDate)}</span></div><b className={lot.type === "CREDIT" ? "positive" : "negative"}>{formatMinutes((lot.type === "CREDIT" ? 1 : -1) * lot.remainingMinutes, true)}</b></div><div className="deadline-line"><small>{statusLabel(lot.status)}</small><time>{formatDate(lot.deadlineDate)}</time></div></article>)}</div> : <Empty text="Nenhum lote de saldo aberto." />}</div></section>

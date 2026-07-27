@@ -13,7 +13,11 @@ test("ships protected Horus workflows backed by server data", async () => {
   ]);
 
   assert.match(app, /initialDashboard/);
-  assert.match(views, /Intervalo de datas/);
+  assert.match(views, /INTERVALO DE DATAS/);
+  assert.match(views, /Voltar para o mês anterior/);
+  assert.match(views, /Avançar para o próximo mês/);
+  assert.match(views, /moveMonth\(-1\)/);
+  assert.match(views, /moveMonth\(1\)/);
   assert.match(app, /\/api\/dashboard/);
   assert.match(app, /\/api\/time-entries/);
   assert.match(page, /getOptionalActor/);
