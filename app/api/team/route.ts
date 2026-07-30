@@ -26,12 +26,33 @@ export async function POST(request: Request) {
     const row = { id, organization_id: actor.organizationId, name, email, role: "PJ", status: "ACTIVE" };
     const result = await admin.from("users").insert(row);
     if (result.error) throw result.error;
+
+    const redirectTo = new URL("/auth/callback", request.url).toString();
+    const accessEmail = await admin.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: true,
+      },
+    });
+    const accessEmailSent = !accessEmail.error;
+    if (accessEmail.error) {
+      console.error("[horus] Contractor created, but access email could not be sent", accessEmail.error);
+    }
+
     const audit = await admin.from("audit_logs").insert({
       id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
-      action: "CONTRACTOR_CREATED", entity_type: "User", entity_id: id, new_value: row,
+      action: "CONTRACTOR_CREATED", entity_type: "User", entity_id: id,
+      new_value: { ...row, access_email_sent: accessEmailSent },
     });
     if (audit.error) throw audit.error;
-    return Response.json({ id }, { status: 201 });
+    return Response.json({
+      id,
+      accessEmailSent,
+      message: accessEmailSent
+        ? "Prestador cadastrado e link de acesso enviado por e-mail."
+        : "Prestador cadastrado, mas o e-mail de acesso não pôde ser enviado. Verifique o SMTP e tente o acesso pela tela de login.",
+    }, { status: 201 });
   } catch (error) { return apiFailure(error, "contractor create"); }
 }
 
@@ -60,4 +81,3 @@ export async function PATCH(request: Request) {
     return Response.json({ id: body.id, status: body.status });
   } catch (error) { return apiFailure(error, "contractor status"); }
 }
-

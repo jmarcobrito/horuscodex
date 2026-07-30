@@ -3,13 +3,14 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard] = await Promise.all([
+  const [app, views, page, actor, entries, dashboard, team] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/actor.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/time-entries/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/dashboard/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /initialDashboard/);
@@ -27,6 +28,12 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(entries, /save_time_entry/);
   assert.match(entries, /changeReason/);
   assert.match(dashboard, /requireActor/);
+  assert.match(team, /admin\.auth\.signInWithOtp/);
+  assert.match(team, /shouldCreateUser:\s*true/);
+  assert.match(team, /emailRedirectTo:\s*redirectTo/);
+  assert.match(team, /accessEmailSent/);
+  assert.match(app, /result\.message \|\| success/);
+  assert.match(app, /Cadastrar e enviar acesso/);
   assert.doesNotMatch(app, /Beatriz Lima|Caio Martins|1\.284:30/);
 });
 
