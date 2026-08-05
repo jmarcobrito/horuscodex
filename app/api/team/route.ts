@@ -155,3 +155,69 @@ export async function PATCH(request: Request) {
     return Response.json({ id: body.id, status: body.status });
   } catch (error) { return apiFailure(error, "contractor update"); }
 }
+
+export async function DELETE(request: Request) {
+  const body = await readJson(request) as Record<string, unknown> | null;
+  const id = typeof body?.id === "string" ? body.id : "";
+  const reason = cleanText(body?.reason, 2000);
+  if (!id || reason.length < 5) {
+    return Response.json({ error: "Informe o prestador e uma justificativa com pelo menos 5 caracteres." }, { status: 400 });
+  }
+
+  try {
+    const actor = await requireActor();
+    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode excluir prestadores." }, { status: 403 });
+    const admin = getSupabaseAdmin();
+    const current = await admin.from("users").select("id,auth_user_id,organization_id,name,email,role,status")
+      .eq("id", id).eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
+    if (current.error) throw current.error;
+    if (!current.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
+
+    const authUser = current.data.auth_user_id
+      ? { id: String(current.data.auth_user_id) }
+      : await findAuthUserByEmail(admin, String(current.data.email).toLowerCase());
+    const auditId = crypto.randomUUID();
+    const audit = await admin.from("audit_logs").insert({
+      id: auditId,
+      organization_id: actor.organizationId,
+      user_id: actor.id,
+      action: "CONTRACTOR_DELETED",
+      entity_type: "User",
+      entity_id: id,
+      previous_value: current.data,
+      reason,
+    });
+    if (audit.error) throw audit.error;
+
+    const deleted = await admin.from("users").delete()
+      .eq("id", id).eq("organization_id", actor.organizationId).eq("role", "PJ")
+      .select("id").maybeSingle();
+    if (deleted.error || !deleted.data) {
+      await admin.from("audit_logs").delete().eq("id", auditId);
+      if (deleted.error) throw deleted.error;
+      return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
+    }
+
+    let accessRemoved = true;
+    if (authUser?.id) {
+      const remainingLink = await admin.from("users").select("id").eq("auth_user_id", authUser.id).limit(1);
+      if (remainingLink.error) {
+        console.error("[horus] Could not verify remaining auth link", remainingLink.error);
+        accessRemoved = false;
+      } else if (!remainingLink.data?.length) {
+        const authDeletion = await admin.auth.admin.deleteUser(authUser.id);
+        if (authDeletion.error) {
+          console.error("[horus] Could not delete contractor auth user", authDeletion.error);
+          accessRemoved = false;
+        }
+      }
+    }
+
+    return Response.json({
+      id,
+      message: accessRemoved
+        ? "Prestador, acesso e histórico excluídos permanentemente."
+        : "Prestador e histórico excluídos. A conta não tem mais autorização no Horus.",
+    });
+  } catch (error) { return apiFailure(error, "contractor delete"); }
+}

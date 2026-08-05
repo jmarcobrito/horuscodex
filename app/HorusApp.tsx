@@ -10,7 +10,7 @@ import {
 type User = { name: string; email: string };
 type ModalKind = "entry" | "history" | "occurrence" | "leave" | "authorization" | "contractor" | "contractorPassword" | "policy" | null;
 type HistoryVersion = { id: string; version_number: number; previous_data: Record<string, unknown>; new_data: Record<string, unknown>; changed_by: string; change_reason: string | null; changed_at: string };
-type Confirmation = { title: string; description: string; confirmLabel: string; reasonRequired: boolean; onConfirm: (reason: string) => Promise<void> } | null;
+type Confirmation = { title: string; description: string; confirmLabel: string; reasonRequired: boolean; danger?: boolean; onConfirm: (reason: string) => Promise<void> } | null;
 
 const navItems: Array<{ id: Section; label: string; icon: string; rhOnly?: boolean }> = [
   { id: "overview", label: "Visão geral", icon: "⌂", rhOnly: true },
@@ -65,7 +65,7 @@ export function HorusApp({ user, role, organizationName, initialDashboard }: { u
   async function refreshDashboard(query = dashboardQuery) {
     setLoading(true); try { await fetchDashboard(query); } catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível atualizar os dados."); } finally { setLoading(false); }
   }
-  async function mutate(path: string, method: "POST" | "PATCH", body: unknown, success: string, closeModal = true) {
+  async function mutate(path: string, method: "POST" | "PATCH" | "DELETE", body: unknown, success: string, closeModal = true) {
     setLoading(true);
     try {
       const response = await fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -115,6 +115,9 @@ export function HorusApp({ user, role, organizationName, initialDashboard }: { u
   function changeContractorStatus(id: string, next: "ACTIVE" | "INACTIVE") {
     setConfirmation({ title: next === "INACTIVE" ? "Inativar prestador" : "Reativar prestador", description: next === "INACTIVE" ? "O prestador perderá o acesso, mas todo o histórico será preservado." : "O prestador voltará a poder acessar o Horus.", confirmLabel: next === "INACTIVE" ? "Inativar" : "Reativar", reasonRequired: true, onConfirm: async (reason) => { const ok = await mutate("/api/team", "PATCH", { id, status: next, reason }, "Situação do prestador atualizada.", false); if (ok) setConfirmation(null); } });
   }
+  function deleteContractor(id: string, name: string) {
+    setConfirmation({ title: `Excluir ${name}?`, description: "Esta ação apaga permanentemente o cadastro, o acesso, os lançamentos, os saldos e as solicitações deste prestador. Não pode ser desfeita. Para preservar o histórico, use Inativar.", confirmLabel: "Excluir permanentemente", reasonRequired: true, danger: true, onConfirm: async (reason) => { const ok = await mutate("/api/team", "DELETE", { id, reason }, "Prestador excluído permanentemente.", false); if (ok) setConfirmation(null); } });
+  }
   function timesheetAction(contractorId: string, action: "CLOSE" | "REOPEN") {
     if (!dashboard.period.year || !dashboard.period.month) { showNotice("Selecione um mês para fechar ou reabrir uma competência."); return; }
     setConfirmation({ title: action === "CLOSE" ? "Fechar competência" : "Reabrir competência", description: action === "CLOSE" ? "O fechamento gerará as movimentações FIFO e bloqueará novas edições." : "A reabertura estornará o fechamento quando não existirem movimentações posteriores.", confirmLabel: action === "CLOSE" ? "Fechar competência" : "Reabrir competência", reasonRequired: action === "REOPEN", onConfirm: async (reason) => { const ok = await mutate("/api/timesheets", "POST", { contractorId, year: dashboard.period.year, month: dashboard.period.month, action, reason }, action === "CLOSE" ? "Competência fechada e banco atualizado." : "Competência reaberta com estorno auditado.", false); if (ok) setConfirmation(null); } });
@@ -129,7 +132,7 @@ export function HorusApp({ user, role, organizationName, initialDashboard }: { u
       {section === "entries" && <EntriesView role={role} data={dashboard} onNew={openNewEntry} onEdit={openEditEntry} onHistory={openHistory} />}
       {section === "balance" && <BalanceView data={dashboard} />}
       {section === "requests" && <RequestsView data={dashboard} role={role} onNewOccurrence={() => { setOccurrenceForm({ contractorId: defaultContractorId(), type: "MEDICAL_CERTIFICATE", startDate: today, endDate: today, hours: "8", effect: "CREDITS_HOURS", description: "" }); setModal("occurrence"); }} onNewLeave={() => { setLeaveForm({ contractorId: defaultContractorId(), startDate: today, endDate: today, hours: "8", reason: "" }); setModal("leave"); }} onNewAuthorization={() => { setAuthorizationForm({ contractorId: defaultContractorId(), workDate: today, hours: "8", reason: "" }); setModal("authorization"); }} onDecision={decide} />}
-      {section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onTimesheet={timesheetAction} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "" }); setModal("contractorPassword"); }} />}
+      {section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onDelete={deleteContractor} onTimesheet={timesheetAction} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "" }); setModal("contractorPassword"); }} />}
       {section === "reports" && role === "rh" && <ReportsView data={dashboard} onPolicy={() => { setPolicyForm({ monthlyHours: minutesToHours(dashboard.policy.monthlyRequiredMinutes), minimumNotice: String(dashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(dashboard.policy.retroactiveBatchThreshold), deadlinePolicy: dashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" }); setModal("policy"); }} />}
     </div></main>
 
@@ -148,12 +151,12 @@ export function HorusApp({ user, role, organizationName, initialDashboard }: { u
 function Modal({ title, eyebrow, description, onClose, children }: { title: string; eyebrow: string; description: string; onClose: () => void; children: ReactNode }) {
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="entry-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-header"><div><span className="eyebrow">{eyebrow}</span><h2 id="modal-title">{title}</h2><p>{description}</p></div><button type="button" onClick={onClose} aria-label="Fechar">×</button></div>{children}</section></div>;
 }
-function ModalActions({ loading, onCancel, label }: { loading: boolean; onCancel: () => void; label: string }) { return <div className="modal-actions"><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={loading}>{loading ? "Processando…" : label}</button></div>; }
+function ModalActions({ loading, onCancel, label, danger = false }: { loading: boolean; onCancel: () => void; label: string; danger?: boolean }) { return <div className="modal-actions"><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button><button className={danger ? "danger-button" : "primary-button"} type="submit" disabled={loading}>{loading ? "Processando…" : label}</button></div>; }
 function ContractorSelect({ value, onChange, data, disabled = false }: { value: string; onChange: (value: string) => void; data: DashboardData; disabled?: boolean }) { return <label className="field full-field">Prestador<select value={value} onChange={(event) => onChange(event.target.value)} required disabled={disabled}><option value="">Selecione</option>{data.contractors.filter((person) => person.status === "ACTIVE" || person.id === value).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>; }
 function historyHours(data: Record<string, unknown>) { const start = String(data.start_time ?? "").slice(0, 5); const end = String(data.end_time ?? "").slice(0, 5); const total = Number(data.calculated_minutes ?? 0); return `${start} → ${end} · ${formatMinutes(total)}`; }
 
 function ConfirmationModal({ confirmation, loading, onClose }: { confirmation: Exclude<Confirmation, null>; loading: boolean; onClose: () => void }) {
   const [reason, setReason] = useState("");
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); await confirmation.onConfirm(reason); }
-  return <Modal title={confirmation.title} eyebrow="CONFIRMAÇÃO" description={confirmation.description} onClose={onClose}><form onSubmit={submit}>{confirmation.reasonRequired && <label className="field full-field">Justificativa<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={2000} required autoFocus /></label>}<ModalActions loading={loading} onCancel={onClose} label={confirmation.confirmLabel} /></form></Modal>;
+  return <Modal title={confirmation.title} eyebrow="CONFIRMAÇÃO" description={confirmation.description} onClose={onClose}><form onSubmit={submit}>{confirmation.reasonRequired && <label className="field full-field">Justificativa<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={2000} required autoFocus /></label>}<ModalActions loading={loading} onCancel={onClose} label={confirmation.confirmLabel} danger={confirmation.danger} /></form></Modal>;
 }

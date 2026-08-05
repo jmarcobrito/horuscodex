@@ -134,6 +134,11 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .team-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:17px; }
 .team-actions button { flex:1; }
 .team-actions button.approve { border-color:#6657d7; background:#6d5ddd; color:#fff; }
+.team-actions button.delete-action { border-color:#f1c2bd; background:#fff7f6; color:#b83e34; }
+.team-actions button.delete-action:hover { border-color:#d9655b; background:#fff0ee; }
+.danger-button { min-height:42px; padding:0 18px; border:1px solid #b83e34; border-radius:10px; background:#b83e34; color:#fff; font-size:11px; font-weight:800; cursor:pointer; }
+.danger-button:hover { background:#9e3028; }
+.danger-button:disabled { opacity:.55; cursor:not-allowed; }
 .competence-state { display:block; margin-top:10px; color:#9295a5; font-size:8px; text-align:center; }
 .report-card a.primary-button { width:100%; text-decoration:none; }
 .report-card a.primary-button span { margin-left:auto; }
