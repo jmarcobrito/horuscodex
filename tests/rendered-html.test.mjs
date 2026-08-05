@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard, team] = await Promise.all([
+  const [app, views, page, actor, entries, dashboard, team, signIn, google, signInScreen] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -11,6 +11,9 @@ test("ships protected Horus workflows backed by server data", async () => {
     readFile(new URL("../app/api/time-entries/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/dashboard/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/sign-in/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/google/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/SignInScreen.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /initialDashboard/);
@@ -28,12 +31,19 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(entries, /save_time_entry/);
   assert.match(entries, /changeReason/);
   assert.match(dashboard, /requireActor/);
-  assert.match(team, /admin\.auth\.signInWithOtp/);
-  assert.match(team, /shouldCreateUser:\s*true/);
-  assert.match(team, /emailRedirectTo:\s*redirectTo/);
-  assert.match(team, /accessEmailSent/);
+  assert.match(team, /admin\.auth\.admin\.createUser/);
+  assert.match(team, /admin\.auth\.admin\.updateUserById/);
+  assert.match(team, /CONTRACTOR_PASSWORD_SET/);
+  assert.doesNotMatch(team, /signInWithOtp/);
+  assert.match(signIn, /signInWithPassword/);
+  assert.doesNotMatch(signIn, /signInWithOtp/);
+  assert.match(google, /signInWithOAuth/);
+  assert.match(google, /provider:\s*"google"/);
+  assert.match(signInScreen, /Continuar com Google/);
+  assert.match(signInScreen, /type="password"/);
   assert.match(app, /result\.message \|\| success/);
-  assert.match(app, /Cadastrar e enviar acesso/);
+  assert.match(app, /Cadastrar prestador/);
+  assert.match(app, /Definir senha/);
   assert.doesNotMatch(app, /Beatriz Lima|Caio Martins|1\.284:30/);
 });
 

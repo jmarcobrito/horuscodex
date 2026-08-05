@@ -4,10 +4,12 @@ import { createSupabaseServerClient } from "../../../../db/supabase-auth";
 
 export const dynamic = "force-dynamic";
 
-const GENERIC_MESSAGE = "Se o e-mail estiver autorizado, voc\u00ea receber\u00e1 um link de acesso em instantes.";
-
 function validEmail(value: unknown): value is string {
   return typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function validPassword(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 8 && value.length <= 72;
 }
 
 export async function POST(request: Request) {
@@ -18,33 +20,31 @@ export async function POST(request: Request) {
     return Response.json({ error: "Corpo JSON inv\u00e1lido." }, { status: 400 });
   }
 
-  const email = (body as { email?: unknown } | null)?.email;
-  if (!validEmail(email)) {
-    return Response.json({ error: "Informe um e-mail v\u00e1lido." }, { status: 400 });
+  const credentials = body as { email?: unknown; password?: unknown } | null;
+  const email = credentials?.email;
+  const password = credentials?.password;
+  if (!validEmail(email) || !validPassword(password)) {
+    return Response.json({ error: "Informe um e-mail v\u00e1lido e uma senha com pelo menos 8 caracteres." }, { status: 400 });
   }
 
   try {
     const normalizedEmail = email.trim().toLowerCase();
     const allowed = await ensureBootstrapAccess(normalizedEmail);
-    if (!allowed) return Response.json({ message: GENERIC_MESSAGE });
+    if (!allowed) return Response.json({ error: "E-mail ou senha inv\u00e1lidos." }, { status: 401 });
 
     const supabase = await createSupabaseServerClient();
-    const origin = new URL(request.url).origin;
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: origin + "/auth/callback",
-        shouldCreateUser: true,
-      },
+      password,
     });
-    if (error) throw error;
+    if (error) return Response.json({ error: "E-mail ou senha inv\u00e1lidos." }, { status: 401 });
 
-    return Response.json({ message: GENERIC_MESSAGE });
+    return Response.json({ message: "Acesso autorizado.", redirectTo: "/" });
   } catch (error) {
     console.error("[horus] Could not start sign-in", error);
     if (error instanceof SupabaseConfigurationError) {
       return Response.json({ error: "Autentica\u00e7\u00e3o ainda n\u00e3o configurada no servidor." }, { status: 503 });
     }
-    return Response.json({ error: "N\u00e3o foi poss\u00edvel enviar o link de acesso." }, { status: 502 });
+    return Response.json({ error: "N\u00e3o foi poss\u00edvel entrar. Tente novamente." }, { status: 502 });
   }
 }

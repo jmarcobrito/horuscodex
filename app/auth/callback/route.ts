@@ -18,5 +18,5 @@ export async function GET(request: Request) {
     if (!error) return NextResponse.redirect(new URL(safeNext(url.searchParams.get("next")), url.origin));
   }
 
-  return NextResponse.redirect(new URL("/?auth_error=invalid_link", url.origin));
+  return NextResponse.redirect(new URL("/?auth_error=invalid_callback", url.origin));
 }

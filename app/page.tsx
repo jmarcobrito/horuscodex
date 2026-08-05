@@ -18,9 +18,9 @@ async function resolveHomeState() {
   }
 }
 
-export default async function Home() {
-  const state = await resolveHomeState();
-  if (state.kind === "signed-out") return <SignInScreen />;
+export default async function Home({ searchParams }: { searchParams: Promise<{ auth_error?: string }> }) {
+  const [state, params] = await Promise.all([resolveHomeState(), searchParams]);
+  if (state.kind === "signed-out") return <SignInScreen authError={params.auth_error} />;
   if (state.kind === "denied") return <AccessDeniedScreen />;
 
   return (
