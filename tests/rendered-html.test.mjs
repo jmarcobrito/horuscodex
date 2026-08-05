@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, signIn, google, signInScreen] = await Promise.all([
+  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -13,6 +13,7 @@ test("ships protected Horus workflows backed by server data", async () => {
     readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/AdminView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/SelectMenu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/sign-in/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/google/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/SignInScreen.tsx", import.meta.url), "utf8"),
@@ -62,6 +63,10 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(adminRoute, /USER_STATUS_CHANGED/);
   assert.match(adminView, /Visualizar como/);
   assert.match(adminView, /Este perfil não pode ser rebaixado/);
+  assert.match(selectMenu, /role="listbox"/);
+  assert.match(selectMenu, /aria-selected/);
+  assert.doesNotMatch(app, /<select/);
+  assert.doesNotMatch(adminView, /<select/);
   assert.doesNotMatch(app, /Beatriz Lima|Caio Martins|1\.284:30/);
 });
 

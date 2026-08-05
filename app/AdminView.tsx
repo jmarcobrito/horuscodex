@@ -1,4 +1,5 @@
 import type { AdminData, AdminUser } from "./admin-types";
+import { SelectMenu } from "./SelectMenu";
 
 type Props = {
   data: AdminData | null;
@@ -41,8 +42,8 @@ export function AdminView({ data, loading, onRole, onStatus, onPassword, onDelet
         return <article className={"admin-user-row " + (user.status === "INACTIVE" ? "inactive" : "")} key={user.id}>
           <div className="admin-user-avatar">{user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>
           <div className="admin-user-identity"><strong>{user.name}</strong><span>{user.email}</span></div>
-          <div className="admin-user-field"><span>Perfil</span>{protectedUser ? <strong className="locked-role">Desenvolvedor</strong> : <select value={user.role === "PJ" ? "PJ" : "RH"} onChange={(event) => onRole(user, event.target.value as "RH" | "PJ")} disabled={loading}><option value="RH">Recursos Humanos</option><option value="PJ">Prestador PJ</option></select>}</div>
-          <div className="admin-user-field"><span>Situação</span>{protectedUser ? <strong className="locked-role">Ativo</strong> : <select value={user.status} onChange={(event) => onStatus(user, event.target.value as "ACTIVE" | "INACTIVE")} disabled={loading}><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option></select>}</div>
+          <div className="admin-user-field"><span>Perfil</span>{protectedUser ? <strong className="locked-role">Desenvolvedor</strong> : <SelectMenu ariaLabel={`Perfil de ${user.name}`} value={user.role === "PJ" ? "PJ" : "RH"} onChange={(value) => onRole(user, value as "RH" | "PJ")} disabled={loading} options={[{ value: "RH", label: "Recursos Humanos", description: "Gerencia equipe e aprovações" }, { value: "PJ", label: "Prestador PJ", description: "Registra e acompanha as próprias horas" }]} />}</div>
+          <div className="admin-user-field"><span>Situação</span>{protectedUser ? <strong className="locked-role">Ativo</strong> : <SelectMenu ariaLabel={`Situação de ${user.name}`} value={user.status} onChange={(value) => onStatus(user, value as "ACTIVE" | "INACTIVE")} disabled={loading} options={[{ value: "ACTIVE", label: "Ativo", description: "Acesso liberado ao Horus" }, { value: "INACTIVE", label: "Inativo", description: "Acesso bloqueado, histórico preservado" }]} />}</div>
           <div className="admin-user-actions">
             {user.role === "PJ" && <button className="view-as-action" onClick={() => onViewAs(user)} disabled={loading}>Visualizar como</button>}
             {!protectedUser && <button onClick={() => onPassword(user)} disabled={loading}>Definir senha</button>}
