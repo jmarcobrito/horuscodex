@@ -3,7 +3,7 @@ import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "./supabase";
 import { createSupabaseServerClient } from "./supabase-auth";
 
-export type HorusRole = "RH" | "PJ" | "ADMIN";
+export type HorusRole = "RH" | "PJ" | "ADMIN" | "DEV";
 
 export type HorusActor = {
   id: string;
@@ -53,6 +53,15 @@ function bootstrapEmails(): Set<string> {
   );
 }
 
+function bootstrapDevEmails(): Set<string> {
+  return new Set(
+    (process.env.HORUS_BOOTSTRAP_DEV_EMAILS ?? "britojoaomarco@gmail.com")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 function safeId(value: string) {
   return value
     .normalize("NFD")
@@ -66,6 +75,10 @@ export function isBootstrapRhEmail(email: string): boolean {
   return bootstrapEmails().has(email.trim().toLowerCase());
 }
 
+export function isBootstrapDevEmail(email: string): boolean {
+  return bootstrapDevEmails().has(email.trim().toLowerCase());
+}
+
 export async function ensureBootstrapAccess(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const admin = getSupabaseAdmin();
@@ -77,7 +90,7 @@ export async function ensureBootstrapAccess(email: string) {
 
   if (existingError) throw existingError;
   if (existing) return existing.status === "ACTIVE";
-  if (!isBootstrapRhEmail(normalizedEmail)) return false;
+  if (!isBootstrapRhEmail(normalizedEmail) && !isBootstrapDevEmail(normalizedEmail)) return false;
 
   const organizationId = process.env.HORUS_BOOTSTRAP_ORGANIZATION_ID?.trim() || "org_horuscodex";
   const organizationName = process.env.HORUS_BOOTSTRAP_ORGANIZATION_NAME?.trim() || "Horus Codex";
@@ -105,12 +118,35 @@ export async function ensureBootstrapAccess(email: string) {
     organization_id: organizationId,
     name: displayName,
     email: normalizedEmail,
-    role: "RH",
+    role: isBootstrapDevEmail(normalizedEmail) ? "DEV" : "RH",
     status: "ACTIVE",
   });
   if (userError) throw userError;
 
   return true;
+}
+
+export async function resolveViewActor(actor: HorusActor, viewAsId?: string): Promise<HorusActor> {
+  if (!viewAsId) return actor;
+  if (actor.role !== "DEV") throw new AuthorizationError("Apenas o perfil DEV pode simular a visão de outro usuário.");
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("users")
+    .select("id,name,email,role,status")
+    .eq("id", viewAsId)
+    .eq("organization_id", actor.organizationId)
+    .eq("role", "PJ")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AuthorizationError("Prestador não encontrado para visualização.");
+
+  return {
+    ...actor,
+    id: String(data.id),
+    name: String(data.name),
+    email: String(data.email),
+    role: "PJ",
+  };
 }
 
 async function findActorRow(authUser: SupabaseAuthUser): Promise<HorusUserRow> {

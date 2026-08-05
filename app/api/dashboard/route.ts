@@ -1,4 +1,4 @@
-import { actorErrorResponse, requireActor } from "../../../db/actor";
+import { actorErrorResponse, requireActor, resolveViewActor } from "../../../db/actor";
 import { getDashboardData } from "../../../db/dashboard";
 import { SupabaseConfigurationError } from "../../../db/supabase";
 
@@ -12,8 +12,9 @@ function numberParameter(value: string | null) {
 
 export async function GET(request: Request) {
   try {
-    const actor = await requireActor();
+    const authenticatedActor = await requireActor();
     const url = new URL(request.url);
+    const actor = await resolveViewActor(authenticatedActor, url.searchParams.get("viewAs") ?? undefined);
     const data = await getDashboardData(actor, {
       year: numberParameter(url.searchParams.get("year")),
       month: numberParameter(url.searchParams.get("month")),

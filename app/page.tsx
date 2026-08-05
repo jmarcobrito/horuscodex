@@ -26,7 +26,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
   return (
     <HorusApp
       user={{ name: state.actor.name, email: state.actor.email }}
-      role={state.actor.role === "PJ" ? "pj" : "rh"}
+      accountRole={state.actor.role === "DEV" ? "dev" : state.actor.role === "PJ" ? "pj" : "rh"}
       organizationName={state.actor.organizationName}
       initialDashboard={state.initialDashboard}
     />

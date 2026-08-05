@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard, team, signIn, google, signInScreen] = await Promise.all([
+  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, signIn, google, signInScreen] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -11,6 +11,8 @@ test("ships protected Horus workflows backed by server data", async () => {
     readFile(new URL("../app/api/time-entries/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/dashboard/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/AdminView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/sign-in/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/google/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/SignInScreen.tsx", import.meta.url), "utf8"),
@@ -31,6 +33,7 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(entries, /save_time_entry/);
   assert.match(entries, /changeReason/);
   assert.match(dashboard, /requireActor/);
+  assert.match(dashboard, /resolveViewActor/);
   assert.match(team, /admin\.auth\.admin\.createUser/);
   assert.match(team, /admin\.auth\.admin\.updateUserById/);
   assert.match(team, /CONTRACTOR_PASSWORD_SET/);
@@ -49,16 +52,27 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(app, /Excluir permanentemente/);
   assert.match(views, /onDelete/);
   assert.match(views, />Excluir</);
+  assert.match(actor, /"DEV"/);
+  assert.match(actor, /resolveViewActor/);
+  assert.match(app, /MODO DEV/);
+  assert.match(app, /somente leitura/);
+  assert.match(app, /Administração/);
+  assert.match(adminRoute, /actor\.role !== "DEV"/);
+  assert.match(adminRoute, /USER_ROLE_CHANGED/);
+  assert.match(adminRoute, /USER_STATUS_CHANGED/);
+  assert.match(adminView, /Visualizar como/);
+  assert.match(adminView, /Este perfil não pode ser rebaixado/);
   assert.doesNotMatch(app, /Beatriz Lima|Caio Martins|1\.284:30/);
 });
 
 test("ships metadata and all database migrations", async () => {
-  const [layout, hosting, initialMigration, authMigration, workflowsMigration] = await Promise.all([
+  const [layout, hosting, initialMigration, authMigration, workflowsMigration, devMigration] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20260716120000_initial_horus_schema.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20260717120000_auth_identity.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20260717180000_operational_workflows.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260805130000_dev_administration.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /Horus — Controle de horas técnicas/);
@@ -71,6 +85,8 @@ test("ships metadata and all database migrations", async () => {
   assert.match(workflowsMigration, /create table if not exists public\.occurrences/i);
   assert.match(workflowsMigration, /create or replace function public\.close_timesheet/i);
   assert.match(workflowsMigration, /create or replace function public\.decide_leave_request/i);
+  assert.match(devMigration, /'DEV'/);
+  assert.match(devMigration, /britojoaomarco@gmail\.com/i);
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });
