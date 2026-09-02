@@ -10,7 +10,7 @@
     "build": "vinext build",
     "build:vercel": "next build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/time-rules.test.mjs tests/workflow-rules.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "history:baseline": "node scripts/print-history-baseline.mjs",
     "test:safety": "node --test tests/history-safety-contract.test.mjs",
     "lint": "eslint app db tests worker proxy.ts --ignore-pattern .next --ignore-pattern .vinext",

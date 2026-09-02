@@ -1,7 +1,7 @@
 # Horus — Controle de Horas Técnicas
 
-Aplicação de controle de horas, banco de horas e solicitações para prestadores
-PJ e equipes de RH. O frontend roda com vinext/OpenAI Sites e os dados
+Aplicação de controle de horas, banco de horas e solicitações para colaboradores
+e equipes de RH. O frontend roda com vinext/OpenAI Sites e os dados
 persistentes ficam em um projeto Supabase PostgreSQL.
 
 ## Requisitos
@@ -34,6 +34,17 @@ nunca faça commit do valor real.
 - o backend acessa o banco com a chave `service_role`, armazenada como segredo
   no ambiente de produção;
 - o acesso de cada usuário continua vinculado à identidade fornecida pelo Sites.
+
+## Fechamento mensal seguro
+
+O espaço **Fechamento do mês** inicia em modo somente conferência. A ação real
+permanece bloqueada por padrão por `HORUS_MONTH_CLOSING_WRITE_ENABLED` e não deve
+ser ativada antes da aprovação do backend transacional.
+
+O Horus não oferece exclusão permanente de colaboradores. A inativação preserva
+cadastros, lançamentos, versões, folhas mensais e auditorias. A consulta de
+baseline e a sequência segura das próximas etapas estão no
+[`docs/runbooks/safe-workflow-foundation.md`](docs/runbooks/safe-workflow-foundation.md).
 
 ## Workspace Auth Headers
 
@@ -97,7 +108,9 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm test`: compila o Horus e executa todos os testes locais
+- `npm run test:safety`: verifica o contrato de preservação do histórico
+- `npm run history:baseline`: imprime a consulta somente leitura para comparar o histórico
 - `npm run db:push`: apply pending migrations to the linked Supabase project
 - `npm run db:types`: regenerate TypeScript database types from Supabase
 
