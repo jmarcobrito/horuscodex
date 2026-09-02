@@ -51,7 +51,6 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(actor, /"DEV"/);
   assert.match(actor, /resolveViewActor/);
   assert.match(app, /MODO DEV/);
-  assert.match(app, /somente leitura/);
   assert.match(app, /Administração/);
   assert.match(adminRoute, /actor\.role !== "DEV"/);
   assert.match(adminRoute, /USER_ROLE_CHANGED/);
