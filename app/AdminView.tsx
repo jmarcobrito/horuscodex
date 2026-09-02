@@ -7,12 +7,11 @@ type Props = {
   onRole: (user: AdminUser, role: "RH" | "PJ") => void;
   onStatus: (user: AdminUser, status: "ACTIVE" | "INACTIVE") => void;
   onPassword: (user: AdminUser) => void;
-  onDelete: (user: AdminUser) => void;
   onViewAs: (user: AdminUser) => void;
 };
 
 function roleLabel(role: AdminUser["role"]) {
-  if (role === "PJ") return "Prestador PJ";
+  if (role === "PJ") return "Colaborador";
   if (role === "DEV") return "Desenvolvedor";
   if (role === "ADMIN") return "Administrador";
   return "Recursos Humanos";
@@ -27,13 +26,13 @@ function actionLabel(action: string) {
   } as Record<string, string>)[action] ?? action.replaceAll("_", " ").toLowerCase();
 }
 
-export function AdminView({ data, loading, onRole, onStatus, onPassword, onDelete, onViewAs }: Props) {
+export function AdminView({ data, loading, onRole, onStatus, onPassword, onViewAs }: Props) {
   return <>
     <section className="page-heading admin-heading"><div><span className="eyebrow">ACESSO EXCLUSIVO DEV</span><h1>Administração</h1><p>Gerencie perfil e acesso sem misturar a função da pessoa com a situação do cadastro.</p></div><span className="dev-protection-badge">DEV PROTEGIDO</span></section>
     <section className="admin-summary">
       <article><span>Usuários</span><strong>{data?.users.length ?? "—"}</strong></article>
       <article><span>RH ativos</span><strong>{data?.users.filter((user) => user.role === "RH" && user.status === "ACTIVE").length ?? "—"}</strong></article>
-      <article><span>PJs ativos</span><strong>{data?.users.filter((user) => user.role === "PJ" && user.status === "ACTIVE").length ?? "—"}</strong></article>
+      <article><span>Colaboradores ativos</span><strong>{data?.users.filter((user) => user.role === "PJ" && user.status === "ACTIVE").length ?? "—"}</strong></article>
     </section>
     <section className="panel admin-users-panel">
       <div className="panel-heading static"><div><span>CONTROLE DE ACESSO</span><h2>Usuários da organização</h2></div></div>
@@ -42,12 +41,11 @@ export function AdminView({ data, loading, onRole, onStatus, onPassword, onDelet
         return <article className={"admin-user-row " + (user.status === "INACTIVE" ? "inactive" : "")} key={user.id}>
           <div className="admin-user-avatar">{user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</div>
           <div className="admin-user-identity"><strong>{user.name}</strong><span>{user.email}</span></div>
-          <div className="admin-user-field"><span>Perfil</span>{protectedUser ? <strong className="locked-role">Desenvolvedor</strong> : <SelectMenu ariaLabel={`Perfil de ${user.name}`} value={user.role === "PJ" ? "PJ" : "RH"} onChange={(value) => onRole(user, value as "RH" | "PJ")} disabled={loading} options={[{ value: "RH", label: "Recursos Humanos", description: "Gerencia equipe e aprovações" }, { value: "PJ", label: "Prestador PJ", description: "Registra e acompanha as próprias horas" }]} />}</div>
+          <div className="admin-user-field"><span>Perfil</span>{protectedUser ? <strong className="locked-role">Desenvolvedor</strong> : <SelectMenu ariaLabel={`Perfil de ${user.name}`} value={user.role === "PJ" ? "PJ" : "RH"} onChange={(value) => onRole(user, value as "RH" | "PJ")} disabled={loading} options={[{ value: "RH", label: "Recursos Humanos", description: "Gerencia pessoas e aprovações" }, { value: "PJ", label: "Colaborador", description: "Registra e acompanha as próprias horas" }]} />}</div>
           <div className="admin-user-field"><span>Situação</span>{protectedUser ? <strong className="locked-role">Ativo</strong> : <SelectMenu ariaLabel={`Situação de ${user.name}`} value={user.status} onChange={(value) => onStatus(user, value as "ACTIVE" | "INACTIVE")} disabled={loading} options={[{ value: "ACTIVE", label: "Ativo", description: "Acesso liberado ao Horus" }, { value: "INACTIVE", label: "Inativo", description: "Acesso bloqueado, histórico preservado" }]} />}</div>
           <div className="admin-user-actions">
             {user.role === "PJ" && <button className="view-as-action" onClick={() => onViewAs(user)} disabled={loading}>Visualizar como</button>}
             {!protectedUser && <button onClick={() => onPassword(user)} disabled={loading}>Definir senha</button>}
-            {!protectedUser && user.role === "PJ" && <button className="delete-action" onClick={() => onDelete(user)} disabled={loading}>Excluir</button>}
           </div>
           <small className="admin-user-note">{protectedUser ? "Este perfil não pode ser rebaixado, inativado ou excluído." : `${roleLabel(user.role)} · ${user.hasAccess ? "conta vinculada" : "conta ainda não vinculada"}`}</small>
         </article>;

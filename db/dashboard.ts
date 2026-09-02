@@ -3,6 +3,7 @@ import type {
   DashboardContractor, DashboardData, DashboardEntry, DashboardOccurrence, DashboardRequest,
 } from "../app/dashboard-types";
 import type { HorusActor } from "./actor";
+import { buildPeriodSummary } from "./dashboard-summary";
 import { getSupabaseAdmin } from "./supabase";
 
 type PeriodInput = { year?: number; month?: number; from?: string; to?: string };
@@ -66,7 +67,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   ]);
   for (const result of results) if (result.error) throw result.error;
   const [usersResult, entriesResult, timesheetsResult, lotsResult, transactionsResult, requestsResult, occurrencesResult, authorizationsResult, auditsResult, policyResult, actorUsersResult] = results;
-  const users = (usersResult.data ?? []) as UserRow[]; const activeUsers = users.filter((user) => user.status === "ACTIVE");
+  const users = (usersResult.data ?? []) as UserRow[];
   const entries = (entriesResult.data ?? []) as EntryRow[]; const keys = monthKeys(period.from, period.to);
   const timesheets = ((timesheetsResult.data ?? []) as TimesheetRow[]).filter((row) => keys.has(`${row.year}-${row.month}`));
   const lots = ((lotsResult.data ?? []) as LotRow[]).filter((lot) => !["CONSUMED", "CANCELLED", "SETTLED"].includes(lot.status) && lot.remaining_minutes > 0);
@@ -89,13 +90,18 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const dashboardOccurrences: DashboardOccurrence[] = occurrences.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, type: row.type, startDate: row.start_date, endDate: row.end_date, minutes: row.minutes, calculationEffect: row.calculation_effect, status: row.status, description: row.description, createdAt: row.created_at, decisionNotes: row.decision_notes ?? "" }));
   const dashboardAuthorizations: DashboardAuthorization[] = authorizations.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, workDate: row.work_date, estimatedMinutes: row.estimated_minutes, approvedMinutes: row.approved_minutes, reason: row.reason, status: row.status, requestedAt: row.requested_at, decisionNotes: row.decision_notes ?? "" }));
   const dashboardAudits: DashboardAudit[] = audits.map((row) => ({ id: row.id, userName: names.get(row.user_id) ?? (row.user_id === actor.id ? actor.name : "Usuário"), action: row.action, entityType: row.entity_type, entityId: row.entity_id, reason: row.reason ?? "", createdAt: row.created_at }));
-  const activeIds = new Set(activeUsers.map((user) => user.id)); const activeEntries = entries.filter((entry) => activeIds.has(entry.contractor_id)); const activeTimesheets = timesheets.filter((row) => activeIds.has(row.contractor_id));
-  const workedMinutes = sum(activeEntries, (entry) => entry.calculated_minutes); const creditedMinutes = sum(activeTimesheets, (row) => row.credited_minutes); const consideredMinutes = sum(activeEntries, (entry) => entry.eligible_minutes) + creditedMinutes;
-  const requiredMinutes = activeTimesheets.length ? sum(activeTimesheets, (row) => row.required_minutes) : requiredPerMonth * activeUsers.length * keys.size; const statuses = new Set(activeTimesheets.map((row) => row.status));
+  const summary = buildPeriodSummary({
+    users: users.map((user) => ({ id: user.id, status: user.status })),
+    entries: entries.map((entry) => ({ contractorId: entry.contractor_id, calculatedMinutes: entry.calculated_minutes, eligibleMinutes: entry.eligible_minutes })),
+    timesheets: timesheets.map((row) => ({ contractorId: row.contractor_id, requiredMinutes: row.required_minutes, creditedMinutes: row.credited_minutes })),
+    requiredPerMonth,
+    monthCount: keys.size,
+  });
+  const statuses = new Set(timesheets.map((row) => row.status));
   return {
     period,
-    metrics: { activeContractors: activeUsers.length, workedMinutes, requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED").length },
-    timesheet: { workedMinutes, creditedMinutes, consideredMinutes, requiredMinutes, projectedBalanceMinutes: consideredMinutes - requiredMinutes, status: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" },
+    metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED").length },
+    timesheet: { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" },
     policy: { monthlyRequiredMinutes: requiredPerMonth, positiveBalanceAfterDeadlinePolicy: policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE", minimumLeaveNoticeDays: policyRow?.minimum_leave_notice_days ?? null, retroactiveBatchThreshold: policyRow?.retroactive_batch_threshold ?? 3 },
     contractors, entries: dashboardEntries, balanceLots, balanceTransactions, requests: dashboardRequests,
     occurrences: dashboardOccurrences, authorizations: dashboardAuthorizations, audits: dashboardAudits,

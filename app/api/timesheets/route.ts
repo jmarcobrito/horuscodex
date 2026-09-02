@@ -1,10 +1,17 @@
 import { requireActor } from "../../../db/actor";
+import { monthClosingWriteEnabled } from "../../../db/feature-flags";
 import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
+  if (!monthClosingWriteEnabled()) {
+    return Response.json({ error: "O fechamento está temporariamente disponível somente para conferência." }, { status: 503 });
+  }
   const body = await readJson(request) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
   const year = Number(body?.year); const month = Number(body?.month);
@@ -20,7 +27,7 @@ export async function POST(request: Request) {
     const contractor = await admin.from("users").select("id").eq("id", body.contractorId)
       .eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
     if (contractor.error) throw contractor.error;
-    if (!contractor.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
+    if (!contractor.data) return Response.json({ error: "Colaborador não encontrado." }, { status: 404 });
     if (action === "CLOSE") {
       const result = await admin.rpc("close_timesheet", {
         p_organization_id: actor.organizationId, p_actor_id: actor.id, p_timesheet_id: timesheetId,

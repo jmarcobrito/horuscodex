@@ -1,4 +1,5 @@
 import { ensureBootstrapAccess } from "../../../../db/actor";
+import { sameOriginFailure } from "../../../../db/request-security";
 import { SupabaseConfigurationError } from "../../../../db/supabase";
 import { createSupabaseServerClient } from "../../../../db/supabase-auth";
 
@@ -13,6 +14,8 @@ function validPassword(value: unknown): value is string {
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   let body: unknown;
   try {
     body = await request.json();

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         .select("contractor_id,type,original_minutes,remaining_minutes,reserved_minutes,origin_date,deadline_date,status,users!hour_balance_lots_contractor_id_fkey(name,email)")
         .eq("organization_id", actor.organizationId).gte("origin_date", from).lte("origin_date", to).order("origin_date");
       if (result.error) throw result.error;
-      rows = [["Prestador", "E-mail", "Tipo", "Original (min)", "Restante (min)", "Reservado (min)", "Origem", "Prazo", "Situação"],
+      rows = [["Colaborador", "E-mail", "Tipo", "Original (min)", "Restante (min)", "Reservado (min)", "Origem", "Prazo", "Situação"],
         ...(result.data ?? []).map((row: Record<string, unknown>) => { const user = row.users as { name?: string; email?: string } | null; return [user?.name, user?.email, row.type, row.original_minutes, row.remaining_minutes, row.reserved_minutes, row.origin_date, row.deadline_date, row.status]; })];
     } else if (type === "audit") {
       const result = await admin.from("audit_logs").select("created_at,action,entity_type,entity_id,reason,users!audit_logs_user_id_fkey(name,email)")
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
         .select("work_date,start_time,end_time,break_minutes,calculated_minutes,eligible_minutes,non_business_day_status,notes,created_at,updated_at,users!time_entries_contractor_id_fkey(name,email)")
         .eq("organization_id", actor.organizationId).gte("work_date", from).lte("work_date", to).order("work_date");
       if (result.error) throw result.error;
-      rows = [["Data trabalhada", "Prestador", "E-mail", "Entrada", "Saída", "Intervalo (min)", "Trabalhadas (min)", "Consideradas (min)", "Dia não útil", "Observação", "Criado em", "Atualizado em"],
+      rows = [["Data trabalhada", "Colaborador", "E-mail", "Entrada", "Saída", "Intervalo (min)", "Trabalhadas (min)", "Consideradas (min)", "Dia não útil", "Observação", "Criado em", "Atualizado em"],
         ...(result.data ?? []).map((row: Record<string, unknown>) => { const user = row.users as { name?: string; email?: string } | null; return [row.work_date, user?.name, user?.email, row.start_time, row.end_time, row.break_minutes, row.calculated_minutes, row.eligible_minutes, row.non_business_day_status, row.notes, row.created_at, row.updated_at]; })];
     }
     const filename = `horus-${type}-${from}-${to}.csv`;

@@ -1,5 +1,6 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ async function findAuthUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, e
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   const name = cleanText(body?.name, 200);
   const email = cleanText(body?.email, 320).toLowerCase();
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode cadastrar prestadores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode cadastrar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
     const existing = await admin.from("users").select("id").eq("email", email).maybeSingle();
     if (existing.error) throw existing.error;
@@ -76,20 +79,22 @@ export async function POST(request: Request) {
     if (audit.error) throw audit.error;
     return Response.json({
       id,
-      message: "Prestador cadastrado. Compartilhe a senha inicial por um canal seguro.",
+      message: "Colaborador cadastrado. Compartilhe a senha inicial por um canal seguro.",
     }, { status: 201 });
   } catch (error) { return apiFailure(error, "contractor create"); }
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   if (!body || typeof body.id !== "string") {
-    return Response.json({ error: "Dados do prestador inválidos." }, { status: 400 });
+    return Response.json({ error: "Dados do colaborador inválidos." }, { status: 400 });
   }
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode alterar prestadores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode alterar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
 
     if (body.action === "SET_PASSWORD") {
@@ -99,7 +104,7 @@ export async function PATCH(request: Request) {
       const current = await admin.from("users").select("id,auth_user_id,organization_id,name,email,role,status")
         .eq("id", body.id).eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
       if (current.error) throw current.error;
-      if (!current.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
+      if (!current.data) return Response.json({ error: "Colaborador não encontrado." }, { status: 404 });
 
       let authUserId = current.data.auth_user_id as string | null;
       if (!authUserId) {
@@ -133,16 +138,16 @@ export async function PATCH(request: Request) {
         new_value: { access_method: "PASSWORD_OR_GOOGLE" },
       });
       if (audit.error) throw audit.error;
-      return Response.json({ id: body.id, message: "Senha do prestador atualizada." });
+      return Response.json({ id: body.id, message: "Senha do colaborador atualizada." });
     }
 
     if (!["ACTIVE", "INACTIVE"].includes(String(body.status))) {
-      return Response.json({ error: "Situação do prestador inválida." }, { status: 400 });
+      return Response.json({ error: "Situação do colaborador inválida." }, { status: 400 });
     }
     const current = await admin.from("users").select("*").eq("id", body.id)
       .eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
     if (current.error) throw current.error;
-    if (!current.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
+    if (!current.data) return Response.json({ error: "Colaborador não encontrado." }, { status: 404 });
     const update = { status: String(body.status), updated_at: new Date().toISOString() };
     const result = await admin.from("users").update(update).eq("id", body.id);
     if (result.error) throw result.error;
@@ -156,68 +161,3 @@ export async function PATCH(request: Request) {
   } catch (error) { return apiFailure(error, "contractor update"); }
 }
 
-export async function DELETE(request: Request) {
-  const body = await readJson(request) as Record<string, unknown> | null;
-  const id = typeof body?.id === "string" ? body.id : "";
-  const reason = cleanText(body?.reason, 2000);
-  if (!id || reason.length < 5) {
-    return Response.json({ error: "Informe o prestador e uma justificativa com pelo menos 5 caracteres." }, { status: 400 });
-  }
-
-  try {
-    const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode excluir prestadores." }, { status: 403 });
-    const admin = getSupabaseAdmin();
-    const current = await admin.from("users").select("id,auth_user_id,organization_id,name,email,role,status")
-      .eq("id", id).eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
-    if (current.error) throw current.error;
-    if (!current.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
-
-    const authUser = current.data.auth_user_id
-      ? { id: String(current.data.auth_user_id) }
-      : await findAuthUserByEmail(admin, String(current.data.email).toLowerCase());
-    const auditId = crypto.randomUUID();
-    const audit = await admin.from("audit_logs").insert({
-      id: auditId,
-      organization_id: actor.organizationId,
-      user_id: actor.id,
-      action: "CONTRACTOR_DELETED",
-      entity_type: "User",
-      entity_id: id,
-      previous_value: current.data,
-      reason,
-    });
-    if (audit.error) throw audit.error;
-
-    const deleted = await admin.from("users").delete()
-      .eq("id", id).eq("organization_id", actor.organizationId).eq("role", "PJ")
-      .select("id").maybeSingle();
-    if (deleted.error || !deleted.data) {
-      await admin.from("audit_logs").delete().eq("id", auditId);
-      if (deleted.error) throw deleted.error;
-      return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
-    }
-
-    let accessRemoved = true;
-    if (authUser?.id) {
-      const remainingLink = await admin.from("users").select("id").eq("auth_user_id", authUser.id).limit(1);
-      if (remainingLink.error) {
-        console.error("[horus] Could not verify remaining auth link", remainingLink.error);
-        accessRemoved = false;
-      } else if (!remainingLink.data?.length) {
-        const authDeletion = await admin.auth.admin.deleteUser(authUser.id);
-        if (authDeletion.error) {
-          console.error("[horus] Could not delete contractor auth user", authDeletion.error);
-          accessRemoved = false;
-        }
-      }
-    }
-
-    return Response.json({
-      id,
-      message: accessRemoved
-        ? "Prestador, acesso e histórico excluídos permanentemente."
-        : "Prestador e histórico excluídos. A conta não tem mais autorização no Horus.",
-    });
-  } catch (error) { return apiFailure(error, "contractor delete"); }
-}

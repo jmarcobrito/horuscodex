@@ -1,5 +1,6 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 import { calculateWorkedMinutes } from "../../../db/time-rules";
 
@@ -57,6 +58,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const payload = await readJson(request);
 
   if (!validPayload(payload)) {
@@ -70,7 +73,7 @@ export async function POST(request: Request) {
   try {
     const actor = await requireActor();
     const contractorId = actor.role === "PJ" ? actor.id : cleanText(payload.contractorId, 200);
-    if (!contractorId) return Response.json({ error: "Selecione o prestador." }, { status: 400 });
+    if (!contractorId) return Response.json({ error: "Selecione o colaborador." }, { status: 400 });
     const changeReason = cleanText(payload.changeReason);
     if (actor.role !== "PJ" && changeReason.length < 5) {
       return Response.json({ error: "O RH deve informar a justificativa da correção." }, { status: 400 });

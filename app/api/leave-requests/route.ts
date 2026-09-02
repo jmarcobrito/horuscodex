@@ -1,10 +1,13 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   if (!body || !validIsoDate(body.startDate) || !validIsoDate(body.endDate)
       || String(body.startDate) > String(body.endDate) || !Number.isInteger(body.requestedMinutes)
@@ -14,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const actor = await requireActor();
     const contractorId = actor.role === "PJ" ? actor.id : cleanText(body.contractorId, 200);
-    if (!contractorId) return Response.json({ error: "Selecione o prestador." }, { status: 400 });
+    if (!contractorId) return Response.json({ error: "Selecione o colaborador." }, { status: 400 });
     const admin = getSupabaseAdmin();
     const { data: policy, error: policyError } = await admin.from("organization_policies")
       .select("minimum_leave_notice_days").eq("organization_id", actor.organizationId).maybeSingle();
@@ -42,6 +45,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
   if (!body || typeof body.id !== "string" || !["APPROVE", "REJECT", "CANCEL", "UTILIZE"].includes(action)) {

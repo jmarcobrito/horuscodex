@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const ogImage = `${protocol}://${host}/og.png`;
   return {
     title: "Horus — Controle de horas técnicas",
-    description: "Controle de horas, competências, solicitações e banco de horas para equipes PJ.",
+    description: "Controle de horas, fechamento mensal, solicitações e banco de horas para colaboradores.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: { title: "Horus — Horas técnicas sob controle", description: "Acompanhe lançamentos, saldos e prazos em um único extrato confiável.", images: [{ url: ogImage, width: 1728, height: 912, alt: "Horus — horas técnicas sob controle" }] },
     twitter: { card: "summary_large_image", title: "Horus — Horas técnicas sob controle", description: "Lançamentos, saldos e prazos em um único extrato confiável.", images: [ogImage] },
