@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
       const result = await admin.from("users").update(update).eq("id", target.id).eq("organization_id", actor.organizationId);
       if (result.error) throw result.error;
       await writeAudit(actor, "USER_ROLE_CHANGED", target, reason, target, { ...target, ...update });
-      return Response.json({ message: `${target.name} agora possui o perfil ${role === "RH" ? "RH" : "Prestador PJ"}.` });
+      return Response.json({ message: `${target.name} agora possui o perfil ${role === "RH" ? "RH" : "Colaborador"}.` });
     }
     if (action === "SET_STATUS") {
       const status = body.status === "ACTIVE" ? "ACTIVE" : body.status === "INACTIVE" ? "INACTIVE" : null;

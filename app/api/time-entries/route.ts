@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   try {
     const actor = await requireActor();
     const contractorId = actor.role === "PJ" ? actor.id : cleanText(payload.contractorId, 200);
-    if (!contractorId) return Response.json({ error: "Selecione o prestador." }, { status: 400 });
+    if (!contractorId) return Response.json({ error: "Selecione o colaborador." }, { status: 400 });
     const changeReason = cleanText(payload.changeReason);
     if (actor.role !== "PJ" && changeReason.length < 5) {
       return Response.json({ error: "O RH deve informar a justificativa da correção." }, { status: 400 });

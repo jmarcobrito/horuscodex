@@ -46,7 +46,8 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(signInScreen, /Continuar com Google/);
   assert.match(signInScreen, /type="password"/);
   assert.match(app, /result\.message \|\| success/);
-  assert.match(app, /Cadastrar prestador/);
+  assert.match(app, /Cadastrar colaborador/);
+  assert.doesNotMatch(app, /prestador/i);
   assert.match(app, /Definir senha/);
   assert.match(actor, /"DEV"/);
   assert.match(actor, /resolveViewActor/);
