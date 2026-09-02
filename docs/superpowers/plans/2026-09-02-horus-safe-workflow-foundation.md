@@ -28,25 +28,24 @@
 ### Task 1: Baseline imutável do histórico
 
 **Files:**
-- Create: `supabase/tests/history_baseline_read_only.sql`
+- Create: `db/history-baseline.ts`
+- Create: `scripts/print-history-baseline.mjs`
 - Create: `tests/history-safety-contract.test.mjs`
 - Modify: `package.json`
 
 **Interfaces:**
 - Consumes: tabelas legadas `time_entries`, `time_entry_versions`, `monthly_timesheets` e `audit_logs`.
-- Produces: consulta somente de leitura que retorna `dataset`, `row_count`, `metric_a`, `metric_b` e `signature`; script `npm run test:safety`.
+- Produces: `historyBaselineSql(): string`, comando `npm run history:baseline` e teste `npm run test:safety`.
 
 - [ ] **Step 1: Write the failing safety-contract test**
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const sqlUrl = new URL("../supabase/tests/history_baseline_read_only.sql", import.meta.url);
+import { historyBaselineSql } from "../db/history-baseline.ts";
 
 test("history baseline is read-only and covers every protected dataset", async () => {
-  const sql = await readFile(sqlUrl, "utf8");
+  const sql = historyBaselineSql();
   assert.match(sql, /begin transaction read only/i);
   for (const table of ["time_entries", "time_entry_versions", "monthly_timesheets", "audit_logs"]) {
     assert.match(sql, new RegExp(`public\\.${table}`, "i"));
@@ -60,12 +59,13 @@ test("history baseline is read-only and covers every protected dataset", async (
 
 Run: `node --test tests/history-safety-contract.test.mjs`
 
-Expected: FAIL with `ENOENT` for `history_baseline_read_only.sql`.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `db/history-baseline.ts`.
 
 - [ ] **Step 3: Add the read-only baseline query**
 
-```sql
-begin transaction read only;
+```ts
+export function historyBaselineSql() {
+  return `begin transaction read only;
 
 select 'time_entries'::text as dataset,
        count(*)::bigint as row_count,
@@ -88,7 +88,15 @@ select 'audit_logs', count(*), 0, 0,
 from public.audit_logs as t
 order by dataset;
 
-rollback;
+rollback;`;
+}
+```
+
+Create the executable printer:
+
+```js
+import { historyBaselineSql } from "../db/history-baseline.ts";
+process.stdout.write(historyBaselineSql() + "\n");
 ```
 
 - [ ] **Step 4: Expose the safety test without changing the existing test command**
@@ -96,6 +104,7 @@ rollback;
 Add to `package.json`:
 
 ```json
+"history:baseline": "node scripts/print-history-baseline.mjs",
 "test:safety": "node --test tests/history-safety-contract.test.mjs"
 ```
 
@@ -105,6 +114,10 @@ Run: `npm run test:safety`
 
 Expected: PASS.
 
+Run: `npm run history:baseline`
+
+Expected: prints one read-only transaction covering the four protected datasets and exits with code 0.
+
 Run: `npm test`
 
 Expected: build and every Node test PASS.
@@ -112,7 +125,7 @@ Expected: build and every Node test PASS.
 - [ ] **Step 6: Commit the baseline contract**
 
 ```bash
-git add package.json supabase/tests/history_baseline_read_only.sql tests/history-safety-contract.test.mjs
+git add package.json db/history-baseline.ts scripts/print-history-baseline.mjs tests/history-safety-contract.test.mjs
 git commit -m "test: protect Horus history baseline"
 ```
 
@@ -126,6 +139,7 @@ git commit -m "test: protect Horus history baseline"
 - Modify: `app/AdminView.tsx`
 - Modify: `app/globals.css`
 - Create: `tests/people-history-protection.test.mjs`
+- Create: `tests/fixtures/dashboard.mjs`
 
 **Interfaces:**
 - Consumes: existing `PATCH /api/team` and `PATCH /api/admin/users` status changes.
@@ -135,24 +149,49 @@ git commit -m "test: protect Horus history baseline"
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import * as teamRoute from "../app/api/team/route.ts";
+import * as adminRoute from "../app/api/admin/users/route.ts";
+import { TeamView } from "../app/HorusViews.tsx";
+import { AdminView } from "../app/AdminView.tsx";
+import { makeAdminData, makeDashboard } from "./fixtures/dashboard.mjs";
 
 test("people can be inactivated but never permanently deleted", async () => {
-  const [teamRoute, adminRoute, app, views, adminView] = await Promise.all([
-    readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/AdminView.tsx", import.meta.url), "utf8"),
-  ]);
-  assert.doesNotMatch(teamRoute, /export async function DELETE/);
-  assert.doesNotMatch(adminRoute, /export async function DELETE/);
-  assert.doesNotMatch(teamRoute, /\.from\("users"\)\.delete/);
-  assert.doesNotMatch(adminRoute, /\.from\("users"\)\.delete/);
-  assert.doesNotMatch(app + views + adminView, /Excluir permanentemente|Prestador excluído|onDelete/);
-  assert.match(app, /todo o histórico será preservado/i);
+  assert.equal("DELETE" in teamRoute, false);
+  assert.equal("DELETE" in adminRoute, false);
+  const teamHtml = renderToStaticMarkup(createElement(TeamView, {
+    data: makeDashboard(), onNew() {}, onStatus() {}, onDelete() {}, onTimesheet() {}, onSetPassword() {},
+  }));
+  const adminHtml = renderToStaticMarkup(createElement(AdminView, {
+    data: makeAdminData(), loading: false, onRole() {}, onStatus() {}, onPassword() {}, onDelete() {}, onViewAs() {},
+  }));
+  assert.doesNotMatch(teamHtml + adminHtml, /Excluir/);
+  assert.match(teamHtml, /Inativar/);
 });
+```
+
+Create the complete UI fixture used by this and later rendering tests:
+
+```js
+export function makeDashboard() {
+  return {
+    period: { from: "2026-08-01", to: "2026-08-31", year: 2026, month: 8 },
+    metrics: { activeContractors: 1, workedMinutes: 480, requiredMinutes: 9720, positiveBalanceMinutes: 0, negativeBalanceMinutes: 0, pendingRequests: 0, pendingOccurrences: 0, pendingAuthorizations: 0 },
+    timesheet: { workedMinutes: 480, creditedMinutes: 0, consideredMinutes: 480, requiredMinutes: 9720, projectedBalanceMinutes: -9240, status: "OPEN" },
+    policy: { monthlyRequiredMinutes: 9720, positiveBalanceAfterDeadlinePolicy: "ALLOW_AFTER_DEADLINE", minimumLeaveNoticeDays: null, retroactiveBatchThreshold: 3 },
+    contractors: [{ id: "person-1", name: "Ana Exemplo", email: "ana@example.com", initials: "AE", status: "ACTIVE", lastEntryDate: "2026-08-01", lastEntryAt: "2026-08-01T20:00:00Z", workedMinutes: 480, consideredMinutes: 480, requiredMinutes: 9720, fillPercentage: 5, averageDelayDays: 0, retroactiveEntries: 0, timesheetStatus: "OPEN" }],
+    entries: [], balanceLots: [], balanceTransactions: [], requests: [], occurrences: [], authorizations: [], audits: [],
+  };
+}
+
+export function makeAdminData() {
+  return {
+    users: [{ id: "person-1", name: "Ana Exemplo", email: "ana@example.com", role: "PJ", status: "ACTIVE", hasAccess: true, createdAt: "2026-08-01T12:00:00Z", updatedAt: "2026-08-01T12:00:00Z" }],
+    audits: [],
+  };
+}
 ```
 
 - [ ] **Step 2: Run the test and verify it finds the legacy delete flows**
@@ -239,7 +278,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit the non-destructive lifecycle**
 
 ```bash
-git add app/api/team/route.ts app/api/admin/users/route.ts app/HorusApp.tsx app/HorusViews.tsx app/AdminView.tsx app/globals.css tests/people-history-protection.test.mjs
+git add app/api/team/route.ts app/api/admin/users/route.ts app/HorusApp.tsx app/HorusViews.tsx app/AdminView.tsx app/globals.css tests/fixtures/dashboard.mjs tests/people-history-protection.test.mjs
 git commit -m "fix: preserve people and their history"
 ```
 
@@ -397,16 +436,21 @@ git commit -m "fix: include inactive people in historical totals"
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { HorusApp } from "../app/HorusApp.tsx";
+import { makeDashboard } from "./fixtures/dashboard.mjs";
 
 test("navigation uses clear names and keeps DEV simulation read-only", async () => {
-  const app = await readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8");
+  const app = renderToStaticMarkup(createElement(HorusApp, {
+    user: { name: "João Dev", email: "dev@example.com" }, accountRole: "dev",
+    organizationName: "Exemplo", initialDashboard: makeDashboard(),
+  }));
   for (const label of ["Painel", "Aprovações", "Fechamento do mês", "Pessoas", "Visualizar como colaborador"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /Modo de visualização — somente leitura/);
-  assert.match(app, /readOnly=\{isDev && viewMode === "pj"\}/);
   assert.doesNotMatch(app, />Prestador</);
 });
 ```
@@ -498,23 +542,22 @@ git commit -m "feat: clarify Horus roles and navigation"
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ClosingOverview } from "../app/ClosingOverview.tsx";
+import { POST } from "../app/api/timesheets/route.ts";
+import { makeDashboard } from "./fixtures/dashboard.mjs";
 
 test("closing workspace is visible but writes are disabled by default", async () => {
-  const [app, view, route, flags] = await Promise.all([
-    readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/ClosingOverview.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/timesheets/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../db/feature-flags.ts", import.meta.url), "utf8"),
-  ]);
-  assert.match(app, /<ClosingOverview/);
+  delete process.env.HORUS_MONTH_CLOSING_WRITE_ENABLED;
+  const view = renderToStaticMarkup(createElement(ClosingOverview, { data: makeDashboard() }));
   assert.match(view, /Somente conferência/);
   assert.match(view, /Nenhum dado será alterado nesta tela/);
-  assert.doesNotMatch(view, /onClick=.*CLOSE|Fechar todos/);
-  assert.match(flags, /HORUS_MONTH_CLOSING_WRITE_ENABLED/);
-  assert.match(route, /monthClosingWriteEnabled/);
-  assert.match(route, /status: 503/);
+  assert.doesNotMatch(view, /<button|Fechar todos/);
+  const response = await POST(new Request("https://horuscodex.vercel.app/api/timesheets", { method: "POST" }));
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "O fechamento está temporariamente disponível somente para conferência." });
 });
 ```
 
