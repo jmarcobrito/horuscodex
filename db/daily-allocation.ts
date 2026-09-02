@@ -37,11 +37,12 @@ export function validateDailyAllocation(input: {
   totalMinutes: unknown;
   days: unknown;
 }): DailyAllocationResult {
-  if (!isIsoDate(input.startDate)
-      || !isIsoDate(input.endDate)
-      || input.startDate > input.endDate
-      || !Number.isInteger(input.totalMinutes)
-      || Number(input.totalMinutes) <= 0
+  const { startDate, endDate, totalMinutes } = input;
+  if (!isIsoDate(startDate)
+      || !isIsoDate(endDate)
+      || startDate > endDate
+      || !Number.isInteger(totalMinutes)
+      || Number(totalMinutes) <= 0
       || !Array.isArray(input.days)
       || input.days.length === 0
       || !input.days.every(isDailyAllocation)) {
@@ -52,11 +53,11 @@ export function validateDailyAllocation(input: {
   if (new Set(days.map((day) => day.date)).size !== days.length) {
     return { ok: false, code: "DUPLICATE_DAY", field: "days" };
   }
-  if (days.some((day) => day.date < input.startDate || day.date > input.endDate)) {
+  if (days.some((day) => day.date < startDate || day.date > endDate)) {
     return { ok: false, code: "DAY_OUTSIDE_PERIOD", field: "days" };
   }
   const allocatedMinutes = days.reduce((total, day) => total + day.minutes, 0);
-  if (allocatedMinutes !== input.totalMinutes) {
+  if (allocatedMinutes !== totalMinutes) {
     return { ok: false, code: "DAILY_TOTAL_MISMATCH", field: "days" };
   }
   return { ok: true, days };

@@ -407,27 +407,27 @@ git commit -m "feat: expose safe closing API contracts"
 - Produces: dashboard sem escrita, solicitações filtradas pelo período, `ApprovalInbox` com pendentes e histórico paginado, previews de fechamento por pessoa.
 - Consumes: `normalizeTimesheetPreview` e RPC `preview_timesheet_v2`.
 
-- [ ] **Step 1: escrever testes do modelo mensal**
+- [x] **Step 1: escrever testes do modelo mensal**
 
 Verificar que mês sem registro não aparece como aberto e pronto; que solicitações fora do mês não entram na lista mensal; e que a leitura não chama `refresh_hour_balance_statuses`.
 
-- [ ] **Step 2: executar testes e confirmar o estado incorreto atual**
+- [x] **Step 2: executar testes e confirmar o estado incorreto atual**
 
 Run: `node --test tests/dashboard-model.test.mjs`
 
 Expected: FAIL para mês inexistente tratado como `OPEN`.
 
-- [ ] **Step 3: implementar modelo sem efeitos colaterais**
+- [x] **Step 3: implementar modelo sem efeitos colaterais**
 
 Remover a atualização de status do `GET`, consultar folgas por sobreposição de período e anexar os previews oficiais às pessoas quando o intervalo representar um único mês.
 
-- [ ] **Step 4: executar testes e suíte completa**
+- [x] **Step 4: executar testes e suíte completa**
 
 Run: `node --test tests/dashboard-model.test.mjs && npm test`
 
 Expected: todos PASS.
 
-- [ ] **Step 5: versionar a unidade**
+- [x] **Step 5: versionar a unidade**
 
 ```bash
 git add db/dashboard.ts db/approval-inbox.ts app/dashboard-types.ts tests/dashboard-model.test.mjs
