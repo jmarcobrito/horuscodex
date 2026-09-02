@@ -5,14 +5,14 @@ Este procedimento protege o histórico do Horus. Ele não autoriza uma implanta�
 ## Estado validado em 2 de setembro de 2026
 
 - Produção: projeto `pronuvcdjyitpygxyrdu`. Nenhuma migração desta entrega foi aplicada.
-- Validação: branch `horus-safe-closing-2026-09-02`, projeto `uirrbmpobebbtappyhjv`.
-- A branch recebeu apenas cópia do esquema, sem dados reais. As migrações, o backfill conservador e os testes transacionais passaram nela.
-- A história de migrações da produção está vazia, embora o esquema legado exista. Por isso, **não usar merge automático da branch** e não executar `db push` antes de reconciliar a história.
+- Validação concluída na branch `horus-safe-closing-2026-09-02`, projeto `uirrbmpobebbtappyhjv`, depois removida para encerrar o custo. Ela recebeu apenas cópia do esquema e dados fictícios; as migrações, o backfill conservador e os testes transacionais passaram nela.
+- Ao criar a branch, o Supabase registrou automaticamente na produção a migração `20260902095706_remote_schema`, que representa o retrato do esquema legado existente. Nenhuma das duas migrações desta entrega foi aplicada e os agregados dos dados permaneceram idênticos.
+- A história da produção ainda não contém as migrações legadas com seus nomes originais. Por isso, **não usar merge automático da branch** e não executar `db push` antes de reconciliar a história.
 - Os scripts novos são aditivos. Eles não removem tabelas nem convertem períodos antigos de vários dias por média. Registros antigos que não podem ser distribuídos com certeza ficam como `NEEDS_REVIEW`.
 
 ### Baseline agregado mais recente de produção
 
-Capturado por consulta somente de leitura por volta de 11:36 UTC. A produção recebeu atividade normal durante o trabalho, portanto estes números são referência histórica e devem ser recapturados na janela de implantação.
+Recapturado por consulta somente de leitura às 11:49 UTC, depois da remoção da branch de validação. Os números permaneceram idênticos à leitura das 11:36 UTC. A produção recebeu atividade normal durante o trabalho, portanto estes números são referência histórica e devem ser recapturados na janela de implantação.
 
 | Medida | Valor |
 | --- | ---: |
@@ -34,7 +34,7 @@ O baseline não contém nomes, e-mails, identificadores de pessoas ou chaves.
 - [ ] Data e estado do backup mais recente confirmados em **Database > Backups**.
 - [ ] Restauração testada em clone/branch ou exportação restaurável validada. Não basta existir um arquivo sem teste.
 - [ ] Baseline imediatamente anterior salvo executando somente o primeiro `SELECT` de `supabase/tests/reconcile_production.sql`.
-- [ ] `supabase migration list` conferido. Como a produção não registra o legado, o histórico deve ser reparado por uma pessoa responsável antes de qualquer fluxo automático.
+- [ ] `supabase migration list` conferido. O registro automático `20260902095706_remote_schema` deve ser tratado como baseline do esquema legado; confirmar o alinhamento do histórico com uma pessoa responsável antes de qualquer fluxo automático.
 - [ ] Commit exato da aplicação e os dois arquivos SQL exatos registrados no chamado de mudança.
 - [ ] Autorização final específica para alterar a produção recebida.
 
