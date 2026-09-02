@@ -1,5 +1,6 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ async function findAuthUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, e
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   const name = cleanText(body?.name, 200);
   const email = cleanText(body?.email, 320).toLowerCase();
@@ -82,6 +85,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   if (!body || typeof body.id !== "string") {
     return Response.json({ error: "Dados do colaborador inválidos." }, { status: 400 });

@@ -1,10 +1,13 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   if (!body || !validIsoDate(body.workDate) || !Number.isInteger(body.estimatedMinutes)
       || Number(body.estimatedMinutes) <= 0 || Number(body.estimatedMinutes) > 1440) {
@@ -36,6 +39,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
   if (!body || typeof body.id !== "string" || !["APPROVE", "REJECT", "NEEDS_ADJUSTMENT"].includes(action)) {

@@ -2,6 +2,7 @@ import type { User as AuthUser } from "@supabase/supabase-js";
 
 import { requireActor } from "../../../../db/actor";
 import { apiFailure, cleanText, readJson } from "../../../../db/http";
+import { sameOriginFailure } from "../../../../db/request-security";
 import { getSupabaseAdmin } from "../../../../db/supabase";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = (await readJson(request) as Record<string, unknown> | null) ?? {};
   const id = typeof body.id === "string" ? body.id : "";
   const action = typeof body.action === "string" ? body.action : "";

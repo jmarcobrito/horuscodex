@@ -1,5 +1,6 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 import { calculateWorkedMinutes } from "../../../db/time-rules";
 
@@ -57,6 +58,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const payload = await readJson(request);
 
   if (!validPayload(payload)) {

@@ -1,11 +1,14 @@
 import { requireActor } from "../../../db/actor";
 import { monthClosingWriteEnabled } from "../../../db/feature-flags";
 import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   if (!monthClosingWriteEnabled()) {
     return Response.json({ error: "O fechamento está temporariamente disponível somente para conferência." }, { status: 503 });
   }

@@ -1,5 +1,6 @@
 import { requireActor } from "../../../db/actor";
 import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http";
+import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ async function recalculate(admin: ReturnType<typeof getSupabaseAdmin>, organizat
 }
 
 export async function POST(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   if (!body || !types.has(String(body.type)) || !validIsoDate(body.startDate) || !validIsoDate(body.endDate)
       || String(body.startDate) > String(body.endDate) || !Number.isInteger(body.minutes) || Number(body.minutes) < 0) {
@@ -63,6 +66,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const originFailure = sameOriginFailure(request);
+  if (originFailure) return originFailure;
   const body = await readJson(request) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
   if (!body || typeof body.id !== "string" || !["APPROVE", "REJECT", "CANCEL"].includes(action)) {
