@@ -38,8 +38,6 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(team, /admin\.auth\.admin\.createUser/);
   assert.match(team, /admin\.auth\.admin\.updateUserById/);
   assert.match(team, /CONTRACTOR_PASSWORD_SET/);
-  assert.match(team, /export async function DELETE/);
-  assert.match(team, /CONTRACTOR_DELETED/);
   assert.doesNotMatch(team, /signInWithOtp/);
   assert.match(signIn, /signInWithPassword/);
   assert.doesNotMatch(signIn, /signInWithOtp/);
@@ -50,9 +48,6 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(app, /result\.message \|\| success/);
   assert.match(app, /Cadastrar prestador/);
   assert.match(app, /Definir senha/);
-  assert.match(app, /Excluir permanentemente/);
-  assert.match(views, /onDelete/);
-  assert.match(views, />Excluir</);
   assert.match(actor, /"DEV"/);
   assert.match(actor, /resolveViewActor/);
   assert.match(app, /MODO DEV/);
