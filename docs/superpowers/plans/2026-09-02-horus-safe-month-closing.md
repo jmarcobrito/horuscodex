@@ -268,7 +268,7 @@ git commit -m "feat: add non-destructive daily allocation schema"
 - Produces RPCs `preview_timesheet_v2`, `close_timesheet_v2`, `reopen_timesheet_preview_v2`, `reopen_timesheet_v2`, `decide_occurrence_v2`, `decide_non_business_authorization_v2`.
 - Produces TypeScript `TimesheetPreview`, `TimesheetBlocker`, `normalizeTimesheetPreview`.
 
-- [ ] **Step 1: escrever testes SQL que reproduzem os riscos atuais**
+- [x] **Step 1: escrever testes SQL que reproduzem os riscos atuais**
 
 O fixture deve criar uma organização e pessoa isoladas dentro de `begin/rollback` e verificar literalmente:
 
@@ -282,13 +282,13 @@ O fixture deve criar uma organização e pessoa isoladas dentro de `begin/rollba
 -- reabertura falha quando o lote teve movimentação posterior.
 ```
 
-- [ ] **Step 2: executar testes e confirmar falha por RPCs ausentes**
+- [x] **Step 2: executar testes e confirmar falha por RPCs ausentes**
 
 Run: enviar `safe_month_closing_workflows.sql` para a branch.
 
 Expected: FAIL informando que `preview_timesheet_v2` não existe.
 
-- [ ] **Step 3: implementar RPC de pré-conferência sem efeitos colaterais**
+- [x] **Step 3: implementar RPC de pré-conferência sem efeitos colaterais**
 
 ```sql
 create or replace function public.preview_timesheet_v2(
@@ -299,19 +299,19 @@ create or replace function public.preview_timesheet_v2(
 $$;
 ```
 
-- [ ] **Step 4: implementar fechamento v2 com revalidação e snapshot**
+- [x] **Step 4: implementar fechamento v2 com revalidação e snapshot**
 
 `close_timesheet_v2` deve bloquear mês e dependências, recalcular `reviewVersion`, aplicar somente parcelas do mês, consumir reservas exatamente uma vez, aceitar a exceção vazia apenas com justificativa e gravar `closure_snapshot` versão 2.
 
-- [ ] **Step 5: implementar prévia e execução de reabertura**
+- [x] **Step 5: implementar prévia e execução de reabertura**
 
 `reopen_timesheet_preview_v2` será somente leitura. `reopen_timesheet_v2` usará o snapshot para estornar todos os efeitos ou retornar `BALANCE_ALREADY_USED` sem mudar dados.
 
-- [ ] **Step 6: tornar decisões de ausência e autorização atômicas**
+- [x] **Step 6: tornar decisões de ausência e autorização atômicas**
 
 Substituir os fluxos de múltiplas chamadas por `decide_occurrence_v2` e `decide_non_business_authorization_v2`, incluindo recálculo e auditoria na mesma transação.
 
-- [ ] **Step 7: executar testes SQL e normalização TypeScript**
+- [x] **Step 7: executar testes SQL e normalização TypeScript**
 
 Run: teste SQL completo na branch.
 
@@ -321,7 +321,7 @@ Run: `node --test tests/timesheet-preview.test.mjs`
 
 Expected: PASS para READY, NEEDS_REVIEW e CLOSED.
 
-- [ ] **Step 8: versionar a unidade**
+- [x] **Step 8: versionar a unidade**
 
 ```bash
 git add supabase/migrations/20260902095102_transactional_month_closing.sql supabase/tests/safe_month_closing_workflows.sql db/timesheet-preview.ts tests/timesheet-preview.test.mjs
