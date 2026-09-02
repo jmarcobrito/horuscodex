@@ -7,7 +7,6 @@ type Props = {
   onRole: (user: AdminUser, role: "RH" | "PJ") => void;
   onStatus: (user: AdminUser, status: "ACTIVE" | "INACTIVE") => void;
   onPassword: (user: AdminUser) => void;
-  onDelete: (user: AdminUser) => void;
   onViewAs: (user: AdminUser) => void;
 };
 
@@ -27,7 +26,7 @@ function actionLabel(action: string) {
   } as Record<string, string>)[action] ?? action.replaceAll("_", " ").toLowerCase();
 }
 
-export function AdminView({ data, loading, onRole, onStatus, onPassword, onDelete, onViewAs }: Props) {
+export function AdminView({ data, loading, onRole, onStatus, onPassword, onViewAs }: Props) {
   return <>
     <section className="page-heading admin-heading"><div><span className="eyebrow">ACESSO EXCLUSIVO DEV</span><h1>Administração</h1><p>Gerencie perfil e acesso sem misturar a função da pessoa com a situação do cadastro.</p></div><span className="dev-protection-badge">DEV PROTEGIDO</span></section>
     <section className="admin-summary">
@@ -47,7 +46,6 @@ export function AdminView({ data, loading, onRole, onStatus, onPassword, onDelet
           <div className="admin-user-actions">
             {user.role === "PJ" && <button className="view-as-action" onClick={() => onViewAs(user)} disabled={loading}>Visualizar como</button>}
             {!protectedUser && <button onClick={() => onPassword(user)} disabled={loading}>Definir senha</button>}
-            {!protectedUser && user.role === "PJ" && <button className="delete-action" onClick={() => onDelete(user)} disabled={loading}>Excluir</button>}
           </div>
           <small className="admin-user-note">{protectedUser ? "Este perfil não pode ser rebaixado, inativado ou excluído." : `${roleLabel(user.role)} · ${user.hasAccess ? "conta vinculada" : "conta ainda não vinculada"}`}</small>
         </article>;

@@ -450,43 +450,43 @@ git commit -m "feat: align monthly dashboard with closing preview"
 - Produces: seção RH `closing`, `ClosingView` e formulários diários; navegação do colaborador com Meu mês/Banco de horas/Solicitações; navegação RH com Painel/Lançamentos/Aprovações/Fechamento/Pessoas/Relatórios.
 - Consumes: previews e APIs da Task 4.
 
-- [ ] **Step 1: escrever testes de comportamento observável antes da UI**
+- [x] **Step 1: escrever testes de comportamento observável antes da UI**
 
 Atualizar o teste renderizado para exigir as novas seções e para rejeitar **Marcar utilizada**, `BANK_LEAVE`, **Excluir permanentemente** e o uso principal de **Competência**.
 
-- [ ] **Step 2: executar teste e confirmar falha com a interface antiga**
+- [x] **Step 2: executar teste e confirmar falha com a interface antiga**
 
 Run: `npm test`
 
 Expected: FAIL nas novas expectativas de navegação e fechamento.
 
-- [ ] **Step 3: implementar navegação e caixa de entrada**
+- [x] **Step 3: implementar navegação e caixa de entrada**
 
 Separar pendentes de histórico, incluir filtros claros e apresentar **Nova solicitação** com as três escolhas aprovadas.
 
-- [ ] **Step 4: implementar formulários de distribuição diária**
+- [x] **Step 4: implementar formulários de distribuição diária**
 
 Cada data do intervalo terá campo de horas; soma, dias duplicados e limites serão mostrados junto aos campos antes do envio.
 
-- [ ] **Step 5: implementar Fechamento do mês**
+- [x] **Step 5: implementar Fechamento do mês**
 
 Mostrar **Prontas para fechar**, **Precisam de revisão** e **Mês fechado**; permitir fechamento individual e **Fechar todos os prontos**; exibir impacto no banco, exceção de mês vazio e prévia de reabertura.
 
-- [ ] **Step 6: remover ações destrutivas e caminhos duplicados**
+- [x] **Step 6: remover ações destrutivas e caminhos duplicados**
 
 Substituir exclusão por inativação, remover utilização manual de folga e retirar `BANK_LEAVE` dos formulários.
 
-- [ ] **Step 7: verificar layout, teclado e telas pequenas no navegador**
+- [x] **Step 7: verificar layout, teclado e telas pequenas no navegador**
 
 Run: iniciar `npm run dev`, percorrer RH e colaborador em 1440 px, 1024 px e 390 px; verificar foco visível, Escape nos modais, nomes acessíveis e ausência de rolagem horizontal indevida.
 
-- [ ] **Step 8: executar lint, build e testes**
+- [x] **Step 8: executar lint, build e testes**
 
 Run: `npm run lint && npm test`
 
 Expected: 0 erros e todos os testes PASS.
 
-- [ ] **Step 9: versionar a unidade**
+- [x] **Step 9: versionar a unidade**
 
 ```bash
 git add app/ClosingView.tsx app/DailyAllocationFields.tsx app/ApprovalInboxView.tsx app/HorusViews.tsx app/HorusApp.tsx app/AdminView.tsx app/globals.css tests/rendered-html.test.mjs

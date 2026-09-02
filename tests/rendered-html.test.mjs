@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen] = await Promise.all([
+  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen, closing, approvals, dailyAllocation] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -17,6 +17,9 @@ test("ships protected Horus workflows backed by server data", async () => {
     readFile(new URL("../app/api/auth/sign-in/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/google/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/SignInScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ClosingView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ApprovalInboxView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/DailyAllocationFields.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /initialDashboard/);
@@ -38,8 +41,9 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(team, /admin\.auth\.admin\.createUser/);
   assert.match(team, /admin\.auth\.admin\.updateUserById/);
   assert.match(team, /CONTRACTOR_PASSWORD_SET/);
-  assert.match(team, /export async function DELETE/);
-  assert.match(team, /CONTRACTOR_DELETED/);
+  assert.match(team, /INACTIVE/);
+  assert.doesNotMatch(team, /export async function DELETE/);
+  assert.doesNotMatch(adminRoute, /export async function DELETE/);
   assert.doesNotMatch(team, /signInWithOtp/);
   assert.match(signIn, /signInWithPassword/);
   assert.doesNotMatch(signIn, /signInWithOtp/);
@@ -50,9 +54,25 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(app, /result\.message \|\| success/);
   assert.match(app, /Cadastrar prestador/);
   assert.match(app, /Definir senha/);
-  assert.match(app, /Excluir permanentemente/);
-  assert.match(views, /onDelete/);
-  assert.match(views, />Excluir</);
+  assert.match(app, /label: "Painel"/);
+  assert.match(app, /label: "Aprovações"/);
+  assert.match(app, /label: "Fechamento do mês"/);
+  assert.match(app, /label: "Pessoas"/);
+  assert.match(app, /label: "Meu mês"/);
+  assert.match(approvals, /Aguardando análise/);
+  assert.match(approvals, /Histórico/);
+  assert.match(approvals, /Nova solicitação/);
+  assert.match(closing, /Prontas para fechar/);
+  assert.match(closing, /Precisam de revisão/);
+  assert.match(closing, /Mês fechado/);
+  assert.match(closing, /Fechar todos os prontos/);
+  assert.match(closing, /Fechar mês sem horas registradas/);
+  assert.match(dailyAllocation, /Horas por dia/);
+  assert.match(dailyAllocation, /Total distribuído/);
+  assert.doesNotMatch(app + views, /Marcar utilizada/);
+  assert.doesNotMatch(app + views, /BANK_LEAVE/);
+  assert.doesNotMatch(app + views + adminView, /Excluir permanentemente|>Excluir</);
+  assert.doesNotMatch(app + views, /Fechar competência|Reabrir competência|Competência:/);
   assert.match(actor, /"DEV"/);
   assert.match(actor, /resolveViewActor/);
   assert.match(app, /MODO DEV/);
