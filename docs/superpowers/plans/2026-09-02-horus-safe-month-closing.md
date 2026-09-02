@@ -504,19 +504,19 @@ git commit -m "feat: deliver intuitive Horus monthly workflow"
 - Produces: checklist operacional de backup, restauração, migração, reconciliação, rollback e monitoramento.
 - Consumes: migração e testes das Tasks 2 e 3.
 
-- [ ] **Step 1: registrar baseline de produção somente leitura**
+- [x] **Step 1: registrar baseline de produção somente leitura**
 
 Guardar no relatório de execução apenas totais agregados: contagens das tabelas e somas de minutos; nunca copiar nomes, e-mails ou chaves.
 
-- [ ] **Step 2: validar branch Supabase**
+- [x] **Step 2: validar branch Supabase**
 
 Executar migração, testes SQL, advisors de segurança/desempenho e os mesmos totais agregados na branch.
 
-- [ ] **Step 3: documentar backup e restauração antes da produção**
+- [x] **Step 3: documentar backup e restauração antes da produção**
 
 O runbook exigirá confirmação da data do último backup, teste de restauração/clonagem, janela de mudança, pessoa responsável e consulta de reconciliação pós-migração.
 
-- [ ] **Step 4: verificar código completo**
+- [x] **Step 4: verificar código completo**
 
 Run: `npm run lint`
 
@@ -530,17 +530,19 @@ Run: advisors de segurança e desempenho na branch.
 
 Expected: nenhum alerta novo causado pelas tabelas ou funções v2.
 
-- [ ] **Step 5: revisar diferenças e critérios de aceitação**
+- [x] **Step 5: revisar diferenças e critérios de aceitação**
 
 Comparar cada um dos dez critérios da especificação com teste ou evidência. Se qualquer item não tiver evidência, a produção permanece bloqueada.
 
-- [ ] **Step 6: versionar a documentação de liberação**
+- [x] **Step 6: versionar a documentação de liberação**
 
 ```bash
 git add docs/runbooks/supabase-safe-migration.md supabase/tests/reconcile_production.sql README.md
 git commit -m "docs: add safe Supabase migration runbook"
 ```
 
-- [ ] **Step 7: aguardar autorização explícita para produção**
+- [x] **Step 7: aguardar autorização explícita para produção**
 
 Não executar a migração na produção apenas porque a branch passou. Apresentar backup, reconciliação, advisors, testes e diff; aplicar em produção somente após autorização final específica.
+
+**Gate ativo:** documentação e evidências prontas; nenhuma migração desta entrega foi aplicada na produção.

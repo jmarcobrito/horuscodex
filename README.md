@@ -35,6 +35,16 @@ nunca faça commit do valor real.
   no ambiente de produção;
 - o acesso de cada usuário continua vinculado à identidade fornecida pelo Sites.
 
+### Fechamento mensal seguro
+
+- folgas e ausências de vários dias exigem horas explícitas para cada data;
+- a pré-conferência oficial do banco separa meses prontos, pendentes e fechados;
+- fechamento e reabertura são transacionais e usam uma versão de revisão para impedir decisões sobre dados desatualizados;
+- inativar uma pessoa preserva o histórico; as rotas de exclusão operacional foram removidas;
+- migrações de produção devem seguir o [runbook de liberação segura](docs/runbooks/supabase-safe-migration.md) e a [consulta agregada de reconciliação](supabase/tests/reconcile_production.sql).
+
+As migrações desta entrega foram validadas em uma branch Supabase sem dados reais. Isso não autoriza aplicação em produção.
+
 ## Workspace Auth Headers
 
 OpenAI workspace sites can read the current user's email from
@@ -97,7 +107,7 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm test`: executa os testes de domínio, APIs, dashboard e interface
 - `npm run db:push`: apply pending migrations to the linked Supabase project
 - `npm run db:types`: regenerate TypeScript database types from Supabase
 
