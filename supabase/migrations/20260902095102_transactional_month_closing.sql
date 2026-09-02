@@ -1181,18 +1181,15 @@ set search_path = ''
 as $$
 declare
   v_occurrence public.occurrences%rowtype;
+  v_actor_role text;
   v_previous jsonb;
   v_new jsonb;
   v_period record;
   v_timesheet_id text;
 begin
-  if not exists (
-    select 1 from public.users
-    where id = p_actor_id and organization_id = p_organization_id
-      and status = 'ACTIVE' and role in ('RH', 'ADMIN', 'DEV')
-  ) then
-    raise exception 'HORUS_DOMAIN:ACTOR_NOT_AUTHORIZED';
-  end if;
+  select role into v_actor_role from public.users
+  where id = p_actor_id and organization_id = p_organization_id and status = 'ACTIVE';
+  if v_actor_role is null then raise exception 'HORUS_DOMAIN:ACTOR_NOT_AUTHORIZED'; end if;
 
   select * into v_occurrence
   from public.occurrences
@@ -1200,7 +1197,13 @@ begin
   for update;
   if v_occurrence.id is null then raise exception 'HORUS_DOMAIN:OCCURRENCE_NOT_FOUND'; end if;
   if v_occurrence.status <> 'REQUESTED' then raise exception 'HORUS_DOMAIN:OCCURRENCE_ALREADY_DECIDED'; end if;
-  if p_action not in ('APPROVE', 'REJECT') then raise exception 'HORUS_DOMAIN:INVALID_ACTION'; end if;
+  if p_action not in ('APPROVE', 'REJECT', 'CANCEL') then raise exception 'HORUS_DOMAIN:INVALID_ACTION'; end if;
+  if p_action in ('APPROVE', 'REJECT') and v_actor_role not in ('RH', 'ADMIN', 'DEV') then
+    raise exception 'HORUS_DOMAIN:ACTOR_NOT_AUTHORIZED';
+  end if;
+  if p_action = 'CANCEL' and v_actor_role = 'PJ' and p_actor_id <> v_occurrence.contractor_id then
+    raise exception 'HORUS_DOMAIN:ACTOR_NOT_AUTHORIZED';
+  end if;
   if p_action = 'APPROVE' and v_occurrence.allocation_status <> 'COMPLETE' then
     raise exception 'HORUS_DOMAIN:INCOMPLETE_DAILY_ALLOCATION';
   end if;
@@ -1213,8 +1216,8 @@ begin
 
   v_previous := to_jsonb(v_occurrence);
   update public.occurrences
-  set status = case when p_action = 'APPROVE' then 'APPROVED' else 'REJECTED' end,
-      decided_by = p_actor_id,
+  set status = case when p_action = 'APPROVE' then 'APPROVED' when p_action = 'REJECT' then 'REJECTED' else 'CANCELLED' end,
+      decided_by = case when p_action = 'CANCEL' and v_actor_role = 'PJ' then null else p_actor_id end,
       decided_at = now(),
       decision_notes = p_notes,
       updated_by = p_actor_id,
@@ -1246,7 +1249,7 @@ begin
   );
   return jsonb_build_object(
     'id', v_occurrence.id,
-    'status', case when p_action = 'APPROVE' then 'APPROVED' else 'REJECTED' end
+    'status', case when p_action = 'APPROVE' then 'APPROVED' when p_action = 'REJECT' then 'REJECTED' else 'CANCELLED' end
   );
 end;
 $$;
@@ -1523,6 +1526,240 @@ begin
 end;
 $$;
 
+create or replace function public.create_leave_request_v2(
+  p_organization_id text,
+  p_actor_id text,
+  p_contractor_id text,
+  p_start_date date,
+  p_end_date date,
+  p_requested_minutes integer,
+  p_reason text,
+  p_days jsonb
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_request_id text := gen_random_uuid()::text;
+  v_item jsonb;
+  v_day date;
+  v_minutes integer;
+  v_count integer;
+  v_unique_count integer;
+  v_total integer;
+begin
+  perform public.assert_month_closing_actor(
+    p_organization_id, p_actor_id, p_contractor_id, false
+  );
+  if p_end_date < p_start_date or p_requested_minutes <= 0
+     or jsonb_typeof(p_days) <> 'array' or jsonb_array_length(p_days) = 0 then
+    raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+  end if;
+
+  begin
+    select count(*)::integer,
+      count(distinct item->>'date')::integer,
+      coalesce(sum((item->>'minutes')::integer), 0)::integer
+    into v_count, v_unique_count, v_total
+    from jsonb_array_elements(p_days) item;
+  exception when others then
+    raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+  end;
+  if v_count <> v_unique_count then raise exception 'HORUS_DOMAIN:DUPLICATE_DAY'; end if;
+  if v_total <> p_requested_minutes then raise exception 'HORUS_DOMAIN:DAILY_TOTAL_MISMATCH'; end if;
+
+  for v_item in select value from jsonb_array_elements(p_days)
+  loop
+    begin
+      v_day := (v_item->>'date')::date;
+      v_minutes := (v_item->>'minutes')::integer;
+    exception when others then
+      raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+    end;
+    if v_day < p_start_date or v_day > p_end_date then
+      raise exception 'HORUS_DOMAIN:DAY_OUTSIDE_PERIOD';
+    end if;
+    if v_minutes <= 0 or v_minutes > 1440 then
+      raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+    end if;
+  end loop;
+
+  insert into public.leave_requests (
+    id, organization_id, contractor_id, start_date, end_date,
+    requested_minutes, status, reason, allocation_status
+  ) values (
+    v_request_id, p_organization_id, p_contractor_id, p_start_date, p_end_date,
+    p_requested_minutes, 'REQUESTED', coalesce(p_reason, ''), 'COMPLETE'
+  );
+  insert into public.leave_request_days (
+    id, organization_id, leave_request_id, work_date, minutes, application_status
+  )
+  select gen_random_uuid()::text, p_organization_id, v_request_id,
+    (item->>'date')::date, (item->>'minutes')::integer, 'PENDING'
+  from jsonb_array_elements(p_days) item;
+  insert into public.audit_logs (
+    id, organization_id, user_id, action, entity_type, entity_id, new_value
+  ) values (
+    gen_random_uuid()::text, p_organization_id, p_actor_id,
+    'LEAVE_REQUEST_CREATED', 'LeaveRequest', v_request_id,
+    jsonb_build_object(
+      'contractorId', p_contractor_id, 'startDate', p_start_date,
+      'endDate', p_end_date, 'requestedMinutes', p_requested_minutes, 'days', p_days
+    )
+  );
+  return jsonb_build_object('id', v_request_id, 'status', 'REQUESTED');
+end;
+$$;
+
+create or replace function public.create_occurrence_v2(
+  p_organization_id text,
+  p_actor_id text,
+  p_contractor_id text,
+  p_type text,
+  p_start_date date,
+  p_end_date date,
+  p_minutes integer,
+  p_calculation_effect text,
+  p_description text,
+  p_days jsonb
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_occurrence_id text := gen_random_uuid()::text;
+  v_item jsonb;
+  v_day date;
+  v_day_minutes integer;
+  v_count integer;
+  v_unique_count integer;
+  v_total integer;
+begin
+  perform public.assert_month_closing_actor(
+    p_organization_id, p_actor_id, p_contractor_id, false
+  );
+  if p_type not in ('VACATION', 'JUSTIFIED_ABSENCE', 'MEDICAL_CERTIFICATE', 'OTHER')
+     or p_calculation_effect not in ('CREDITS_HOURS', 'DOES_NOT_CREDIT', 'CONSUMES_BALANCE')
+     or p_end_date < p_start_date or p_minutes <= 0
+     or jsonb_typeof(p_days) <> 'array' or jsonb_array_length(p_days) = 0 then
+    raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+  end if;
+
+  begin
+    select count(*)::integer,
+      count(distinct item->>'date')::integer,
+      coalesce(sum((item->>'minutes')::integer), 0)::integer
+    into v_count, v_unique_count, v_total
+    from jsonb_array_elements(p_days) item;
+  exception when others then
+    raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+  end;
+  if v_count <> v_unique_count then raise exception 'HORUS_DOMAIN:DUPLICATE_DAY'; end if;
+  if v_total <> p_minutes then raise exception 'HORUS_DOMAIN:DAILY_TOTAL_MISMATCH'; end if;
+
+  for v_item in select value from jsonb_array_elements(p_days)
+  loop
+    begin
+      v_day := (v_item->>'date')::date;
+      v_day_minutes := (v_item->>'minutes')::integer;
+    exception when others then
+      raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION';
+    end;
+    if v_day < p_start_date or v_day > p_end_date then raise exception 'HORUS_DOMAIN:DAY_OUTSIDE_PERIOD'; end if;
+    if v_day_minutes <= 0 or v_day_minutes > 1440 then raise exception 'HORUS_DOMAIN:INVALID_DAILY_ALLOCATION'; end if;
+  end loop;
+
+  insert into public.occurrences (
+    id, organization_id, contractor_id, type, start_date, end_date, minutes,
+    calculation_effect, status, description, created_by, updated_by, allocation_status
+  ) values (
+    v_occurrence_id, p_organization_id, p_contractor_id, p_type, p_start_date, p_end_date,
+    p_minutes, p_calculation_effect, 'REQUESTED', coalesce(p_description, ''),
+    p_actor_id, p_actor_id, 'COMPLETE'
+  );
+  insert into public.occurrence_days (
+    id, organization_id, occurrence_id, work_date, minutes
+  )
+  select gen_random_uuid()::text, p_organization_id, v_occurrence_id,
+    (item->>'date')::date, (item->>'minutes')::integer
+  from jsonb_array_elements(p_days) item;
+  insert into public.audit_logs (
+    id, organization_id, user_id, action, entity_type, entity_id, new_value
+  ) values (
+    gen_random_uuid()::text, p_organization_id, p_actor_id,
+    'OCCURRENCE_REQUESTED', 'Occurrence', v_occurrence_id,
+    jsonb_build_object(
+      'contractorId', p_contractor_id, 'type', p_type,
+      'startDate', p_start_date, 'endDate', p_end_date,
+      'minutes', p_minutes, 'days', p_days
+    )
+  );
+  return jsonb_build_object('id', v_occurrence_id, 'status', 'REQUESTED');
+end;
+$$;
+
+create or replace function public.create_non_business_authorization_v2(
+  p_organization_id text,
+  p_actor_id text,
+  p_contractor_id text,
+  p_work_date date,
+  p_estimated_minutes integer,
+  p_reason text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_authorization_id text;
+  v_existing_status text;
+begin
+  perform public.assert_month_closing_actor(
+    p_organization_id, p_actor_id, p_contractor_id, false
+  );
+  if p_estimated_minutes <= 0 or p_estimated_minutes > 1440 then
+    raise exception 'HORUS_DOMAIN:INVALID_APPROVED_MINUTES';
+  end if;
+  select id, status into v_authorization_id, v_existing_status
+  from public.non_business_day_authorizations
+  where organization_id = p_organization_id
+    and contractor_id = p_contractor_id and work_date = p_work_date
+  for update;
+  if v_authorization_id is not null and v_existing_status <> 'REQUESTED' then
+    raise exception 'HORUS_DOMAIN:AUTHORIZATION_ALREADY_DECIDED';
+  end if;
+  if v_authorization_id is null then
+    v_authorization_id := gen_random_uuid()::text;
+    insert into public.non_business_day_authorizations (
+      id, organization_id, contractor_id, work_date, estimated_minutes, reason, status
+    ) values (
+      v_authorization_id, p_organization_id, p_contractor_id, p_work_date,
+      p_estimated_minutes, coalesce(p_reason, ''), 'REQUESTED'
+    );
+  else
+    update public.non_business_day_authorizations
+    set estimated_minutes = p_estimated_minutes, reason = coalesce(p_reason, '')
+    where id = v_authorization_id;
+  end if;
+  insert into public.audit_logs (
+    id, organization_id, user_id, action, entity_type, entity_id, new_value
+  ) values (
+    gen_random_uuid()::text, p_organization_id, p_actor_id,
+    'NON_BUSINESS_AUTH_REQUESTED', 'NonBusinessDayAuthorization', v_authorization_id,
+    jsonb_build_object(
+      'contractorId', p_contractor_id, 'workDate', p_work_date,
+      'estimatedMinutes', p_estimated_minutes
+    )
+  );
+  return jsonb_build_object('id', v_authorization_id, 'status', 'REQUESTED');
+end;
+$$;
+
 revoke all on function public.assert_month_closing_actor(text, text, text, boolean)
 from public, anon, authenticated;
 revoke all on function public.preview_timesheet_v2(text, text, text, integer, integer)
@@ -1541,6 +1778,12 @@ revoke all on function public.decide_leave_request(text, text, text, text, text)
 from public, anon, authenticated;
 revoke all on function public.recalculate_timesheet(text)
 from public, anon, authenticated;
+revoke all on function public.create_leave_request_v2(text, text, text, date, date, integer, text, jsonb)
+from public, anon, authenticated;
+revoke all on function public.create_occurrence_v2(text, text, text, text, date, date, integer, text, text, jsonb)
+from public, anon, authenticated;
+revoke all on function public.create_non_business_authorization_v2(text, text, text, date, integer, text)
+from public, anon, authenticated;
 
 grant execute on function public.assert_month_closing_actor(text, text, text, boolean) to service_role;
 grant execute on function public.preview_timesheet_v2(text, text, text, integer, integer) to service_role;
@@ -1551,6 +1794,9 @@ grant execute on function public.decide_occurrence_v2(text, text, text, text, te
 grant execute on function public.decide_non_business_authorization_v2(text, text, text, text, integer, text) to service_role;
 grant execute on function public.decide_leave_request(text, text, text, text, text) to service_role;
 grant execute on function public.recalculate_timesheet(text) to service_role;
+grant execute on function public.create_leave_request_v2(text, text, text, date, date, integer, text, jsonb) to service_role;
+grant execute on function public.create_occurrence_v2(text, text, text, text, date, date, integer, text, text, jsonb) to service_role;
+grant execute on function public.create_non_business_authorization_v2(text, text, text, date, integer, text) to service_role;
 
 comment on function public.preview_timesheet_v2(text, text, text, integer, integer) is
   'Side-effect-free official month-closing preview. reviewVersion covers all calculation inputs.';

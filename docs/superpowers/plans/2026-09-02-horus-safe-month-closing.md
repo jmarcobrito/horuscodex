@@ -345,7 +345,7 @@ git commit -m "feat: add transactional month closing workflows"
 - Consumes: RPCs v2 e `validateDailyAllocation`.
 - Produces: respostas `{ error: { code, message, field, action } }`, preview individual, fechamento individual, resultado parcial em grupo e prévia de reabertura.
 
-- [ ] **Step 1: escrever testes para payloads e traduções antes das rotas**
+- [x] **Step 1: escrever testes para payloads e traduções antes das rotas**
 
 ```js
 test("traduz REVIEW_OUTDATED para ação de revisar novamente", () => {
@@ -356,25 +356,25 @@ test("traduz REVIEW_OUTDATED para ação de revisar novamente", () => {
 });
 ```
 
-- [ ] **Step 2: executar testes e confirmar falha por contrato ainda antigo**
+- [x] **Step 2: executar testes e confirmar falha por contrato ainda antigo**
 
 Run: `node --test tests/api-contracts.test.mjs`
 
 Expected: FAIL porque `apiFailure` ainda retorna string simples.
 
-- [ ] **Step 3: implementar erros estruturados e validação de sessão**
+- [x] **Step 3: implementar erros estruturados e validação de sessão**
 
 As rotas não aceitarão `organizationId` como autoridade do corpo; usarão `actor.organizationId`. O papel será validado antes da RPC e novamente no banco.
 
-- [ ] **Step 4: substituir criação de folga e ausência por distribuição diária**
+- [x] **Step 4: substituir criação de folga e ausência por distribuição diária**
 
 Remover `UTILIZE`, bloquear `BANK_LEAVE` em novas ocorrências e enviar as parcelas diárias às operações transacionais.
 
-- [ ] **Step 5: implementar preview, fechamento individual, grupo e reabertura**
+- [x] **Step 5: implementar preview, fechamento individual, grupo e reabertura**
 
 O fechamento em grupo chamará uma transação por pessoa e devolverá `closed`, `alreadyClosed`, `needsReview` ou `failed` sem desfazer sucessos anteriores.
 
-- [ ] **Step 6: executar testes, lint e build**
+- [x] **Step 6: executar testes, lint e build**
 
 Run: `node --test tests/api-contracts.test.mjs`
 
@@ -388,7 +388,7 @@ Run: `npm test`
 
 Expected: build e testes PASS.
 
-- [ ] **Step 7: versionar a unidade**
+- [x] **Step 7: versionar a unidade**
 
 ```bash
 git add db/http.ts app/api/leave-requests/route.ts app/api/occurrences/route.ts app/api/non-business-authorizations/route.ts app/api/timesheets tests/api-contracts.test.mjs

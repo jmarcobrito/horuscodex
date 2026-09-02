@@ -393,6 +393,50 @@ begin
   end if;
 end $$;
 
+-- Request creation writes parent, daily allocation and audit in one operation.
+do $$
+declare
+  v_result jsonb;
+begin
+  v_result := public.create_leave_request_v2(
+    'org_workflow_test', 'usr_workflow_pj', 'usr_workflow_pj',
+    '2027-04-10', '2027-04-11', 120, 'Descanso programado',
+    '[{"date":"2027-04-10","minutes":60},{"date":"2027-04-11","minutes":60}]'::jsonb
+  );
+  if not exists (
+    select 1 from public.leave_requests request
+    where request.id = v_result->>'id' and request.allocation_status = 'COMPLETE'
+      and request.status = 'REQUESTED'
+      and (select sum(minutes) from public.leave_request_days where leave_request_id = request.id) = 120
+  ) then
+    raise exception 'atomic leave creation failed';
+  end if;
+
+  v_result := public.create_occurrence_v2(
+    'org_workflow_test', 'usr_workflow_pj', 'usr_workflow_pj', 'MEDICAL_CERTIFICATE',
+    '2027-04-12', '2027-04-12', 90, 'CREDITS_HOURS', 'Consulta médica',
+    '[{"date":"2027-04-12","minutes":90}]'::jsonb
+  );
+  if not exists (
+    select 1 from public.occurrences occurrence
+    where occurrence.id = v_result->>'id' and occurrence.allocation_status = 'COMPLETE'
+      and (select sum(minutes) from public.occurrence_days where occurrence_id = occurrence.id) = 90
+  ) then
+    raise exception 'atomic occurrence creation failed';
+  end if;
+
+  v_result := public.create_non_business_authorization_v2(
+    'org_workflow_test', 'usr_workflow_pj', 'usr_workflow_pj',
+    '2027-04-17', 120, 'Atividade excepcional'
+  );
+  if not exists (
+    select 1 from public.non_business_day_authorizations
+    where id = v_result->>'id' and status = 'REQUESTED'
+  ) then
+    raise exception 'atomic authorization creation failed';
+  end if;
+end $$;
+
 rollback;
 
 select 'PASS' as workflow_test;
