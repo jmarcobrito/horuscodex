@@ -1,5 +1,5 @@
 import { requireActor } from "../../../db/actor";
-import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { apiDomainError, apiError, apiFailure, cleanText, readJson } from "../../../db/http";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
 export const dynamic = "force-dynamic";
@@ -10,32 +10,41 @@ export async function POST(request: Request) {
   const year = Number(body?.year); const month = Number(body?.month);
   if (!body || typeof body.contractorId !== "string" || !["CLOSE", "REOPEN"].includes(action)
       || !Number.isInteger(year) || year < 2000 || year > 2200 || !Number.isInteger(month) || month < 1 || month > 12) {
-    return Response.json({ error: "Dados da competência inválidos." }, { status: 400 });
+    return apiDomainError("INVALID_PERIOD");
   }
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode fechar ou reabrir competências." }, { status: 403 });
+    if (actor.role === "PJ") return apiError("ACTOR_NOT_AUTHORIZED", "Apenas o RH pode fechar ou reabrir meses.", 403, null, "GO_BACK");
     const admin = getSupabaseAdmin();
-    const timesheetId = `ts_${body.contractorId}_${year}_${month}`;
-    const contractor = await admin.from("users").select("id").eq("id", body.contractorId)
-      .eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
-    if (contractor.error) throw contractor.error;
-    if (!contractor.data) return Response.json({ error: "Prestador não encontrado." }, { status: 404 });
     if (action === "CLOSE") {
-      const result = await admin.rpc("close_timesheet", {
-        p_organization_id: actor.organizationId, p_actor_id: actor.id, p_timesheet_id: timesheetId,
+      if (typeof body.reviewVersion !== "string" || !body.reviewVersion) {
+        return apiDomainError("REVIEW_REQUIRED", "reviewVersion");
+      }
+      const result = await admin.rpc("close_timesheet_v2", {
+        p_organization_id: actor.organizationId,
+        p_actor_id: actor.id,
+        p_contractor_id: body.contractorId,
+        p_year: year,
+        p_month: month,
+        p_review_version: body.reviewVersion,
+        p_allow_empty_month: body.allowEmptyMonth === true,
+        p_empty_month_reason: cleanText(body.emptyMonthReason) || null,
       });
       if (result.error) throw result.error;
       return Response.json({ action, result: result.data });
     }
     const reason = cleanText(body.reason);
-    if (reason.length < 5) return Response.json({ error: "Informe a justificativa da reabertura." }, { status: 400 });
-    const result = await admin.rpc("reopen_timesheet", {
-      p_organization_id: actor.organizationId, p_actor_id: actor.id,
-      p_timesheet_id: timesheetId, p_reason: reason,
+    if (reason.length < 5) return apiDomainError("REOPEN_REASON_REQUIRED", "reason");
+    const result = await admin.rpc("reopen_timesheet_v2", {
+      p_organization_id: actor.organizationId,
+      p_actor_id: actor.id,
+      p_contractor_id: body.contractorId,
+      p_year: year,
+      p_month: month,
+      p_reason: reason,
     });
     if (result.error) throw result.error;
-    return Response.json({ action, id: result.data });
+    return Response.json({ action, result: result.data });
   } catch (error) { return apiFailure(error, "timesheet action"); }
 }
 

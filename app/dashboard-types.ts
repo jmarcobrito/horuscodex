@@ -1,3 +1,6 @@
+import type { ApprovalInbox } from "../db/approval-inbox";
+import type { TimesheetPreview } from "../db/timesheet-preview";
+
 export type DashboardPeriod = {
   from: string;
   to: string;
@@ -19,7 +22,8 @@ export type DashboardContractor = {
   fillPercentage: number;
   averageDelayDays: number;
   retroactiveEntries: number;
-  timesheetStatus: "OPEN" | "CLOSED" | "REOPENED" | "MIXED";
+  timesheetStatus: "NOT_STARTED" | "OPEN" | "CLOSED" | "REOPENED" | "MIXED";
+  closingPreview: TimesheetPreview | null;
 };
 
 export type DashboardEntry = {
@@ -139,9 +143,11 @@ export type DashboardData = {
     consideredMinutes: number;
     requiredMinutes: number;
     projectedBalanceMinutes: number;
-    status: "OPEN" | "CLOSED" | "REOPENED" | "MIXED";
+    status: "NOT_STARTED" | "OPEN" | "CLOSED" | "REOPENED" | "MIXED";
   };
   policy: DashboardPolicy;
+  closingPreviews: TimesheetPreview[];
+  approvalInbox: ApprovalInbox;
   contractors: DashboardContractor[];
   entries: DashboardEntry[];
   balanceLots: DashboardBalanceLot[];
