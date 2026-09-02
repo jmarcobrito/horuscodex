@@ -78,7 +78,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   async function refreshDashboard(query = dashboardQuery) {
     setLoading(true); try { await fetchDashboard(query); } catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível atualizar os dados."); } finally { setLoading(false); }
   }
-  async function mutate(path: string, method: "POST" | "PATCH" | "DELETE", body: unknown, success: string, closeModal = true) {
+  async function mutate(path: string, method: "POST" | "PATCH", body: unknown, success: string, closeModal = true) {
     setLoading(true);
     try {
       const response = await fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -100,7 +100,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     finally { setLoading(false); }
   }
 
-  async function adminMutate(method: "PATCH" | "DELETE", body: unknown, success: string, closeModal = true) {
+  async function adminMutate(method: "PATCH", body: unknown, success: string, closeModal = true) {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/users", { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -169,9 +169,6 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   function changeContractorStatus(id: string, next: "ACTIVE" | "INACTIVE") {
     setConfirmation({ title: next === "INACTIVE" ? "Inativar prestador" : "Reativar prestador", description: next === "INACTIVE" ? "O prestador perderá o acesso, mas todo o histórico será preservado." : "O prestador voltará a poder acessar o Horus.", confirmLabel: next === "INACTIVE" ? "Inativar" : "Reativar", reasonRequired: true, onConfirm: async (reason) => { const ok = await mutate("/api/team", "PATCH", { id, status: next, reason }, "Situação do prestador atualizada.", false); if (ok) setConfirmation(null); } });
   }
-  function deleteContractor(id: string, name: string) {
-    setConfirmation({ title: `Excluir ${name}?`, description: "Esta ação apaga permanentemente o cadastro, o acesso, os lançamentos, os saldos e as solicitações deste prestador. Não pode ser desfeita. Para preservar o histórico, use Inativar.", confirmLabel: "Excluir permanentemente", reasonRequired: true, danger: true, onConfirm: async (reason) => { const ok = await mutate("/api/team", "DELETE", { id, reason }, "Prestador excluído permanentemente.", false); if (ok) setConfirmation(null); } });
-  }
   function timesheetAction(contractorId: string, action: "CLOSE" | "REOPEN") {
     if (!dashboard.period.year || !dashboard.period.month) { showNotice("Selecione um mês para fechar ou reabrir uma competência."); return; }
     setConfirmation({ title: action === "CLOSE" ? "Fechar competência" : "Reabrir competência", description: action === "CLOSE" ? "O fechamento gerará as movimentações FIFO e bloqueará novas edições." : "A reabertura estornará o fechamento quando não existirem movimentações posteriores.", confirmLabel: action === "CLOSE" ? "Fechar competência" : "Reabrir competência", reasonRequired: action === "REOPEN", onConfirm: async (reason) => { const ok = await mutate("/api/timesheets", "POST", { contractorId, year: dashboard.period.year, month: dashboard.period.month, action, reason }, action === "CLOSE" ? "Competência fechada e banco atualizado." : "Competência reaberta com estorno auditado.", false); if (ok) setConfirmation(null); } });
@@ -185,9 +182,6 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     if (userToChange.status === next) return;
     setConfirmation({ title: next === "INACTIVE" ? "Inativar usuário" : "Reativar usuário", description: next === "INACTIVE" ? `${userToChange.name} perderá o acesso, mas o histórico será preservado.` : `${userToChange.name} voltará a ter acesso ao Horus.`, confirmLabel: next === "INACTIVE" ? "Inativar" : "Reativar", reasonRequired: true, onConfirm: async (reason) => { const ok = await adminMutate("PATCH", { id: userToChange.id, action: "SET_STATUS", status: next, reason }, "Situação atualizada.", false); if (ok) setConfirmation(null); } });
   }
-  function deleteAdminUser(userToDelete: AdminUser) {
-    setConfirmation({ title: `Excluir ${userToDelete.name}?`, description: "O cadastro, o acesso e o histórico operacional do prestador serão apagados permanentemente. Para manter os dados, use Inativar.", confirmLabel: "Excluir permanentemente", reasonRequired: true, danger: true, onConfirm: async (reason) => { const ok = await adminMutate("DELETE", { id: userToDelete.id, reason }, "Usuário excluído.", false); if (ok) setConfirmation(null); } });
-  }
 
   return <div className="app-shell">
     <button className="mobile-menu" onClick={() => setSidebarOpen((open) => !open)} aria-label="Abrir menu" aria-expanded={sidebarOpen} aria-controls="main-sidebar"><span /><span /></button>
@@ -198,9 +192,9 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
       {section === "entries" && <EntriesView role={role} data={dashboard} readOnly={isDev && viewMode === "pj"} onNew={openNewEntry} onEdit={openEditEntry} onHistory={openHistory} />}
       {section === "balance" && <BalanceView data={dashboard} />}
       {section === "requests" && <RequestsView data={dashboard} role={role} readOnly={isDev && viewMode === "pj"} onNewOccurrence={() => { setOccurrenceForm({ contractorId: defaultContractorId(), type: "MEDICAL_CERTIFICATE", startDate: today, endDate: today, hours: "8", effect: "CREDITS_HOURS", description: "" }); setModal("occurrence"); }} onNewLeave={() => { setLeaveForm({ contractorId: defaultContractorId(), startDate: today, endDate: today, hours: "8", reason: "" }); setModal("leave"); }} onNewAuthorization={() => { setAuthorizationForm({ contractorId: defaultContractorId(), workDate: today, hours: "8", reason: "" }); setModal("authorization"); }} onDecision={decide} />}
-      {section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onDelete={deleteContractor} onTimesheet={timesheetAction} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
+      {section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onTimesheet={timesheetAction} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
       {section === "reports" && role === "rh" && <ReportsView data={dashboard} onPolicy={() => { setPolicyForm({ monthlyHours: minutesToHours(dashboard.policy.monthlyRequiredMinutes), minimumNotice: String(dashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(dashboard.policy.retroactiveBatchThreshold), deadlinePolicy: dashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" }); setModal("policy"); }} />}
-      {section === "admin" && isDev && role === "rh" && <AdminView data={adminData} loading={loading} onRole={changeUserRole} onStatus={changeUserStatus} onDelete={deleteAdminUser} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}
+      {section === "admin" && isDev && role === "rh" && <AdminView data={adminData} loading={loading} onRole={changeUserRole} onStatus={changeUserStatus} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}
     </div></main>
 
     {modal === "entry" && <Modal title={editingEntry ? "Editar lançamento" : "Registrar horas"} eyebrow="LANÇAMENTO DIÁRIO" description="O servidor recalcula o total e preserva o histórico." onClose={() => setModal(null)}><form onSubmit={submitEntry}>{role === "rh" && <ContractorSelect value={entryForm.contractorId} onChange={(contractorId) => setEntryForm({ ...entryForm, contractorId })} data={dashboard} disabled={Boolean(editingEntry)} />}<label className="field full-field">Data trabalhada<input type="date" value={entryForm.date} max={today} onChange={(event) => setEntryForm({ ...entryForm, date: event.target.value })} required disabled={Boolean(editingEntry)} /></label><div className="form-grid"><label className="field">Entrada<input type="time" value={entryForm.start} onChange={(event) => setEntryForm({ ...entryForm, start: event.target.value })} required /></label><label className="field">Saída<input type="time" value={entryForm.end} onChange={(event) => setEntryForm({ ...entryForm, end: event.target.value })} required /></label><label className="field">Intervalo em minutos<input type="number" min="0" max="1440" value={entryForm.breakMinutes} onChange={(event) => setEntryForm({ ...entryForm, breakMinutes: event.target.value })} required /></label><div className="calculated-field"><span>Total calculado</span><strong>{formatMinutes(calculated)}</strong></div></div><label className="field full-field">Observação <em>opcional</em><textarea value={entryForm.notes} onChange={(event) => setEntryForm({ ...entryForm, notes: event.target.value })} maxLength={2000} /></label>{role === "rh" && <label className="field full-field">Justificativa da correção<textarea value={entryForm.changeReason} onChange={(event) => setEntryForm({ ...entryForm, changeReason: event.target.value })} minLength={5} maxLength={2000} required /></label>}<ModalActions loading={loading} onCancel={() => setModal(null)} label={editingEntry ? "Salvar correção" : "Salvar lançamento"} /></form></Modal>}

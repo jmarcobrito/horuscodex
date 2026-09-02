@@ -126,26 +126,3 @@ export async function PATCH(request: Request) {
   } catch (error) { return apiFailure(error, "admin user update"); }
 }
 
-export async function DELETE(request: Request) {
-  const body = await readJson(request) as Record<string, unknown> | null;
-  const id = typeof body?.id === "string" ? body.id : "";
-  const reason = cleanText(body?.reason, 2000);
-  if (!id || reason.length < 5) return Response.json({ error: "Informe o usuário e uma justificativa com pelo menos 5 caracteres." }, { status: 400 });
-  try {
-    const { actor, denied } = await requireDev();
-    if (denied) return denied;
-    const target = await loadTarget(actor, id);
-    if (!target) return Response.json({ error: "Usuário não encontrado." }, { status: 404 });
-    if (target.role !== "PJ") return Response.json({ error: "Usuários do RH devem ser inativados para preservar a autoria e a auditoria." }, { status: 409 });
-    const admin = getSupabaseAdmin();
-    const authUser = target.auth_user_id ? { id: target.auth_user_id } : await findAuthUserByEmail(target.email.toLowerCase());
-    await writeAudit(actor, "USER_DELETED", target, reason);
-    const deleted = await admin.from("users").delete().eq("id", target.id).eq("organization_id", actor.organizationId).eq("role", "PJ").select("id").maybeSingle();
-    if (deleted.error || !deleted.data) throw deleted.error ?? new Error("Usuário não excluído.");
-    if (authUser?.id) {
-      const remaining = await admin.from("users").select("id").eq("auth_user_id", authUser.id).limit(1);
-      if (!remaining.error && !remaining.data?.length) await admin.auth.admin.deleteUser(authUser.id);
-    }
-    return Response.json({ message: `${target.name} e seu histórico operacional foram excluídos.` });
-  } catch (error) { return apiFailure(error, "admin user delete"); }
-}
