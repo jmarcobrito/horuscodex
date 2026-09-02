@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Nenhum comando destrutivo, `DROP TABLE`, `TRUNCATE`, `DELETE` de dados históricos ou reconstrução por aproximação.
-- A migração `20260902093957_safe_month_closing.sql` deve ser aditiva e atômica.
+- As migrações `20260902093957_safe_month_closing.sql` e `20260902095102_transactional_month_closing.sql` devem ser aditivas e atômicas.
 - Registros antigos de um dia recebem distribuição diária determinística; registros antigos de vários dias recebem `NEEDS_REVIEW`.
 - Alterações remotas começam em uma branch do Supabase e somente chegam à produção após backup restaurável, reconciliação e autorização de liberação.
 - Uma folga aplicada abona o mês e consome o crédito reservado uma única vez.
@@ -37,7 +37,7 @@
 - Produces: `DailyAllocation`, `validateDailyAllocation(input)`, `DomainErrorCode`, `domainError(code, field?)`, `domainErrorResponse(error)`.
 - Consumes: `validIsoDate` de `db/http.ts`.
 
-- [ ] **Step 1: escrever testes que falham para distribuição diária**
+- [x] **Step 1: escrever testes que falham para distribuição diária**
 
 ```js
 test("aceita horas informadas por dia quando datas e total conferem", () => {
@@ -57,13 +57,13 @@ test("rejeita soma diária diferente do total", () => {
 });
 ```
 
-- [ ] **Step 2: executar os testes e confirmar falha por módulos ausentes**
+- [x] **Step 2: executar os testes e confirmar falha por módulos ausentes**
 
 Run: `node --test tests/daily-allocation.test.mjs tests/domain-errors.test.mjs`
 
 Expected: FAIL com `ERR_MODULE_NOT_FOUND` para os novos módulos.
 
-- [ ] **Step 3: implementar validação e contrato de erros**
+- [x] **Step 3: implementar validação e contrato de erros**
 
 ```ts
 export type DailyAllocation = { date: string; minutes: number };
@@ -81,7 +81,7 @@ export type DomainErrorCode =
   | "INCOMPLETE_DAILY_ALLOCATION" | "BALANCE_ALREADY_USED";
 ```
 
-- [ ] **Step 4: executar testes de domínio e suíte completa**
+- [x] **Step 4: executar testes de domínio e suíte completa**
 
 Run: `node --test tests/daily-allocation.test.mjs tests/domain-errors.test.mjs`
 
@@ -91,7 +91,7 @@ Run: `npm test`
 
 Expected: build e todos os testes PASS.
 
-- [ ] **Step 5: versionar a unidade**
+- [x] **Step 5: versionar a unidade**
 
 ```bash
 git add package.json db/daily-allocation.ts db/domain-errors.ts tests/daily-allocation.test.mjs tests/domain-errors.test.mjs
@@ -101,14 +101,14 @@ git commit -m "feat: add daily allocation domain contracts"
 ### Task 2: Migração aditiva e proteção do histórico
 
 **Files:**
-- Modify: `supabase/migrations/20260902093957_safe_month_closing.sql`
+- Create: `supabase/migrations/20260902093957_safe_month_closing.sql`
 - Create: `supabase/tests/safe_month_closing_schema.sql`
 
 **Interfaces:**
 - Produces: `leave_request_days`, `occurrence_days`, `allocation_status`, reservas parcialmente consumíveis, snapshot v2 e índices da especificação.
 - Consumes: tabelas e funções das quatro migrações existentes.
 
-- [ ] **Step 1: escrever teste SQL de esquema antes da migração**
+- [x] **Step 1: escrever teste SQL de esquema antes da migração**
 
 ```sql
 begin;
@@ -124,13 +124,13 @@ end $$;
 rollback;
 ```
 
-- [ ] **Step 2: executar o teste na branch Supabase antes da migração**
+- [x] **Step 2: executar o teste na branch Supabase antes da migração**
 
 Run: enviar `supabase/tests/safe_month_closing_schema.sql` por `execute_sql` para a branch de desenvolvimento.
 
 Expected: FAIL com `leave_request_days missing`.
 
-- [ ] **Step 3: implementar o esquema aditivo e o backfill determinístico**
+- [x] **Step 3: implementar o esquema aditivo e o backfill determinístico**
 
 ```sql
 begin;
@@ -237,19 +237,19 @@ create index if not exists balance_transaction_leave_created_idx
 
 Trocar as chaves estrangeiras `contractor_id` que hoje usam `on delete cascade` em `monthly_timesheets`, `time_entries`, `hour_balance_lots`, `leave_requests`, `occurrences` e `non_business_day_authorizations` por `on delete restrict`, preservando os nomes atuais das constraints. Adicionar checks `allocation_status in ('COMPLETE','NEEDS_REVIEW')` e `consumed_minutes between 0 and minutes`.
 
-- [ ] **Step 4: executar migração e teste de esquema na branch**
+- [x] **Step 4: executar migração e teste de esquema na branch**
 
 Run: aplicar a migração com o conector Supabase na branch; depois executar `safe_month_closing_schema.sql`.
 
 Expected: migração concluída e teste PASS.
 
-- [ ] **Step 5: reconciliar a branch antes e depois**
+- [x] **Step 5: reconciliar a branch antes e depois**
 
 Run: consulta agregada de contagem por tabela e soma de `calculated_minutes`, `eligible_minutes`, `remaining_minutes` e `reserved_minutes`.
 
 Expected: todas as contagens e somas históricas anteriores permanecem idênticas; apenas tabelas e colunas novas ganham dados derivados de registros de um dia.
 
-- [ ] **Step 6: versionar a unidade**
+- [x] **Step 6: versionar a unidade**
 
 ```bash
 git add supabase/migrations/20260902093957_safe_month_closing.sql supabase/tests/safe_month_closing_schema.sql
@@ -259,7 +259,7 @@ git commit -m "feat: add non-destructive daily allocation schema"
 ### Task 3: Pré-conferência, fechamento e reabertura transacionais
 
 **Files:**
-- Modify: `supabase/migrations/20260902093957_safe_month_closing.sql`
+- Create: `supabase/migrations/20260902095102_transactional_month_closing.sql`
 - Create: `supabase/tests/safe_month_closing_workflows.sql`
 - Create: `db/timesheet-preview.ts`
 - Create: `tests/timesheet-preview.test.mjs`
@@ -324,7 +324,7 @@ Expected: PASS para READY, NEEDS_REVIEW e CLOSED.
 - [ ] **Step 8: versionar a unidade**
 
 ```bash
-git add supabase/migrations/20260902093957_safe_month_closing.sql supabase/tests/safe_month_closing_workflows.sql db/timesheet-preview.ts tests/timesheet-preview.test.mjs
+git add supabase/migrations/20260902095102_transactional_month_closing.sql supabase/tests/safe_month_closing_workflows.sql db/timesheet-preview.ts tests/timesheet-preview.test.mjs
 git commit -m "feat: add transactional month closing workflows"
 ```
 
