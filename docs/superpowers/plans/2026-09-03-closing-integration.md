@@ -44,7 +44,7 @@
 ## 3. Verificar e atualizar o mesmo PR
 
 - [x] Executar a suíte isolada, builds, lint e tipos. Comparar o código enviado com o código testado.
-- [ ] Atualizar PR #3 com integração, resultados reais do ensaio e limites restantes. Manter rascunho se qualquer condição de backend falhar.
+- [x] Atualizar PR #3 com integração, resultados reais do ensaio e limites restantes. Manter rascunho se qualquer condição de backend falhar.
 - [x] Registrar explicitamente se o fechamento real pode ou não ser liberado. Não confundir teste HTTP ou SQL local com validação do banco de produção.
 
 ## Resultado desta execução

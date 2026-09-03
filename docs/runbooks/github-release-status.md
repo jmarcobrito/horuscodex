@@ -10,7 +10,7 @@ Nova execução isolada: **57 testes da aplicação aprovados**, 0 falhas/ignora
 
 As falhas são: pendência sem lançamento não bloqueia o fechamento; aprovação pode alterar mês fechado; edição concorrente pode gravar depois do fechamento. A menor proposta de correção está no relatório. Não houve alteração de migrações, rotas ou funções de banco nesta integração, nem chamada ao Supabase real. O valor da flag de produção não foi consultado nem alterado. Não houve merge/deploy por esta execução.
 
-O código segue no mesmo PR #3, em rascunho. A configuração que desabilita deploy automático desta branch permanece igual. A abertura do PR e os testes locais não comprovam a integridade dos dados reais.
+O código foi publicado no mesmo PR #3 pelo commit `39a16c54305ec65a30673afbdb114a31024599fc`, árvore `f06325de64b7e45d78f1f74ad4e28bfb6689dc66`, igual ao conteúdo local revisado. A descrição do PR foi atualizada com os resultados e o rascunho foi mantido. A configuração que desabilita deploy automático desta branch permanece igual. A abertura do PR e os testes locais não comprovam a integridade dos dados reais. O commit posterior apenas registra esta publicação e conclui os checkboxes desta etapa isolada.
 
 ## Registro da preparação anterior
 
