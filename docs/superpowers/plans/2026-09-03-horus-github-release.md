@@ -87,11 +87,13 @@ As demais branches mantêm o comportamento atual. Esta configuração não imped
 
 **Interfaces:** GitHub Git Trees/Commits/Refs e Pull Requests; base `main`, head `release/monthly-review-2026-09-03`, `draft: true`. Não usar merge automático.
 
-- [ ] Conferir novamente o SHA da `main`. Se houver avanço, revisar as mudanças antes de criar o snapshot; não sobrescrever trabalho posterior.
-- [ ] Criar uma árvore baseada na árvore completa da `main`, com os conteúdos revisados. Criar um commit com pai igual à `main` verificada. Não incluir commits locais anteriores nem arquivos fora do diff aprovado.
-- [ ] Criar a branch diretamente nesse commit, que já contém a configuração de deploy automático desabilitado. Não criar primeiro a branch numa revisão sem essa configuração.
-- [ ] Abrir o PR como rascunho, informando: conferência diária opcional, fechamento mensal preservado na interface mas integração real pendente, testes realizados e ausência de mudanças de banco.
-- [ ] Buscar a branch e comparar a árvore remota com a árvore local revisada. Conferir arquivos e estado do PR; registrar o link. Verificar metadados Vercel sem abrir uma sessão real; produção deve continuar na revisão anterior.
+- [x] Conferir novamente o SHA da `main`. Se houver avanço, revisar as mudanças antes de criar o snapshot; não sobrescrever trabalho posterior.
+- [x] Criar uma árvore baseada na árvore completa da `main`, com os conteúdos revisados. Criar um commit com pai igual à `main` verificada. Não incluir commits locais anteriores nem arquivos fora do diff aprovado.
+- [x] Criar a branch diretamente nesse commit, que já contém a configuração de deploy automático desabilitado. Não criar primeiro a branch numa revisão sem essa configuração.
+- [x] Abrir o PR como rascunho, informando: conferência diária opcional, fechamento mensal preservado na interface mas integração real pendente, testes realizados e ausência de mudanças de banco.
+- [x] Buscar a branch e comparar a árvore remota com a árvore local revisada. Conferir arquivos e estado do PR; registrar o link. Verificar metadados Vercel sem abrir uma sessão real; produção deve continuar na revisão anterior.
+
+Resultado: [PR #3](https://github.com/jmarcobrito/horuscodex/pull/3), rascunho. Evidências em [github-release-status.md](../../runbooks/github-release-status.md). As tarefas 4 e 5 continuam pendentes; código no GitHub não significa função de fechamento real validada ou versão publicada.
 
 ## Tarefa 4 — Condição impeditiva: validar o fechamento real
 

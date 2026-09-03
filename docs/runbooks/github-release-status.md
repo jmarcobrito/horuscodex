@@ -6,6 +6,8 @@ Data: 03/09/2026. Plano: [publicação segura](../superpowers/plans/2026-09-03-h
 
 Publicação de código e abertura de PR autorizadas pelo usuário. A versão completa ainda não está liberada para merge/deploy: falta validar e integrar o fechamento real, por pessoa e para a equipe. A conferência por dia permanece uma opção somente de consulta.
 
+**PR aberto, em rascunho:** [#3 — Revisa fluxo mensal e adiciona conferência diária opcional](https://github.com/jmarcobrito/horuscodex/pull/3). Commit inicial do pacote: `e047b283945f3a498f563daa817d4e99742c0a17`; sua árvore `0d86aa781735c1f9de03d96029023401a582da9d` corresponde exatamente ao snapshot local revisado. O registro posterior de publicação altera somente este relatório e os checkboxes do plano.
+
 A preparação usa um snapshot revisado sobre `main` (`bb9f3752a37da01a5647e5ed48ee4894f1c18628`), sem publicar o histórico local anterior dos documentos que continha contagens internas. Nenhuma alteração no histórico local nem nos registros dos colaboradores.
 
 `vercel.json` desabilita o deploy automático somente de `release/monthly-review-2026-09-03`; outras branches e produção mantêm a configuração existente. Isto não impede deploy manual nem merge indevido. O ambiente de prévia remoto não foi comprovado isolado do Supabase real.
@@ -15,7 +17,7 @@ A preparação usa um snapshot revisado sobre `main` (`bb9f3752a37da01a5647e5ed4
 - Nova execução de `npm run verify:workflow` em 03/09/2026: **48 testes aprovados**, zero falhas e zero testes ignorados. Builds Vinext e Next, ESLint e TypeScript concluídos; processo final com saída 0.
 - A verificação foi feita em uma nova cópia temporária sem arquivos de ambiente nem credenciais de produção. Não foi iniciado servidor autenticado.
 - `git diff --check` e `git diff --cached --check` sem erros. Revisados 45 arquivos alterados em relação à `main`; nenhum arquivo de ambiente ou mudança nos caminhos de banco/API protegidos. A busca por padrões comuns de credenciais não encontrou ocorrências; e-mails no conteúdo novo/revisado usam apenas `example.com`.
-- Configuração JSON válida; bloqueio de deploy automático restrito à branch de revisão. A avaliação remota será conferida após publicar a branch; parse local não comprova execução da Vercel.
+- Configuração JSON válida; bloqueio de deploy automático restrito à branch de revisão. Após abrir o PR, não havia novo deploy desta branch na lista Vercel. Não havia checks/statuses de CI no commit; isso não é uma aprovação remota dos testes nem uma prova isolada do motivo pelo qual o deploy não foi criado.
 - Evidência visual anterior em [daily-review-local-validation.md](daily-review-local-validation.md), sem mudança no código da interface nesta preparação. Os testes locais não comprovam integridade nem prontidão do Supabase real.
 
 ## Revisão de prontidão
@@ -32,3 +34,5 @@ A preparação usa um snapshot revisado sobre `main` (`bb9f3752a37da01a5647e5ed4
 Nenhuma chamada ao Supabase real, migração, fechamento, reabertura, alteração de flag, backup/exportação ou mudança de acesso faz parte desta preparação. Não foi feita verificação atual dos dados reais, portanto não se afirma uma conciliação de integridade com base nos testes fictícios.
 
 Produção identificada pelos metadados Vercel: `dpl_A43LoReGToBdAkDbFSULKy4oyf6F`, commit `bb9f3752a37da01a5647e5ed48ee4894f1c18628`. A abertura de PR não autoriza fechar nenhum mês real.
+
+Após a abertura do PR, a produção continuava nesse deploy. O PR permaneceu em rascunho; não houve merge ou deploy manual. A cópia de trabalho local passou à branch de revisão, mantendo a branch anterior e seu histórico local preservados.
