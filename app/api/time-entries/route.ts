@@ -3,6 +3,7 @@ import { apiFailure, cleanText, readJson, validIsoDate } from "../../../db/http"
 import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 import { calculateWorkedMinutes } from "../../../db/time-rules";
+import { readAllRows } from "../../../db/read-all";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +43,12 @@ export async function GET(request: Request) {
   try {
     const actor = await requireActor();
     const requestedId = new URL(request.url).searchParams.get("contractorId");
-    let query = getSupabaseAdmin().from("time_entries").select("*")
-      .eq("organization_id", actor.organizationId).order("work_date", { ascending: false }).limit(100);
+    let query = getSupabaseAdmin().from("time_entries").select("*", { count: "exact" })
+      .eq("organization_id", actor.organizationId).order("work_date", { ascending: false }).order("id");
     if (actor.role === "PJ") query = query.eq("contractor_id", actor.id);
     else if (requestedId) query = query.eq("contractor_id", requestedId);
 
-    const { data, error } = await query;
-    if (error) throw error;
+    const data = await readAllRows((from, to) => query.range(from, to));
     return Response.json({ entries: (data as Row[]).map(serialize) }, {
       headers: { "cache-control": "private, no-store" },
     });

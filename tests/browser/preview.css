@@ -1,0 +1,9 @@
+.fixture-banner { position: fixed; top: 0; left: 0; right: 0; min-height: 36px; padding: 7px 16px; z-index: 100; background: #fff0b8; color: #29220c; font: 12px system-ui; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.fixture-banner summary { cursor: pointer; text-decoration: underline; }
+.fixture-controls { position: absolute; top: 100%; right: 0; background: #fff8dc; width: min(900px,100vw); max-height: 60vh; overflow: auto; padding: 16px; border: 1px solid #d1b65f; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.fixture-controls label { display: flex; gap: 6px; align-items: center; }
+.fixture-controls select, .fixture-controls button { color: #222; background: white; border: 1px solid #847449; border-radius: 4px; padding: 6px; }
+.fixture-controls output { width: 100%; } .fixture-controls pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-shell { padding-top: 36px; } .sidebar { top: 36px; height: calc(100dvh - 36px); }
+@media (max-width: 850px) { .mobile-menu { top: 53px; } }
+@media (max-width: 600px) { .fixture-banner { font-size: 10px; } .fixture-controls { max-height: 65vh; } }

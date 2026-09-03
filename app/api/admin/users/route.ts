@@ -4,6 +4,7 @@ import { requireActor } from "../../../../db/actor";
 import { apiFailure, cleanText, readJson } from "../../../../db/http";
 import { sameOriginFailure } from "../../../../db/request-security";
 import { getSupabaseAdmin } from "../../../../db/supabase";
+import { readAllRows } from "../../../../db/read-all";
 
 export const dynamic = "force-dynamic";
 
@@ -55,16 +56,14 @@ export async function GET() {
     if (denied) return denied;
     const admin = getSupabaseAdmin();
     const [usersResult, auditsResult] = await Promise.all([
-      admin.from("users").select("id,auth_user_id,name,email,role,status,created_at,updated_at").eq("organization_id", actor.organizationId).order("name"),
-      admin.from("audit_logs").select("id,user_id,action,entity_id,reason,created_at").eq("organization_id", actor.organizationId).eq("entity_type", "User").order("created_at", { ascending: false }).limit(80),
+      readAllRows((from,to) => admin.from("users").select("id,auth_user_id,name,email,role,status,created_at,updated_at", { count: "exact" }).eq("organization_id", actor.organizationId).order("name").order("id").range(from,to)),
+      readAllRows((from,to) => admin.from("audit_logs").select("id,user_id,action,entity_id,reason,created_at", { count: "exact" }).eq("organization_id", actor.organizationId).eq("entity_type", "User").order("created_at", { ascending: false }).order("id").range(from,to)),
     ]);
-    if (usersResult.error) throw usersResult.error;
-    if (auditsResult.error) throw auditsResult.error;
-    const users = (usersResult.data ?? []) as UserRow[];
+    const users = usersResult as UserRow[];
     const names = new Map(users.map((user) => [user.id, user.name]));
     return Response.json({
       users: users.map((user) => ({ id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, hasAccess: Boolean(user.auth_user_id), createdAt: user.created_at, updatedAt: user.updated_at })),
-      audits: ((auditsResult.data ?? []) as AuditRow[]).map((audit) => ({ id: audit.id, actorName: names.get(audit.user_id) ?? "Usuário removido", action: audit.action, targetName: names.get(audit.entity_id) ?? "Usuário removido", reason: audit.reason ?? "", createdAt: audit.created_at })),
+      audits: (auditsResult as AuditRow[]).map((audit) => ({ id: audit.id, actorName: names.get(audit.user_id) ?? "Usuário removido", action: audit.action, targetName: names.get(audit.entity_id) ?? "Usuário removido", reason: audit.reason ?? "", createdAt: audit.created_at })),
     }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) { return apiFailure(error, "admin users read"); }
 }

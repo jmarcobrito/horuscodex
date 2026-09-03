@@ -14,18 +14,6 @@ function defaultEffect(type: string) {
   return "DOES_NOT_CREDIT";
 }
 
-async function recalculate(admin: ReturnType<typeof getSupabaseAdmin>, organizationId: string, contractorId: string, startDate: string) {
-  const [year, month] = startDate.split("-").map(Number);
-  const { data, error } = await admin.from("monthly_timesheets").select("id")
-    .eq("organization_id", organizationId).eq("contractor_id", contractorId)
-    .eq("year", year).eq("month", month).maybeSingle();
-  if (error) throw error;
-  if (data?.id) {
-    const result = await admin.rpc("recalculate_timesheet", { p_timesheet_id: data.id });
-    if (result.error) throw result.error;
-  }
-}
-
 export async function POST(request: Request) {
   const originFailure = sameOriginFailure(request);
   if (originFailure) return originFailure;
@@ -41,27 +29,13 @@ export async function POST(request: Request) {
     const requestedEffect = String(body.calculationEffect ?? "");
     const effect = actor.role === "PJ" || !effects.has(requestedEffect)
       ? defaultEffect(String(body.type)) : requestedEffect;
-    const status = actor.role === "PJ" ? "REQUESTED" : "APPROVED";
-    const id = crypto.randomUUID();
-    const admin = getSupabaseAdmin();
-    const row = {
-      id, organization_id: actor.organizationId, contractor_id: contractorId,
-      type: String(body.type), start_date: String(body.startDate), end_date: String(body.endDate),
-      minutes: Number(body.minutes), calculation_effect: effect, status,
-      description: cleanText(body.description), created_by: actor.id, updated_by: actor.id,
-      decided_by: actor.role === "PJ" ? null : actor.id,
-      decided_at: actor.role === "PJ" ? null : new Date().toISOString(),
-    };
-    const { error } = await admin.from("occurrences").insert(row);
-    if (error) throw error;
-    const audit = await admin.from("audit_logs").insert({
-      id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
-      action: status === "APPROVED" ? "OCCURRENCE_CREATED_APPROVED" : "OCCURRENCE_REQUESTED",
-      entity_type: "Occurrence", entity_id: id, new_value: row,
+    const { data, error } = await getSupabaseAdmin().rpc("create_occurrence", {
+      p_organization_id: actor.organizationId, p_actor_id: actor.id, p_contractor_id: contractorId,
+      p_type: String(body.type), p_start_date: body.startDate, p_end_date: body.endDate,
+      p_minutes: Number(body.minutes), p_calculation_effect: effect, p_description: cleanText(body.description),
     });
-    if (audit.error) throw audit.error;
-    if (status === "APPROVED") await recalculate(admin, actor.organizationId, contractorId, String(body.startDate));
-    return Response.json({ id, status }, { status: 201 });
+    if (error) throw error;
+    return Response.json(data, { status: 201 });
   } catch (error) { return apiFailure(error, "occurrence create"); }
 }
 
@@ -75,32 +49,13 @@ export async function PATCH(request: Request) {
   }
   try {
     const actor = await requireActor();
-    const admin = getSupabaseAdmin();
-    let query = admin.from("occurrences").select("*").eq("id", body.id)
-      .eq("organization_id", actor.organizationId);
-    if (actor.role === "PJ") query = query.eq("contractor_id", actor.id);
-    const { data: occurrence, error } = await query.maybeSingle();
-    if (error) throw error;
-    if (!occurrence) return Response.json({ error: "Ocorrência não encontrada." }, { status: 404 });
     if (actor.role === "PJ" && action !== "CANCEL") return Response.json({ error: "Apenas o RH pode decidir ocorrências." }, { status: 403 });
-    if (occurrence.status !== "REQUESTED") return Response.json({ error: "A ocorrência já foi decidida." }, { status: 409 });
-    const status = action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "CANCELLED";
-    const update = {
-      status, updated_by: actor.id, updated_at: new Date().toISOString(),
-      decided_by: actor.role === "PJ" ? null : actor.id,
-      decided_at: actor.role === "PJ" ? null : new Date().toISOString(),
-      decision_notes: cleanText(body.notes),
-    };
-    const updated = await admin.from("occurrences").update(update).eq("id", occurrence.id);
-    if (updated.error) throw updated.error;
-    const audit = await admin.from("audit_logs").insert({
-      id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
-      action: "OCCURRENCE_" + action, entity_type: "Occurrence", entity_id: occurrence.id,
-      previous_value: occurrence, new_value: { ...occurrence, ...update }, reason: cleanText(body.notes) || null,
+    const { data, error } = await getSupabaseAdmin().rpc("decide_occurrence", {
+      p_organization_id: actor.organizationId, p_actor_id: actor.id, p_occurrence_id: body.id,
+      p_action: action, p_notes: cleanText(body.notes),
     });
-    if (audit.error) throw audit.error;
-    await recalculate(admin, actor.organizationId, occurrence.contractor_id, occurrence.start_date);
-    return Response.json({ id: occurrence.id, status });
+    if (error) throw error;
+    return Response.json(data);
   } catch (error) { return apiFailure(error, "occurrence decision"); }
 }
 

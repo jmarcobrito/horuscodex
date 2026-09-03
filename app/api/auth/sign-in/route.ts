@@ -1,4 +1,4 @@
-import { ensureBootstrapAccess } from "../../../../db/actor";
+import { completeSignInAccess } from "../../../../db/actor";
 import { sameOriginFailure } from "../../../../db/request-security";
 import { SupabaseConfigurationError } from "../../../../db/supabase";
 import { createSupabaseServerClient } from "../../../../db/supabase-auth";
@@ -32,15 +32,18 @@ export async function POST(request: Request) {
 
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const allowed = await ensureBootstrapAccess(normalizedEmail);
-    if (!allowed) return Response.json({ error: "E-mail ou senha inv\u00e1lidos." }, { status: 401 });
-
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     });
     if (error) return Response.json({ error: "E-mail ou senha inv\u00e1lidos." }, { status: 401 });
+
+    try { await completeSignInAccess(); }
+    catch {
+      await supabase.auth.signOut();
+      return Response.json({ error: "Esta conta não possui acesso ativo ao Horus." }, { status: 403 });
+    }
 
     return Response.json({ message: "Acesso autorizado.", redirectTo: "/" });
   } catch (error) {
