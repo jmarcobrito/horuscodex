@@ -69,6 +69,15 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
   };
   const raw = (entry: DashboardEntry) => ({ start_time: entry.startTime, end_time: entry.endTime, break_minutes: entry.breakMinutes, calculated_minutes: entry.calculatedMinutes, notes: entry.notes });
   const { request, calls } = createMockRequest({
+    "POST /api/timesheets": async (_url: URL, init: RequestInit) => {
+      if (role === "pj") return Response.json({ error: "Apenas o RH pode fechar o mês." }, { status: 403 });
+      const body = JSON.parse(String(init.body));
+      if (body.action !== "CLOSE") return Response.json({ error: "Ação fora deste ensaio." }, { status: 400 });
+      if (controls.closingMode === "partial" && body.contractorId === "person-2") return Response.json({ error: "Pendência fictícia impede o fechamento." }, { status: 409 });
+      const [result] = await closingSubmit({ year: body.year, month: body.month, contractorIds: [body.contractorId] });
+      if (!["closed", "already-closed"].includes(result.status)) return Response.json({ error: result.message }, { status: 409 });
+      return Response.json({ action: "CLOSE", result: { timesheetId: `ts_${body.contractorId}_${body.year}_${body.month}`, alreadyClosed: result.status === "already-closed" } });
+    },
     "GET /api/dashboard": async (url: URL) => {
       const data = consult(url);
       const fail = controls.failDashboard; controls.failDashboard = false;

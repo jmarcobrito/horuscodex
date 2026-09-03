@@ -2,6 +2,20 @@
 
 Data: 03/09/2026. Plano: [publicação segura](../superpowers/plans/2026-09-03-horus-github-release.md).
 
+## Atualização — integração e testes do backend local
+
+A integração cliente foi implementada após `731e825`, mantendo a flag do servidor e a API existentes. O detalhe está em [closing-integration-validation.md](closing-integration-validation.md). A lacuna de ligação da interface foi resolvida no código; **a versão continua sem autorização técnica para merge/deploy**, pois três verificações das funções SQL reprovaram em banco novo com dados fictícios.
+
+Nova execução isolada: **57 testes da aplicação aprovados**, 0 falhas/ignorados; builds Vinext/Next, ESLint e TypeScript concluídos com saída 0. Comparação de 105 arquivos com a cópia testada sem diferenças; 57 arquivos da aplicação e do ensaio visual também conferidos. SQL local: 3 testes aprovados e 3 reprovados, saída 1; servidor temporário encerrado.
+
+As falhas são: pendência sem lançamento não bloqueia o fechamento; aprovação pode alterar mês fechado; edição concorrente pode gravar depois do fechamento. A menor proposta de correção está no relatório. Não houve alteração de migrações, rotas ou funções de banco nesta integração, nem chamada ao Supabase real. O valor da flag de produção não foi consultado nem alterado. Não houve merge/deploy por esta execução.
+
+O código segue no mesmo PR #3, em rascunho. A configuração que desabilita deploy automático desta branch permanece igual. A abertura do PR e os testes locais não comprovam a integridade dos dados reais.
+
+## Registro da preparação anterior
+
+As seções abaixo documentam a entrega inicial de 48 testes, antes desta integração. Afirmações sobre `app/page.tsx` e ligação do fechamento são históricas; o estado atual está na atualização acima.
+
 ## Escopo e estado
 
 Publicação de código e abertura de PR autorizadas pelo usuário. A versão completa ainda não está liberada para merge/deploy: falta validar e integrar o fechamento real, por pessoa e para a equipe. A conferência por dia permanece uma opção somente de consulta.

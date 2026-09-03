@@ -99,11 +99,13 @@ Resultado: [PR #3](https://github.com/jmarcobrito/horuscodex/pull/3), rascunho. 
 
 **Estado inicial: não cumprida.** Esta etapa é uma revisão de prontidão, não autorização para modificar o Supabase. Não tratar o PR como versão completa até atendê-la.
 
+**Atualização de 03/09/2026:** integração cliente concluída no [plano de integração](2026-09-03-closing-integration.md), com envio à API existente sob a flag de servidor. O ensaio das funções SQL locais reproduziu três falhas; backend ainda não liberado. Os apontamentos da base e do mapa acima descrevem a preparação anterior, não o estado atualizado dessa integração. Evidências em [closing-integration-validation.md](../../runbooks/closing-integration-validation.md).
+
 **Files a inspecionar:** `app/page.tsx`, `app/HorusApp.tsx`, `app/ClosingConfirmation.tsx`, `app/closing-model.ts`, `app/api/timesheets/route.ts`, `app/api/time-entries/route.ts`, `app/api/non-business-authorizations/route.ts`, `app/api/occurrences/route.ts`, `db/dashboard.ts`, `db/feature-flags.ts` e funções existentes em `supabase/migrations/`.
 
 **Contrato atual:** `ClosingSubmit = (command: { year: number; month: number; contractorIds: string[] }) => Promise<ClosingResult[]>`. A API real é individual: `POST /api/timesheets` com `{ action: "CLOSE", contractorId, year, month }`. Não ligar o callback fictício à produção nem presumir atomicidade de toda a equipe.
 
-- [ ] Obter aprovação da proposta mínima de integração em backend isolado, com dados fictícios; não implementar uma migração de produção sob a autorização de deploy.
+- [x] Obter aprovação da proposta mínima de integração em backend isolado, com dados fictícios; não implementar uma migração de produção sob a autorização de deploy.
 - [ ] Demonstrar consultas sem gravações implícitas, sem permitir o uso de crédito vencido.
 - [ ] Demonstrar proteção transacional do mês fechado, consistência entre lançamento/versão/auditoria/saldo, concorrência, repetição e resposta incerta. Não reabrir automaticamente como compensação.
 - [ ] Demonstrar paginação e completude de registros/pendências, escopo por organização/perfil e consulta a pessoas inativas. Lista limitada não comprova ausência de pendências.

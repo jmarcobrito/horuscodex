@@ -5,8 +5,8 @@ import { formatDate, formatMinutes, monthLabel } from "./HorusViews";
 import { buildClosingRows, makeClosingCommand, type ClosingCommand, type ClosingIssue, type ClosingRow, type ClosingStatus } from "./closing-model";
 
 const labels: Record<ClosingStatus, string> = { UNKNOWN: "Situação mensal não disponível", NO_RECORD: "Sem registro mensal", NO_ENTRIES: "Sem lançamentos", PENDING: "Com pendências", READY: "Pronto para revisar", CLOSED: "Fechado" };
-export function ClosingOverview({ data, onReview, onIssue }: {
-  data: DashboardData; onReview: (command: ClosingCommand, rows: ClosingRow[]) => void; onIssue: (issue: ClosingIssue) => void;
+export function ClosingOverview({ data, onReview, onIssue, closingEnabled = false }: {
+  data: DashboardData; onReview: (command: ClosingCommand, rows: ClosingRow[]) => void; onIssue: (issue: ClosingIssue) => void; closingEnabled?: boolean;
 }) {
   const rows = buildClosingRows(data);
   const [selection, setSelection] = useState<{ data: DashboardData; ids: string[]; acknowledged: string[] }>({ data, ids: [], acknowledged: [] });
@@ -42,7 +42,7 @@ export function ClosingOverview({ data, onReview, onIssue }: {
     </article>;
   }
   return <>
-    <section className="page-heading closing-heading"><div><span className="eyebrow">SOMENTE CONFERÊNCIA</span><h1>Fechamento do mês</h1><p>{monthLabel(data.period)} · Nenhum dado será alterado nesta tela. Confira as pendências e selecione quem deseja revisar.</p></div></section>
+    <section className="page-heading closing-heading"><div><span className="eyebrow">{closingEnabled ? "CONFERÊNCIA E FECHAMENTO" : "SOMENTE CONFERÊNCIA"}</span><h1>Fechamento do mês</h1><p>{monthLabel(data.period)} · {closingEnabled ? "Selecione uma pessoa ou a equipe. O mês só será fechado após sua confirmação." : "Fechamento temporariamente indisponível. Você pode consultar o mês e suas pendências."}</p></div></section>
     <div className="closing-toolbar">
       <button type="button" className="secondary-button" disabled={!rows.some(row => row.status === "READY")} onClick={() => setSelection({ ...current, ids: rows.filter(row => row.status === "READY").map(row => row.contractorId) })}>Selecionar prontos para revisar</button>
       <span role="status">{current.ids.length} selecionado(s)</span>

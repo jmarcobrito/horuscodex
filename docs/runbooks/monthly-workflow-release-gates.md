@@ -2,9 +2,9 @@
 
 Data: 03/09/2026. Referência de código local: `5d447c4`.
 
-**Estado: BLOQUEADO — não autorizado/testado nesta etapa.**
+**Estado atual: BLOQUEADO — integração cliente implementada; três falhas de backend reproduzidas em PostgreSQL local.**
 
-Responsável: próxima etapa de backend, após autorização específica. Este documento registra o que falta; não autoriza execução, configuração ou publicação.
+Atualização de 03/09/2026: a integração e o ensaio isolado foram autorizados e executados. A [validação da integração](closing-integration-validation.md) registra os resultados e a menor proposta de correção. As condições abaixo continuam obrigatórias; este documento não autoriza mudanças no Supabase real, configuração ou publicação.
 
 ## Regra de preservação
 

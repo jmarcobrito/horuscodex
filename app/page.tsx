@@ -1,5 +1,6 @@
 import { AuthorizationError, getOptionalActor } from "../db/actor";
 import { getDashboardData } from "../db/dashboard";
+import { monthClosingWriteEnabled } from "../db/feature-flags";
 import { HorusApp } from "./HorusApp";
 import { AccessDeniedScreen, SignInScreen } from "./SignInScreen";
 
@@ -29,6 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
       accountRole={state.actor.role === "DEV" ? "dev" : state.actor.role === "PJ" ? "pj" : "rh"}
       organizationName={state.actor.organizationName}
       initialDashboard={state.initialDashboard}
+      closingEnabled={state.actor.role !== "PJ" && monthClosingWriteEnabled()}
     />
   );
 }

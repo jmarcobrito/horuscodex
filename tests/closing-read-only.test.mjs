@@ -15,7 +15,7 @@ test("closing workspace is visible but writes are disabled by default", async ()
 
   const view = renderToStaticMarkup(createElement(viewImport.module.ClosingOverview, { data: makeDashboard() }));
   assert.match(view, /SOMENTE CONFERÊNCIA/);
-  assert.match(view, /Nenhum dado será alterado nesta tela/);
+  assert.match(view, /Fechamento temporariamente indisponível/);
   assert.match(view, /Revisar fechamento/);
   assert.doesNotMatch(view, /Fechar todos/);
 

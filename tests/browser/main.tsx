@@ -23,13 +23,13 @@ function Harness() {
         <label><input type="checkbox" onChange={e => { server.configure({ failRefreshAfterSave: e.target.checked }); }} />Falhar consulta após salvar</label>
         <label>Histórico fictício<select onChange={e => { server.configure({ historyMode: e.target.value as typeof server.controls.historyMode }); }}><option value="normal">Versões</option><option value="empty">Vazio</option><option value="error">Erro</option><option value="slow">Lento</option></select></label>
         <label>Resultado fictício<select onChange={e => { server.configure({ closingMode: e.target.value as typeof server.controls.closingMode }); }}><option value="normal">Sucesso</option><option value="partial">Falha parcial</option><option value="uncertain">Incerto</option><option value="slow">Lento</option></select></label>
-        <label><input type="checkbox" checked={realDisconnected} onChange={e => setRealDisconnected(e.target.checked)} />Sem callback (como na página real)</label>
+        <label><input type="checkbox" checked={realDisconnected} onChange={e => setRealDisconnected(e.target.checked)} />Fechamento desativado no servidor</label>
         <button onClick={() => setReport(JSON.stringify({ calls: server.calls, closingCalls: server.closingCalls }, null, 2))}>Mostrar chamadas fictícias</button>
         <button onClick={() => setReport(JSON.stringify(server.snapshot(), null, 2))}>Mostrar dias e versões fictícios</button>
         <output><pre>{report}</pre></output>
       </div></details>
     </div>
-    <HorusApp key={run.id} accountRole={run.role} user={{ name: run.role === "pj" ? "Ana Exemplo" : "Usuário de teste", email: "test@example.com" }} organizationName="Empresa fictícia" initialDashboard={server.initialDashboard} request={server.request} closingSubmit={realDisconnected ? undefined : server.closingSubmit} />
+    <HorusApp key={run.id} accountRole={run.role} user={{ name: run.role === "pj" ? "Ana Exemplo" : "Usuário de teste", email: "test@example.com" }} organizationName="Empresa fictícia" initialDashboard={server.initialDashboard} request={server.request} closingEnabled={!realDisconnected} closingTestMode />
   </>;
 }
 createRoot(document.getElementById("root")!).render(<Harness />);
