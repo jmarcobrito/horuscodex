@@ -3,9 +3,8 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, views, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen] = await Promise.all([
+  const [app, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/HorusViews.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/actor.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/time-entries/route.ts", import.meta.url), "utf8"),
@@ -20,11 +19,6 @@ test("ships protected Horus workflows backed by server data", async () => {
   ]);
 
   assert.match(app, /initialDashboard/);
-  assert.match(views, /INTERVALO DE DATAS/);
-  assert.match(views, /Voltar para o mês anterior/);
-  assert.match(views, /Avançar para o próximo mês/);
-  assert.match(views, /moveMonth\(-1\)/);
-  assert.match(views, /moveMonth\(1\)/);
   assert.match(app, /\/api\/dashboard/);
   assert.match(app, /\/api\/time-entries/);
   assert.match(page, /getOptionalActor/);

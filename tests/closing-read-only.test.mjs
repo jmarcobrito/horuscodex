@@ -16,7 +16,8 @@ test("closing workspace is visible but writes are disabled by default", async ()
   const view = renderToStaticMarkup(createElement(viewImport.module.ClosingOverview, { data: makeDashboard() }));
   assert.match(view, /SOMENTE CONFERÊNCIA/);
   assert.match(view, /Nenhum dado será alterado nesta tela/);
-  assert.doesNotMatch(view, /<button|Fechar todos/);
+  assert.match(view, /Revisar fechamento/);
+  assert.doesNotMatch(view, /Fechar todos/);
 
   const response = await routeImport.module.POST(new Request("https://horuscodex.vercel.app/api/timesheets", {
     method: "POST",

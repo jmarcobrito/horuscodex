@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { runnerImport } from "vite";
+import { makeHistoryVersion } from "./fixtures/monthly-workflow.mjs";
+const options = { configFile: false, envDir: false };
+test("history never reports empty while loading or failed", async () => {
+  const { module: h } = await runnerImport("./app/EntryHistory.tsx", options);
+  const render = state => renderToStaticMarkup(createElement(h.EntryHistory, { state, names: new Map(), onRetry() {} }));
+  const loading = render({ status: "loading", entryId: "entry-1" });
+  assert.match(loading, /Carregando histórico deste dia/);
+  assert.doesNotMatch(loading, /ainda não teve alterações|versão original/);
+  const error = render({ status: "error", entryId: "entry-1", message: "Falha de teste" });
+  assert.match(error, /Não foi possível carregar o histórico/);
+  assert.match(error, /Tentar novamente/);
+  assert.doesNotMatch(error, /ainda não teve alterações|versão original/);
+  assert.match(render({ status: "ready", entryId: "entry-1", versions: [] }), /Este dia ainda não teve alterações/);
+});
+test("history compares all fields and never invents attribution", async () => {
+  const { module: h } = await runnerImport("./app/EntryHistory.tsx", options);
+  const version = makeHistoryVersion();
+  version.change_reason = null;
+  const fields = h.historyFields(version);
+  assert.deepEqual(fields.find(field => field.label === "Intervalo"), { label: "Intervalo", before: "60 min", after: "90 min" });
+  assert.deepEqual(fields.find(field => field.label === "Observação"), { label: "Observação", before: "Original", after: "Corrigida" });
+  const html = renderToStaticMarkup(createElement(h.EntryHistory, { state: { status: "ready", entryId: "entry-1", versions: [version] }, names: new Map(), onRetry() {} }));
+  assert.match(html, /Responsável não identificado/);
+  assert.match(html, /Justificativa não informada/);
+  assert.doesNotMatch(html, /Alteração realizada pelo colaborador/);
+  version.changed_at = "invalid";
+  assert.doesNotThrow(() => renderToStaticMarkup(createElement(h.EntryHistory, { state: { status: "ready", entryId: "entry-1", versions: [version] }, names: new Map(), onRetry() {} })));
+});

@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
+import type { ClosingIssue } from "./closing-model";
+import { SelectMenu } from "./SelectMenu";
+import { entryEditBlockReason, resolveEntryDate, selectDailyEntries, selectEntries, selectableContractors, shiftEntryDate, type EntriesDisplayMode } from "./entries-model";
+import { validPeriodDate } from "./period";
 import type { DashboardData, DashboardEntry } from "./dashboard-types";
 
 export type Role = "rh" | "pj";
@@ -43,41 +47,10 @@ function statusTone(status: string) {
   return "neutral";
 }
 
-export function Overview({ data, loading, onNavigate, onPeriod }: { data: DashboardData; loading: boolean; onNavigate: (section: Section) => void; onPeriod: (query: string) => void }) {
-  const [year, setYear] = useState(data.period.year ?? new Date().getFullYear()); const [month, setMonth] = useState(data.period.month ?? new Date().getMonth() + 1);
-  const [from, setFrom] = useState(data.period.from); const [to, setTo] = useState(data.period.to);
-  const visibleMonth = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
-  function moveMonth(offset: number) {
-    const next = new Date(year, month - 1 + offset, 1);
-    const nextYear = next.getFullYear();
-    const nextMonth = next.getMonth() + 1;
-    setYear(nextYear);
-    setMonth(nextMonth);
-    void onPeriod(new URLSearchParams({ year: String(nextYear), month: String(nextMonth) }).toString());
-  }
-  function applyRange() { void onPeriod(new URLSearchParams({ from, to }).toString()); }
+export function Overview({ data, onNavigate }: { data: DashboardData; onNavigate: (section: Section) => void }) {
   const pending = data.metrics.pendingRequests + data.metrics.pendingOccurrences + data.metrics.pendingAuthorizations;
   return <>
-    <section className="page-heading overview-heading"><div><span className="eyebrow">VISÃO CONSOLIDADA</span><h1>Painel</h1><p>{monthLabel(data.period)} · dados reais da organização</p></div>{pending > 0 && <button className="secondary-button" onClick={() => onNavigate("requests")}>{pending} pendência(s)</button>}</section>
-    <section className="period-panel panel" aria-label="Selecionar período">
-      <div className="month-selector">
-        <span className="period-section-label">NAVEGAR POR MÊS</span>
-        <div className="month-selector-controls">
-          <button type="button" onClick={() => moveMonth(-1)} disabled={loading} aria-label="Voltar para o mês anterior">←</button>
-          <strong aria-live="polite">{visibleMonth}</strong>
-          <button type="button" onClick={() => moveMonth(1)} disabled={loading} aria-label="Avançar para o próximo mês">→</button>
-        </div>
-      </div>
-      <div className="period-divider" aria-hidden="true" />
-      <div className="custom-period-selector">
-        <span className="period-section-label">INTERVALO DE DATAS</span>
-        <div className="period-inline">
-          <label>Data inicial<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-          <label>Data final<input type="date" min={from} value={to} onChange={(event) => setTo(event.target.value)} /></label>
-          <button className="primary-button" type="button" onClick={applyRange} disabled={loading || !from || !to || from > to}>Aplicar período</button>
-        </div>
-      </div>
-    </section>
+    <section className="page-heading overview-heading"><div><span className="eyebrow">VISÃO CONSOLIDADA</span><h1>Painel</h1><p>{monthLabel(data.period)} · dados do período</p></div>{pending > 0 && <button className="secondary-button" onClick={() => onNavigate("requests")}>{pending} pendência(s)</button>}</section>
     <section className="metric-grid"><Metric label="COLABORADORES ATIVOS" value={String(data.metrics.activeContractors)} meta="Cadastros ativos" tone="violet" /><Metric label="HORAS REALIZADAS" value={formatMinutes(data.metrics.workedMinutes)} meta={"Meta " + formatMinutes(data.metrics.requiredMinutes)} tone="blue" /><Metric label="SALDO POSITIVO" value={formatMinutes(data.metrics.positiveBalanceMinutes, true)} meta="Créditos em aberto" tone="green" /><Metric label="SALDO NEGATIVO" value={formatMinutes(-data.metrics.negativeBalanceMinutes, true)} meta="Déficits em aberto" tone="amber" /></section>
     <section className="dashboard-grid"><div className="panel discipline-panel"><PanelHeading eyebrow="DISCIPLINA DE PREENCHIMENTO" title="Acompanhamento das pessoas" action="Ver todas as pessoas" onAction={() => onNavigate("team")} />{data.contractors.filter((person) => person.status === "ACTIVE").length ? <div className="table-scroll"><table><thead><tr><th>Colaborador</th><th>Último lançamento</th><th>Atraso médio</th><th>Retroativos</th><th>Preenchimento</th></tr></thead><tbody>{data.contractors.filter((person) => person.status === "ACTIVE").map((person) => <tr key={person.id}><td><div className="person-cell"><span className="mini-avatar violet">{person.initials}</span><div><strong>{person.name}</strong><small>{person.email}</small></div></div></td><td>{person.lastEntryDate ? formatDate(person.lastEntryDate) : "Sem lançamentos"}</td><td>{person.averageDelayDays} dia(s)</td><td>{person.retroactiveEntries}</td><td><div className="fill-cell"><div className="mini-progress"><span style={{ width: person.fillPercentage + "%" }} /></div><b>{person.fillPercentage}%</b></div></td></tr>)}</tbody></table></div> : <Empty text="Nenhum colaborador ativo encontrado." />}</div>
       <div className="panel balance-panel"><PanelHeading eyebrow="BANCO DE HORAS" title="Saldos mais antigos" action="Ver extrato" onAction={() => onNavigate("balance")} />{data.balanceLots.length ? <div className="lot-list">{data.balanceLots.slice(0, 5).map((lot) => <article className="lot-row" key={lot.id}><div className="lot-top"><div><strong>{lot.contractorName}</strong><span>{formatDate(lot.originDate)}</span></div><b className={lot.type === "CREDIT" ? "positive" : "negative"}>{formatMinutes((lot.type === "CREDIT" ? 1 : -1) * lot.remainingMinutes, true)}</b></div><div className="deadline-line"><small>{statusLabel(lot.status)}</small><time>{formatDate(lot.deadlineDate)}</time></div></article>)}</div> : <Empty text="Nenhum lote de saldo aberto." />}</div></section>
@@ -87,10 +60,76 @@ export function Overview({ data, loading, onNavigate, onPeriod }: { data: Dashbo
 function Metric({ label, value, meta, tone }: { label: string; value: string; meta: string; tone: string }) { return <article className="metric-card"><div className={"metric-icon " + tone}>◇</div><span>{label}</span><strong>{value}</strong><p>{meta}</p></article>; }
 function PanelHeading({ eyebrow, title, action, onAction }: { eyebrow: string; title: string; action: string; onAction: () => void }) { return <div className="panel-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div><button onClick={onAction}>{action} <b>→</b></button></div>; }
 
-export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = false }: { role: Role; data: DashboardData; onNew: () => void; onEdit: (entry: DashboardEntry) => void; onHistory: (entry: DashboardEntry) => void; readOnly?: boolean }) {
-  return <><section className="page-heading"><div><span className="eyebrow">PERÍODO SELECIONADO</span><h1>{role === "rh" ? "Lançamentos da equipe" : "Meu mês"}</h1><p>{monthLabel(data.period)}</p></div>{role === "pj" && !readOnly && <button className="primary-button" onClick={onNew}>+ Registrar horas</button>}</section>
-    <section className="timesheet-summary"><div><span>Horas trabalhadas</span><strong>{formatMinutes(data.timesheet.workedMinutes)}</strong></div><div><span>Horas abonadas</span><strong>{formatMinutes(data.timesheet.creditedMinutes)}</strong></div><div><span>Total considerado</span><strong>{formatMinutes(data.timesheet.consideredMinutes)}</strong><small>Meta: {formatMinutes(data.timesheet.requiredMinutes)}</small></div><div className="projected"><span>Saldo</span><strong>{formatMinutes(data.timesheet.projectedBalanceMinutes, true)}</strong><small>{statusLabel(data.timesheet.status)}</small></div></section>
-    <section className="panel entries-panel">{data.entries.length ? <div className="entry-list">{data.entries.map((entry) => <article key={entry.id} className="entry-row"><div className="date-tile"><strong>{entry.workDate.slice(8, 10)}</strong><span>{entry.workDate.slice(5, 7)}</span></div><div className="entry-day"><strong>{role === "rh" ? entry.contractorName : entryDay(entry)}</strong><span>{entry.notes || entryDay(entry)}</span></div><div className="time-block"><span>Entrada</span><strong>{entry.startTime}</strong></div><div className="time-separator">→</div><div className="time-block"><span>Saída</span><strong>{entry.endTime}</strong></div><div className="time-block break-block"><span>Intervalo</span><strong>{formatMinutes(entry.breakMinutes)}</strong></div><div className="entry-total"><span>Total</span><strong>{formatMinutes(entry.calculatedMinutes)}</strong></div><span className={"status-pill " + statusTone(entry.nonBusinessDayStatus)}>{statusLabel(entry.nonBusinessDayStatus)}</span><div className="row-actions">{!readOnly && <button onClick={() => onEdit(entry)}>Editar</button>}<button onClick={() => onHistory(entry)}>Histórico</button></div></article>)}</div> : <Empty text="Nenhum lançamento no período selecionado." />}</section></>;
+export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = false, contractorId = null, onContractorChange, displayMode = "collaborator", onDisplayModeChange, workDate = "", onWorkDateChange }: {
+  role: Role; data: DashboardData; onNew: () => void; onEdit: (entry: DashboardEntry) => void;
+  onHistory: (entry: DashboardEntry) => void; readOnly?: boolean;
+  contractorId?: string | null; onContractorChange?: (id: string | null) => void;
+  displayMode?: EntriesDisplayMode; onDisplayModeChange?: (mode: EntriesDisplayMode) => void;
+  workDate?: string; onWorkDateChange?: (date: string) => void;
+}) {
+  const available = selectableContractors(data);
+  const selectedId = role === "pj" ? data.contractors[0]?.id ?? null : available.some(person => person.id === contractorId) ? contractorId : null;
+  const selection = selectEntries(data, selectedId);
+  const monthlyKnown = data.monthlyTimesheets?.some(month => !selectedId || month.contractorId === selectedId);
+  const daily = role === "rh" && displayMode === "day";
+  const date = resolveEntryDate(data.period, workDate);
+  const day = daily ? selectDailyEntries(data, date) : null;
+  const previousDay = shiftEntryDate(data.period, date, -1);
+  const nextDay = shiftEntryDate(data.period, date, 1);
+  const visibleEntries = day?.entries ?? selection.entries;
+  return <>
+    <section className="page-heading"><div><span className="eyebrow">PERÍODO SELECIONADO</span><h1>{role === "rh" ? "Lançamentos da equipe" : "Meu mês"}</h1><p>{monthLabel(data.period)}</p></div>{role === "pj" && !readOnly && <button className="primary-button" onClick={onNew}>+ Registrar horas</button>}</section>
+    {role === "rh" && <fieldset className="entries-display"><legend>Visualizar lançamentos</legend>
+      <label><input type="radio" name="entries-display" checked={!daily} onChange={() => onDisplayModeChange?.("collaborator")} />Por colaborador</label>
+      <label><input type="radio" name="entries-display" checked={daily} onChange={() => onDisplayModeChange?.("day")} />Por dia</label>
+    </fieldset>}
+    {role === "rh" && !daily && <div className="entries-filter"><span>Colaborador</span><SelectMenu ariaLabel="Filtrar lançamentos por colaborador" value={selectedId ?? ""} onChange={id => onContractorChange?.(id || null)} options={[{ value: "", label: "Toda a equipe" }, ...available.map(person => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo · histórico preservado" : "Colaborador ativo" }))]} /></div>}
+    {day ? <>
+      <div className="daily-date-control">
+        <label htmlFor="entry-review-date">Data da conferência</label>
+        <div><button type="button" className="secondary-button" aria-label="Conferir dia anterior" disabled={!previousDay} onClick={() => previousDay && onWorkDateChange?.(previousDay)}>←</button>
+          <input id="entry-review-date" type="date" value={date} min={data.period.from} max={data.period.to} onChange={event => { const value = event.target.value; if (validPeriodDate(value) && value >= data.period.from && value <= data.period.to) onWorkDateChange?.(value); }} />
+          <button type="button" className="secondary-button" aria-label="Conferir próximo dia" disabled={!nextDay} onClick={() => nextDay && onWorkDateChange?.(nextDay)}>→</button>
+        </div>
+      </div>
+      <p className="daily-guidance">Somente conferência. Para editar, use “Por colaborador”. O fechamento continua mensal, por pessoa ou equipe, em “Fechamento do mês”.</p>
+      <h2 className="summary-title" aria-live="polite">Conferência de {formatDate(date)} · equipe</h2>
+      <section className="timesheet-summary daily-summary" aria-label={"Resumo do dia " + formatDate(date)}>
+        <div><span>Pessoas com lançamento</span><strong>{day.recordedPeople}</strong></div>
+        <div><span>Sem lançamento nesta consulta</span><strong>{day.withoutEntry.length}</strong></div>
+        <div><span>Horas trabalhadas no dia</span><strong>{formatMinutes(day.workedMinutes)}</strong></div>
+      </section>
+    </> : <><h2 className="summary-title">{selection.title}</h2>
+    <section className="timesheet-summary" aria-label={selection.title}>
+      <div><span>Horas trabalhadas</span><strong>{formatMinutes(selection.summary.workedMinutes)}</strong></div>
+      <div><span>Horas abonadas</span><strong>{formatMinutes(selection.summary.creditedMinutes)}</strong></div>
+      <div><span>Total considerado</span><strong>{formatMinutes(selection.summary.consideredMinutes)}</strong><small>Meta: {formatMinutes(selection.summary.requiredMinutes)}</small></div>
+      <div className="projected"><span>Saldo previsto</span><strong>{formatMinutes(selection.summary.projectedBalanceMinutes, true)}</strong><small>{!selectedId && role === "rh" ? "Consulte a situação por pessoa no fechamento" : monthlyKnown ? statusLabel(selection.summary.status) : "Situação mensal não informada"}</small></div>
+    </section></>}
+    <section className={"panel entries-panel" + (daily ? " daily-entry-panel" : "")}>{visibleEntries.length ? <div className="entry-list">{visibleEntries.map(entry => {
+      const blocked = entryEditBlockReason(data, entry, readOnly);
+      const label = formatDate(entry.workDate) + (role === "rh" ? " · " + entry.contractorName : "");
+      return <article key={entry.id} className="entry-row">
+        <div className="date-tile"><strong>{entry.workDate.slice(8, 10)}</strong><span>{entry.workDate.slice(5, 7)}</span></div>
+        <div className="entry-day"><strong>{role === "rh" ? entry.contractorName : entryDay(entry)}</strong><span>{entry.notes || entryDay(entry)}</span></div>
+        <div className="time-block"><span>Entrada</span><strong>{entry.startTime}</strong></div><div className="time-separator">→</div>
+        <div className="time-block"><span>Saída</span><strong>{entry.endTime}</strong></div>
+        <div className="time-block break-block"><span>Intervalo</span><strong>{formatMinutes(entry.breakMinutes)}</strong></div>
+        <div className="entry-total"><span>Total</span><strong>{formatMinutes(entry.calculatedMinutes)}</strong></div>
+        <span className={"status-pill " + statusTone(entry.nonBusinessDayStatus)}>{statusLabel(entry.nonBusinessDayStatus)}</span>
+        <div className="row-actions daily-actions">
+          {!readOnly && !daily && <button type="button" disabled={Boolean(blocked)} aria-describedby={blocked ? "edit-reason-" + entry.id : undefined} aria-label={"Editar este dia · " + label} onClick={() => onEdit(entry)}>Editar este dia</button>}
+          <button type="button" aria-label={"Histórico deste dia · " + label} onClick={() => onHistory(entry)}>Histórico deste dia</button>
+          {blocked && !readOnly && !daily && <small id={"edit-reason-" + entry.id}>{blocked}</small>}
+        </div>
+      </article>;
+    })}</div> : <Empty text={daily ? "Nenhum lançamento encontrado nesta data." : "Nenhum lançamento no mês para esta seleção."} />}</section>
+    {day && <section className="panel daily-missing" aria-labelledby="daily-missing-title">
+      <h2 id="daily-missing-title">Sem lançamento nesta consulta · {formatDate(date)}</h2>
+      <p>Ausência de lançamento não significa falta. A lista considera os cadastros disponíveis neste mês, incluindo inativos com histórico.</p>
+      {day.withoutEntry.length ? <ul>{day.withoutEntry.map(person => <li key={person.id}><strong>{person.name}</strong><span>{person.status === "INACTIVE" ? "Cadastro inativo · histórico preservado" : "Colaborador ativo"}</span></li>)}</ul> : <p>Todos os colaboradores listados nesta consulta têm lançamento na data.</p>}
+    </section>}
+  </>;
 }
 
 export function BalanceView({ data }: { data: DashboardData }) {
@@ -100,8 +139,22 @@ export function BalanceView({ data }: { data: DashboardData }) {
 }
 
 type RequestActions = { onNewLeave: () => void; onNewOccurrence: () => void; onNewAuthorization: () => void; onDecision: (resource: "leave-requests" | "occurrences" | "non-business-authorizations", id: string, action: string) => void };
-export function RequestsView({ data, role, onNewLeave, onNewOccurrence, onNewAuthorization, onDecision, readOnly = false }: { data: DashboardData; role: Role; readOnly?: boolean } & RequestActions) {
-  return <><section className="page-heading"><div><span className="eyebrow">FLUXOS DE APROVAÇÃO</span><h1>Solicitações e ocorrências</h1><p>{role === "rh" ? "Decisões com autoria e reflexo automático nos cálculos." : readOnly ? "Visualização das solicitações do colaborador selecionado." : "Acompanhe seus pedidos e envie novas solicitações."}</p></div>{!readOnly && <div className="heading-actions"><button className="secondary-button" onClick={onNewOccurrence}>+ Ocorrência</button><button className="secondary-button" onClick={onNewAuthorization}>+ Dia não útil</button><button className="primary-button" onClick={onNewLeave}>+ Solicitar folga</button></div>}</section>
+export function RequestsView({ data: originalData, requestFocus, onClearFocus, role, onNewLeave, onNewOccurrence, onNewAuthorization, onDecision, readOnly = false }: { data: DashboardData; role: Role; readOnly?: boolean; requestFocus?: ClosingIssue; onClearFocus?: () => void } & RequestActions) {
+  const focusRef = useRef<HTMLDivElement>(null);
+  const data = requestFocus ? { ...originalData,
+    requests: [],
+    occurrences: originalData.occurrences.filter(item => requestFocus.kind === "occurrence" && item.id === requestFocus.sourceId && item.contractorId === requestFocus.contractorId),
+    authorizations: originalData.authorizations.filter(item => requestFocus.kind === "authorization-request" && item.id === requestFocus.sourceId && item.contractorId === requestFocus.contractorId),
+  } : originalData;
+  const missing = requestFocus && !data.occurrences.length && !data.authorizations.length && !(requestFocus.kind === "entry-authorization" && originalData.entries.some(entry => entry.id === requestFocus.sourceId && entry.contractorId === requestFocus.contractorId && entry.workDate === requestFocus.workDate));
+  useEffect(() => { if (requestFocus) focusRef.current?.focus(); }, [requestFocus, originalData]);
+  return <>{requestFocus && <div className="request-focus panel" ref={focusRef} tabIndex={-1} id={"pending-" + requestFocus.sourceId}>
+    <strong>Pendência do fechamento · {originalData.contractors.find(person => person.id === requestFocus.contractorId)?.name ?? "Colaborador"} · {formatDate(requestFocus.workDate)}</strong>
+    <p>{requestFocus.label}</p>
+    {missing && <p role="alert">Esta pendência não foi encontrada na consulta; atualize os dados.</p>}
+    {requestFocus.kind === "entry-authorization" && !missing && <p>Confira ou solicite a autorização para este dia. Abrir esta tela não aprova o lançamento.</p>}
+    <button type="button" className="secondary-button" onClick={onClearFocus}>Ver todas</button>
+  </div>}<section className="page-heading"><div><span className="eyebrow">FLUXOS DE APROVAÇÃO</span><h1>Solicitações e ocorrências</h1><p>{role === "rh" ? "Decisões com autoria e reflexo automático nos cálculos." : readOnly ? "Visualização das solicitações do colaborador selecionado." : "Acompanhe seus pedidos e envie novas solicitações."}</p></div>{!readOnly && <div className="heading-actions"><button className="secondary-button" onClick={onNewOccurrence}>+ Ocorrência</button><button className="secondary-button" onClick={onNewAuthorization}>+ Dia não útil</button><button className="primary-button" onClick={onNewLeave}>+ Solicitar folga</button></div>}</section>
     <RequestSection title="Folgas com banco de horas" count={data.requests.filter((item) => item.status === "REQUESTED").length}>{data.requests.length ? data.requests.map((item) => <RequestCard key={item.id} title={item.contractorName} meta={`${formatDate(item.startDate)} a ${formatDate(item.endDate)} · ${formatMinutes(item.requestedMinutes)}`} detail={item.reason || "Sem justificativa informada."} status={item.status}>{!readOnly && item.status === "REQUESTED" && (role === "rh" ? <><button onClick={() => onDecision("leave-requests", item.id, "REJECT")}>Rejeitar</button><button className="approve" onClick={() => onDecision("leave-requests", item.id, "APPROVE")}>Aprovar</button></> : <button onClick={() => onDecision("leave-requests", item.id, "CANCEL")}>Cancelar</button>)}{!readOnly && role === "rh" && item.status === "APPROVED" && <button className="approve" onClick={() => onDecision("leave-requests", item.id, "UTILIZE")}>Marcar utilizada</button>}</RequestCard>) : <Empty text="Nenhuma solicitação de folga." />}</RequestSection>
     <RequestSection title="Ocorrências e abonos" count={data.occurrences.filter((item) => item.status === "REQUESTED").length}>{data.occurrences.length ? data.occurrences.map((item) => <RequestCard key={item.id} title={`${occurrenceLabel(item.type)} · ${item.contractorName}`} meta={`${formatDate(item.startDate)} · ${formatMinutes(item.minutes)}`} detail={item.description || "Sem descrição."} status={item.status}>{!readOnly && item.status === "REQUESTED" && (role === "rh" ? <><button onClick={() => onDecision("occurrences", item.id, "REJECT")}>Rejeitar</button><button className="approve" onClick={() => onDecision("occurrences", item.id, "APPROVE")}>Aprovar</button></> : <button onClick={() => onDecision("occurrences", item.id, "CANCEL")}>Cancelar</button>)}</RequestCard>) : <Empty text="Nenhuma ocorrência no período." />}</RequestSection>
     <RequestSection title="Trabalho em dias não úteis" count={data.authorizations.filter((item) => item.status === "REQUESTED").length}>{data.authorizations.length ? data.authorizations.map((item) => <RequestCard key={item.id} title={item.contractorName} meta={`${formatDate(item.workDate)} · ${formatMinutes(item.estimatedMinutes)}`} detail={item.reason || "Sem justificativa."} status={item.status}>{!readOnly && role === "rh" && item.status === "REQUESTED" && <><button onClick={() => onDecision("non-business-authorizations", item.id, "NEEDS_ADJUSTMENT")}>Solicitar ajuste</button><button onClick={() => onDecision("non-business-authorizations", item.id, "REJECT")}>Rejeitar</button><button className="approve" onClick={() => onDecision("non-business-authorizations", item.id, "APPROVE")}>Aprovar</button></>}</RequestCard>) : <Empty text="Nenhuma autorização no período." />}</RequestSection>
@@ -116,7 +169,7 @@ export function TeamView({ data, onNew, onStatus, onSetPassword }: { data: Dashb
 
 export function ReportsView({ data, onPolicy }: { data: DashboardData; onPolicy: () => void }) {
   const base = `from=${encodeURIComponent(data.period.from)}&to=${encodeURIComponent(data.period.to)}`;
-  return <><section className="page-heading"><div><span className="eyebrow">RELATÓRIOS E CONTROLE</span><h1>Relatórios</h1><p>Exportações respeitam o período selecionado na visão geral.</p></div><button className="secondary-button" onClick={onPolicy}>Configurar políticas</button></section><section className="report-grid"><ReportCard title="Lançamentos" text="Horas trabalhadas, consideradas, atraso e observações." href={`/api/reports/export?type=entries&${base}`} /><ReportCard title="Banco de horas" text="Lotes, origem, prazo, reservas e saldos remanescentes." href={`/api/reports/export?type=balances&${base}`} /><ReportCard title="Auditoria" text="Ações, responsáveis e justificativas registradas." href={`/api/reports/export?type=audit&${base}`} /></section><section className="panel ledger-panel"><div className="panel-heading static"><div><span>TRILHA DE AUDITORIA</span><h2>Ações recentes</h2></div></div>{data.audits.length ? <div className="table-scroll"><table><thead><tr><th>Data</th><th>Responsável</th><th>Ação</th><th>Entidade</th><th>Justificativa</th></tr></thead><tbody>{data.audits.map((audit) => <tr key={audit.id}><td>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(audit.createdAt))}</td><td>{audit.userName}</td><td>{statusLabel(audit.action)}</td><td>{audit.entityType}</td><td>{audit.reason || "—"}</td></tr>)}</tbody></table></div> : <Empty text="Nenhuma ação registrada." />}</section></>;
+  return <><section className="page-heading"><div><span className="eyebrow">RELATÓRIOS E CONTROLE</span><h1>Relatórios</h1><p>Exportações respeitam o período selecionado nesta tela.</p></div><button className="secondary-button" onClick={onPolicy}>Configurar políticas</button></section><section className="report-grid"><ReportCard title="Lançamentos" text="Horas trabalhadas, consideradas, atraso e observações." href={`/api/reports/export?type=entries&${base}`} /><ReportCard title="Banco de horas" text="Lotes, origem, prazo, reservas e saldos remanescentes." href={`/api/reports/export?type=balances&${base}`} /><ReportCard title="Auditoria" text="Ações, responsáveis e justificativas registradas." href={`/api/reports/export?type=audit&${base}`} /></section><section className="panel ledger-panel"><div className="panel-heading static"><div><span>TRILHA DE AUDITORIA</span><h2>Ações recentes</h2></div></div>{data.audits.length ? <div className="table-scroll"><table><thead><tr><th>Data</th><th>Responsável</th><th>Ação</th><th>Entidade</th><th>Justificativa</th></tr></thead><tbody>{data.audits.map((audit) => <tr key={audit.id}><td>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(audit.createdAt))}</td><td>{audit.userName}</td><td>{statusLabel(audit.action)}</td><td>{audit.entityType}</td><td>{audit.reason || "—"}</td></tr>)}</tbody></table></div> : <Empty text="Nenhuma ação registrada." />}</section></>;
 }
 function ReportCard({ title, text, href }: { title: string; text: string; href: string }) { return <article className="report-card"><div>↓</div><h2>{title}</h2><p>{text}</p><a className="primary-button" href={href}>Exportar CSV <span>→</span></a></article>; }
 export function Empty({ text }: { text: string }) { return <div className="empty-state"><strong>Sem dados</strong><p>{text}</p></div>; }

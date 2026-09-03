@@ -9,6 +9,8 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "build:vercel": "next build",
+    "verify:workflow": "node scripts/verify-workflow-isolated.mjs checks",
+    "preview:workflow": "node scripts/verify-workflow-isolated.mjs preview",
     "start": "vinext start",
     "test": "npm run build && node --test tests/*.test.mjs",
     "history:baseline": "node scripts/print-history-baseline.mjs",

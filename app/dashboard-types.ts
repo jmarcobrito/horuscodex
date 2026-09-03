@@ -121,7 +121,15 @@ export type DashboardPolicy = {
   retroactiveBatchThreshold: number;
 };
 
+export type DashboardMonthlyTimesheet = {
+  id: string; contractorId: string; year: number; month: number;
+  status: "OPEN" | "CLOSED" | "REOPENED";
+  workedMinutes: number; creditedMinutes: number; consideredMinutes: number; requiredMinutes: number;
+  closedAt: string | null; closedByName: string | null;
+};
+
 export type DashboardData = {
+  monthlyTimesheets?: DashboardMonthlyTimesheet[];
   period: DashboardPeriod;
   metrics: {
     activeContractors: number;

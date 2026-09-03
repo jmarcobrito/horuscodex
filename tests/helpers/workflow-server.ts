@@ -1,0 +1,131 @@
+import type { DashboardData, DashboardEntry } from "../../app/dashboard-types";
+import type { ClosingSubmit, ClosingResult } from "../../app/closing-model";
+import type { HistoryVersion } from "../../app/EntryHistory";
+import { monthPeriod } from "../../app/period";
+import { buildPeriodSummary } from "../../db/dashboard-summary";
+import { makeWorkflowDashboard, makeHistoryVersion } from "../fixtures/monthly-workflow.mjs";
+import { makeAdminData } from "../fixtures/dashboard.mjs";
+import { createMockRequest } from "./mock-request.mjs";
+
+export type TestRole = "rh" | "pj" | "dev";
+export type TestScenario = "normal" | "pending" | "empty" | "closed" | "unknown" | "range";
+export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenario = "normal") {
+  const dashboards = new Map<string, DashboardData>([["2026-8", makeWorkflowDashboard()], ["2026-9", makeWorkflowDashboard(2026, 9)]]);
+  const versions: Record<string, HistoryVersion[]> = { "entry-1": [makeHistoryVersion()], "entry-2": [] };
+  const closingCalls: unknown[] = [];
+  const controls = { failDashboard: false, delayAugust: false, historyMode: "normal" as "normal" | "empty" | "error" | "slow", closingMode: "normal" as "normal" | "partial" | "uncertain" | "slow", failRefreshAfterSave: false };
+  const august = dashboards.get("2026-8")!;
+  if (scenario === "pending") august.entries[0].nonBusinessDayStatus = "PENDING_AUTHORIZATION";
+  if (scenario === "closed") { august.monthlyTimesheets![0].status = "CLOSED"; august.contractors[0].timesheetStatus = "CLOSED"; }
+  if (scenario === "unknown") august.monthlyTimesheets = undefined;
+  if (scenario === "empty") august.monthlyTimesheets!.push({ ...august.monthlyTimesheets![0], id: "empty-month", contractorId: "person-3", workedMinutes: 0, creditedMinutes: 60, consideredMinutes: 60 });
+  const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  function getMonth(year: number, month: number) {
+    monthPeriod(year, month);
+    const key = year + "-" + month;
+    if (!dashboards.has(key)) dashboards.set(key, makeWorkflowDashboard(year, month));
+    return dashboards.get(key)!;
+  }
+  function consult(url: URL) {
+    const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+    const period = from && to ? { from, to, year: null, month: null } : monthPeriod(Number(url.searchParams.get("year")), Number(url.searchParams.get("month")));
+    const months: DashboardData[] = [];
+    const cursor = new Date(period.from + "T00:00:00Z"), end = new Date(period.to + "T00:00:00Z");
+    while (cursor <= end) { months.push(getMonth(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)); cursor.setUTCDate(1); cursor.setUTCMonth(cursor.getUTCMonth() + 1); }
+    const data = structuredClone(months[0] ?? august);
+    data.period = period;
+    data.entries = structuredClone(months.flatMap(m => m.entries).filter(e => e.workDate >= period.from && e.workDate <= period.to));
+    data.monthlyTimesheets = months.every(m => m.monthlyTimesheets) ? structuredClone(months.flatMap(m => m.monthlyTimesheets!)) : undefined;
+    data.authorizations = structuredClone(months.flatMap(m => m.authorizations).filter(a => a.workDate >= period.from && a.workDate <= period.to));
+    data.occurrences = structuredClone(months.flatMap(m => m.occurrences).filter(o => o.startDate <= period.to && o.endDate >= period.from));
+    const id = role === "pj" ? "person-1" : url.searchParams.get("viewAs");
+    if (id) {
+      data.contractors = data.contractors.filter(p => p.id === id);
+      data.entries = data.entries.filter(e => e.contractorId === id);
+      data.monthlyTimesheets = data.monthlyTimesheets?.filter(m => m.contractorId === id);
+      data.occurrences = data.occurrences.filter(o => o.contractorId === id);
+      data.authorizations = data.authorizations.filter(a => a.contractorId === id);
+      data.requests = []; data.balanceLots = []; data.balanceTransactions = []; data.audits = [];
+    }
+    for (const person of data.contractors) {
+      const entries = data.entries.filter(e => e.contractorId === person.id);
+      const sheets = data.monthlyTimesheets?.filter(m => m.contractorId === person.id) ?? [];
+      person.workedMinutes = entries.reduce((n, e) => n + e.calculatedMinutes, 0);
+      person.consideredMinutes = entries.reduce((n, e) => n + e.eligibleMinutes, 0) + sheets.reduce((n, m) => n + m.creditedMinutes, 0);
+      person.requiredMinutes = sheets.reduce((n, m) => n + m.requiredMinutes, 0) || 480 * months.length;
+      person.timesheetStatus = sheets[0]?.status ?? "OPEN";
+    }
+    const summary = buildPeriodSummary({ users: data.contractors, entries: data.entries, timesheets: data.monthlyTimesheets ?? [], requiredPerMonth: 480, monthCount: months.length });
+    data.timesheet = { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: data.monthlyTimesheets?.every(m => m.status === "CLOSED") ? "CLOSED" : "OPEN" };
+    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, pendingAuthorizations: data.authorizations.filter(a => a.status === "REQUESTED").length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
+    return data;
+  }
+  const snapshot = () => structuredClone({ entries: [...dashboards.values()].flatMap(m => m.entries), versions });
+  const history = (id: string) => async () => {
+    const mode = controls.historyMode;
+    if (mode === "slow") await pause(2500);
+    if (mode === "error") return Response.json({ error: "Falha fictícia no histórico" }, { status: 503 });
+    return Response.json({ versions: mode === "empty" ? [] : structuredClone(versions[id] ?? []) });
+  };
+  const raw = (entry: DashboardEntry) => ({ start_time: entry.startTime, end_time: entry.endTime, break_minutes: entry.breakMinutes, calculated_minutes: entry.calculatedMinutes, notes: entry.notes });
+  const { request, calls } = createMockRequest({
+    "GET /api/dashboard": async (url: URL) => {
+      const data = consult(url);
+      const fail = controls.failDashboard; controls.failDashboard = false;
+      if (controls.delayAugust && data.period.from.startsWith("2026-08")) await pause(2500);
+      return fail ? Response.json({ error: "Falha fictícia na consulta" }, { status: 503 }) : Response.json(data);
+    },
+    "GET /api/admin/users": () => Response.json(makeAdminData()),
+    "GET /api/time-entries/entry-1/history": history("entry-1"),
+    "GET /api/time-entries/entry-2/history": history("entry-2"),
+    "POST /api/time-entries": (_url: URL, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      const data = [...dashboards.values()].find(m => m.entries.some(e => e.contractorId === body.contractorId && e.workDate === body.workDate));
+      const entry = data?.entries.find(e => e.contractorId === body.contractorId && e.workDate === body.workDate);
+      if (!data || !entry) return Response.json({ error: "Dia fora da fixture" }, { status: 404 });
+      if (data.monthlyTimesheets?.find(m => m.contractorId === body.contractorId)?.status === "CLOSED") return Response.json({ error: "Mês fictício fechado" }, { status: 409 });
+      const previous_data = raw(entry);
+      entry.startTime = body.startTime; entry.endTime = body.endTime; entry.breakMinutes = body.breakMinutes; entry.notes = body.notes;
+      const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+      entry.calculatedMinutes = minutes(entry.endTime) - minutes(entry.startTime) - entry.breakMinutes; entry.eligibleMinutes = entry.calculatedMinutes;
+      versions[entry.id] ??= [];
+      versions[entry.id].push({ id: "fixture-version-" + versions[entry.id].length, version_number: versions[entry.id].length + 2, previous_data, new_data: raw(entry), changed_by: role === "pj" ? "person-1" : "test-rh", change_reason: body.changeReason, changed_at: "2026-09-03T12:00:00Z" });
+      const sheet = data.monthlyTimesheets?.find(m => m.contractorId === entry.contractorId);
+      if (sheet) { sheet.workedMinutes = data.entries.filter(e => e.contractorId === entry.contractorId).reduce((n, e) => n + e.calculatedMinutes, 0); sheet.consideredMinutes = sheet.workedMinutes + sheet.creditedMinutes; }
+      if (controls.failRefreshAfterSave) controls.failDashboard = true;
+      return Response.json({ message: "Dia fictício salvo; versão anterior preservada." });
+    },
+    "POST /api/non-business-authorizations": (_url: URL, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      const data = [...dashboards.values()].find(m => m.entries.some(e => e.contractorId === body.contractorId && e.workDate === body.workDate));
+      if (!data) return Response.json({ error: "Dia fora da fixture" }, { status: 404 });
+      data.authorizations.push({ id: "fixture-auth-1", contractorId: body.contractorId, contractorName: data.contractors.find(p => p.id === body.contractorId)!.name, workDate: body.workDate, estimatedMinutes: body.estimatedMinutes, approvedMinutes: null, reason: body.reason, status: "REQUESTED", requestedAt: "2026-09-03T12:00:00Z", decisionNotes: "" });
+      return Response.json({ message: "Solicitação fictícia criada" });
+    },
+    "PATCH /api/non-business-authorizations": (_url: URL, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      const data = [...dashboards.values()].find(m => m.authorizations.some(a => a.id === body.id));
+      const item = data?.authorizations.find(a => a.id === body.id);
+      if (!data || !item) return Response.json({ error: "Autorização fora da fixture" }, { status: 404 });
+      item.status = body.action === "APPROVE" ? "APPROVED" : body.action === "REJECT" ? "REJECTED" : "NEEDS_ADJUSTMENT";
+      if (item.status === "APPROVED") { const entry = data.entries.find(e => e.contractorId === item.contractorId && e.workDate === item.workDate); if (entry) entry.nonBusinessDayStatus = "AUTHORIZED"; }
+      return Response.json({ message: "Decisão fictícia registrada" });
+    },
+  });
+  const closingSubmit: ClosingSubmit = async command => {
+    closingCalls.push(structuredClone(command));
+    if (controls.closingMode === "slow") await pause(2500);
+    if (controls.closingMode === "uncertain") throw Error("Falha fictícia de transporte");
+    return command.contractorIds.map((contractorId, index): ClosingResult => {
+      if (controls.closingMode === "partial" && index > 0) return { contractorId, status: "failed", message: "Falha fictícia, sem reenvio automático" };
+      const sheet = dashboards.get(command.year + "-" + command.month)?.monthlyTimesheets?.find(m => m.contractorId === contractorId);
+      if (!sheet) return { contractorId, status: "blocked", message: "Sem registro mensal fictício" };
+      if (sheet.status === "CLOSED") return { contractorId, status: "already-closed" };
+      sheet.status = "CLOSED"; sheet.closedAt = "2026-09-03T12:00:00Z"; sheet.closedByName = "RH de teste";
+      return { contractorId, status: "closed" };
+    });
+  };
+  const initialDashboard = consult(new URL(scenario === "range" ? "https://horus.invalid/api/dashboard?from=2026-08-03&to=2026-08-15" : "https://horus.invalid/api/dashboard?year=2026&month=8"));
+  const configure = (settings: Partial<typeof controls>) => Object.assign(controls, settings);
+  return { request, calls, closingSubmit, closingCalls, controls, configure, initialDashboard, snapshot };
+}

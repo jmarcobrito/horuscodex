@@ -2,6 +2,7 @@ import type {
   DashboardAudit, DashboardAuthorization, DashboardBalanceLot, DashboardBalanceTransaction,
   DashboardContractor, DashboardData, DashboardEntry, DashboardOccurrence, DashboardRequest,
 } from "../app/dashboard-types";
+import { projectMonthlyTimesheet, type MonthlyTimesheetRow } from "./monthly-timesheet-view";
 import type { HorusActor } from "./actor";
 import { buildPeriodSummary } from "./dashboard-summary";
 import { getSupabaseAdmin } from "./supabase";
@@ -9,7 +10,6 @@ import { getSupabaseAdmin } from "./supabase";
 type PeriodInput = { year?: number; month?: number; from?: string; to?: string };
 type UserRow = { id: string; name: string; email: string; status: "ACTIVE" | "INACTIVE" };
 type EntryRow = { id: string; contractor_id: string; work_date: string; start_time: string; end_time: string; break_minutes: number; calculated_minutes: number; eligible_minutes: number; non_business_day_status: string; notes: string; created_at: string; updated_at: string };
-type TimesheetRow = { contractor_id: string; year: number; month: number; required_minutes: number; credited_minutes: number; status: "OPEN" | "CLOSED" | "REOPENED" };
 type LotRow = { id: string; contractor_id: string; type: "CREDIT" | "DEBIT"; original_minutes: number; remaining_minutes: number; reserved_minutes: number; origin_date: string; deadline_date: string; status: string };
 type TransactionRow = { id: string; contractor_id: string; lot_id: string; type: string; minutes: number; description: string; created_at: string };
 type RequestRow = { id: string; contractor_id: string; start_date: string; end_date: string; requested_minutes: number; reserved_minutes: number; status: string; reason: string; requested_at: string; decision_notes: string | null };
@@ -48,7 +48,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
 
   let usersQuery = admin.from("users").select("id,name,email,status").eq("organization_id", actor.organizationId).eq("role", "PJ").order("name");
   let entriesQuery = admin.from("time_entries").select("id,contractor_id,work_date,start_time,end_time,break_minutes,calculated_minutes,eligible_minutes,non_business_day_status,notes,created_at,updated_at").eq("organization_id", actor.organizationId).gte("work_date", period.from).lte("work_date", period.to).order("work_date", { ascending: false });
-  let timesheetsQuery = admin.from("monthly_timesheets").select("contractor_id,year,month,required_minutes,credited_minutes,status").eq("organization_id", actor.organizationId);
+  let timesheetsQuery = admin.from("monthly_timesheets").select("id,contractor_id,year,month,required_minutes,credited_minutes,worked_minutes,considered_minutes,status,closed_at,closed_by").eq("organization_id", actor.organizationId);
   let lotsQuery = admin.from("hour_balance_lots").select("id,contractor_id,type,original_minutes,remaining_minutes,reserved_minutes,origin_date,deadline_date,status").eq("organization_id", actor.organizationId).order("origin_date");
   let transactionsQuery = admin.from("hour_balance_transactions").select("id,contractor_id,lot_id,type,minutes,description,created_at").eq("organization_id", actor.organizationId).order("created_at", { ascending: false }).limit(100);
   let requestsQuery = admin.from("leave_requests").select("id,contractor_id,start_date,end_date,requested_minutes,reserved_minutes,status,reason,requested_at,decision_notes").eq("organization_id", actor.organizationId).order("requested_at", { ascending: false }).limit(100);
@@ -69,7 +69,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const [usersResult, entriesResult, timesheetsResult, lotsResult, transactionsResult, requestsResult, occurrencesResult, authorizationsResult, auditsResult, policyResult, actorUsersResult] = results;
   const users = (usersResult.data ?? []) as UserRow[];
   const entries = (entriesResult.data ?? []) as EntryRow[]; const keys = monthKeys(period.from, period.to);
-  const timesheets = ((timesheetsResult.data ?? []) as TimesheetRow[]).filter((row) => keys.has(`${row.year}-${row.month}`));
+  const timesheets = ((timesheetsResult.data ?? []) as MonthlyTimesheetRow[]).filter((row) => keys.has(`${row.year}-${row.month}`));
   const lots = ((lotsResult.data ?? []) as LotRow[]).filter((lot) => !["CONSUMED", "CANCELLED", "SETTLED"].includes(lot.status) && lot.remaining_minutes > 0);
   const transactions = (transactionsResult.data ?? []) as TransactionRow[]; const requests = (requestsResult.data ?? []) as RequestRow[];
   const occurrences = (occurrencesResult.data ?? []) as OccurrenceRow[]; const authorizations = (authorizationsResult.data ?? []) as AuthorizationRow[]; const audits = (auditsResult.data ?? []) as AuditRow[];
@@ -100,6 +100,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const statuses = new Set(timesheets.map((row) => row.status));
   return {
     period,
+    monthlyTimesheets: timesheets.map(row => projectMonthlyTimesheet(row, names)),
     metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED").length },
     timesheet: { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" },
     policy: { monthlyRequiredMinutes: requiredPerMonth, positiveBalanceAfterDeadlinePolicy: policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE", minimumLeaveNoticeDays: policyRow?.minimum_leave_notice_days ?? null, retroactiveBatchThreshold: policyRow?.retroactive_batch_threshold ?? 3 },

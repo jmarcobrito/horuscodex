@@ -18,6 +18,7 @@ type Props = {
 type MenuPosition = { top: number; left: number; width: number };
 
 export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = "Selecione", disabled = false, variant = "light" }: Props) {
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<MenuPosition>({ top: 0, left: 0, width: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -39,6 +40,10 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
     });
   }, [options.length]);
 
+  function openMenu() {
+    setPortalRoot(buttonRef.current?.closest<HTMLElement>('[role="dialog"]') ?? document.body);
+    positionMenu(); setOpen(true);
+  }
   function close(focusButton = false) {
     setOpen(false);
     if (focusButton) window.requestAnimationFrame(() => buttonRef.current?.focus());
@@ -86,9 +91,9 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
       aria-expanded={open}
       aria-controls={listboxId}
       disabled={disabled}
-      onClick={() => { if (!open) positionMenu(); setOpen((current) => !current); }}
+      onClick={() => { if (open) close(); else openMenu(); }}
       onKeyDown={(event) => {
-        if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setOpen(true); }
+        if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); openMenu(); }
         if (event.key === "Escape") close();
       }}
     >
@@ -102,7 +107,7 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
           {option.value === value && <b aria-hidden="true">✓</b>}
         </button>)}
       </div>,
-      document.body,
+      portalRoot ?? document.body,
     )}
   </>;
 }
