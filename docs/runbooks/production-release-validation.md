@@ -31,7 +31,9 @@ Metadados de produção foram consultados somente por leitura: tabelas, colunas,
 
 ## Publicação
 
-Em andamento. PR: https://github.com/jmarcobrito/horuscodex/pull/3. Domínio oficial: https://horuscodex.vercel.app.
+Supabase: migração `20260903171101_monthly_write_protection` aplicada com sucesso. A comparação transacional de todas as linhas e permissões passou. O nome do arquivo local foi alinhado ao identificador atribuído pelo Supabase, sem alteração nas funções verificadas.
+
+As 15 funções de proteção/negócio foram conferidas após a instalação: caminho de busca vazio, execução negada a anon/authenticated e permitida ao servidor. A publicação da aplicação segue pelo PR: https://github.com/jmarcobrito/horuscodex/pull/3. Domínio oficial: https://horuscodex.vercel.app.
 
 Não fechar ou reabrir um mês real para verificar o deploy. Isso continua sendo uma decisão operacional explícita do RH.
 

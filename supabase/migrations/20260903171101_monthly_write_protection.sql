@@ -1,4 +1,5 @@
 -- Horus release: definitions only, no historical record repair, deletion or rewrite.
+-- Version aligned with the ID assigned by Supabase when this exact SQL was applied.
 -- Row fingerprints never leave this transaction; they contain no exported row data.
 begin;
 set local lock_timeout = '2s';

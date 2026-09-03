@@ -56,9 +56,9 @@
 
 ## 4. Publicar e confirmar
 
-- [ ] Atualizar o PR #3 com código e evidência, preservando bloqueio de autodeploy do branch até a liberação.
-- [ ] Aplicar somente a migração nova revisada no projeto Horus, com pré-condições e comparação de preservação na mesma transação; nunca executar operações de ponto como teste.
-- [ ] Verificar por leitura funções instaladas, permissões e advisors. Não avançar se houver divergência.
+- [x] Atualizar o PR #3 com código e evidência, preservando bloqueio de autodeploy do branch até a liberação.
+- [x] Aplicar somente a migração nova revisada no projeto Horus, com pré-condições e comparação de preservação na mesma transação; nunca executar operações de ponto como teste.
+- [x] Verificar por leitura funções instaladas, permissões e advisors. Não avançar se houver divergência.
 - [ ] Finalizar/mesclar o PR usando o SHA verificado; publicar no projeto oficial e habilitar o fechamento somente com backend validado.
 - [ ] Confirmar deployment READY, commit publicado, domínio oficial e ausência de novos erros de inicialização. Não executar escrita autenticada em produção como smoke test.
 - [ ] Registrar resultado e encerrar a meta somente após publicação confirmada.

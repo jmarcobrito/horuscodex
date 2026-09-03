@@ -57,7 +57,7 @@ try {
   const tablePermissions = () => query("select jsonb_agg(jsonb_build_object('table',c.relname,'rls',c.relrowsecurity,'acl',c.relacl::text) order by c.relname) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'");
   const beforePermissions = tablePermissions();
   const installCandidate = () => run("psql", connection,
-    readFileSync(join(root, "supabase/migrations/20260903165520_monthly_write_protection.sql"), "utf8"));
+    readFileSync(join(root, "supabase/migrations/20260903171101_monthly_write_protection.sql"), "utf8"));
   if (candidate) installCandidate();
   console.log("New local test cluster: " + target + "; loopback port " + port);
   await probe("installing proposed functions preserves every protected row", () => assert.equal(fullSnapshot(), beforeInstall));
@@ -67,7 +67,7 @@ try {
   });
   if (candidate) await probe("the deployment guard rolls back a tampered installation without changing any row", () => {
     const beforeTamper = fullSnapshot();
-    const sql = readFileSync(join(root, "supabase/migrations/20260903165520_monthly_write_protection.sql"), "utf8");
+    const sql = readFileSync(join(root, "supabase/migrations/20260903171101_monthly_write_protection.sql"), "utf8");
     const tampered = sql.replace("do $preservation_after$", "update public.users set name='Fictitious mutation that must roll back' where id='test-rh';\ndo $preservation_after$");
     assert.notEqual(tampered, sql);
     assert.throws(() => run("psql", connection, tampered), /records or table permissions changed/);

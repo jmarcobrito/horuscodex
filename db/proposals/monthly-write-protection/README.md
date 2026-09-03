@@ -1,6 +1,6 @@
 # Candidato local — proteção das gravações mensais
 
-Estes arquivos são fontes de ensaio e **não devem ser executados separadamente em produção**. O pacote único revisado é `supabase/migrations/20260903165520_monthly_write_protection.sql`, com verificações de compatibilidade e preservação na mesma transação.
+Estes arquivos são fontes de ensaio e **não devem ser executados separadamente em produção**. O pacote único revisado é `supabase/migrations/20260903171101_monthly_write_protection.sql`, com verificações de compatibilidade e preservação na mesma transação.
 
 Atualização: o usuário autorizou a conclusão até o deploy. O executor local agora testa o pacote final, inclusive instalação repetida e cancelamento integral de uma instalação adulterada. Ver [validação da publicação](../../../docs/runbooks/production-release-validation.md). O restante deste documento registra a etapa inicial do candidato.
 
