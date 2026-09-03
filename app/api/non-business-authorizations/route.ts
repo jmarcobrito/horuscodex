@@ -17,24 +17,12 @@ export async function POST(request: Request) {
     const actor = await requireActor();
     const contractorId = actor.role === "PJ" ? actor.id : cleanText(body.contractorId, 200);
     if (!contractorId) return Response.json({ error: "Selecione o colaborador." }, { status: 400 });
-    const id = crypto.randomUUID();
-    const row = {
-      id, organization_id: actor.organizationId, contractor_id: contractorId,
-      work_date: String(body.workDate), estimated_minutes: Number(body.estimatedMinutes),
-      reason: cleanText(body.reason), status: "REQUESTED",
-    };
-    const admin = getSupabaseAdmin();
-    const result = await admin.from("non_business_day_authorizations").upsert(row, {
-      onConflict: "organization_id,contractor_id,work_date",
-    }).select("id").single();
-    if (result.error) throw result.error;
-    const audit = await admin.from("audit_logs").insert({
-      id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
-      action: "NON_BUSINESS_AUTH_REQUESTED", entity_type: "NonBusinessDayAuthorization",
-      entity_id: result.data.id, new_value: row,
+    const { data, error } = await getSupabaseAdmin().rpc("request_non_business_authorization", {
+      p_organization_id: actor.organizationId, p_actor_id: actor.id, p_contractor_id: contractorId,
+      p_work_date: body.workDate, p_estimated_minutes: Number(body.estimatedMinutes), p_reason: cleanText(body.reason),
     });
-    if (audit.error) throw audit.error;
-    return Response.json({ id: result.data.id, status: "REQUESTED" }, { status: 201 });
+    if (error) throw error;
+    return Response.json(data, { status: 201 });
   } catch (error) { return apiFailure(error, "non-business authorization create"); }
 }
 
@@ -46,48 +34,22 @@ export async function PATCH(request: Request) {
   if (!body || typeof body.id !== "string" || !["APPROVE", "REJECT", "NEEDS_ADJUSTMENT"].includes(action)) {
     return Response.json({ error: "Ação inválida." }, { status: 400 });
   }
+  if (action === "APPROVE" && body.approvedMinutes !== undefined
+      && (!Number.isInteger(body.approvedMinutes) || Number(body.approvedMinutes) < 1 || Number(body.approvedMinutes) > 1440)) {
+    return Response.json({ error: "Informe entre 1 e 1440 minutos para aprovar." }, { status: 400 });
+  }
   try {
     const actor = await requireActor();
     if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode decidir autorizações." }, { status: 403 });
-    const admin = getSupabaseAdmin();
-    const { data: authorization, error } = await admin.from("non_business_day_authorizations").select("*")
-      .eq("id", body.id).eq("organization_id", actor.organizationId).maybeSingle();
-    if (error) throw error;
-    if (!authorization) return Response.json({ error: "Autorização não encontrada." }, { status: 404 });
-    if (authorization.status !== "REQUESTED") return Response.json({ error: "A autorização já foi decidida." }, { status: 409 });
-    const entryResult = await admin.from("time_entries").select("id,timesheet_id,calculated_minutes")
-      .eq("organization_id", actor.organizationId).eq("contractor_id", authorization.contractor_id)
-      .eq("work_date", authorization.work_date).maybeSingle();
-    if (entryResult.error) throw entryResult.error;
-    const isRetroactive = Boolean(entryResult.data);
-    const status = action === "APPROVE" ? (isRetroactive ? "RETROACTIVELY_APPROVED" : "APPROVED")
-      : action === "REJECT" ? "REJECTED" : "NEEDS_ADJUSTMENT";
-    const update = {
-      status, approved_minutes: action === "APPROVE" ? Number(body.approvedMinutes ?? authorization.estimated_minutes) : null,
-      decided_at: new Date().toISOString(), decided_by: actor.id, decision_notes: cleanText(body.notes),
-    };
-    const updated = await admin.from("non_business_day_authorizations").update(update).eq("id", authorization.id);
-    if (updated.error) throw updated.error;
-    if (entryResult.data) {
-      const eligible = action === "APPROVE"
-        ? Math.min(entryResult.data.calculated_minutes, Number(update.approved_minutes)) : 0;
-      const entryUpdate = await admin.from("time_entries").update({
-        eligible_minutes: eligible,
-        non_business_day_status: action === "APPROVE" ? "AUTHORIZED" : action === "REJECT" ? "REJECTED" : "PENDING_AUTHORIZATION",
-        updated_by: actor.id, updated_at: new Date().toISOString(),
-      }).eq("id", entryResult.data.id);
-      if (entryUpdate.error) throw entryUpdate.error;
-      const recalc = await admin.rpc("recalculate_timesheet", { p_timesheet_id: entryResult.data.timesheet_id });
-      if (recalc.error) throw recalc.error;
-    }
-    const audit = await admin.from("audit_logs").insert({
-      id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
-      action: "NON_BUSINESS_AUTH_" + action, entity_type: "NonBusinessDayAuthorization",
-      entity_id: authorization.id, previous_value: authorization, new_value: { ...authorization, ...update },
-      reason: cleanText(body.notes) || null,
+    // One database transaction owns the decision, daily version, calculation and audit.
+    // Do not fall back to separate writes or retry an uncertain decision.
+    const { data, error } = await getSupabaseAdmin().rpc("decide_non_business_authorization", {
+      p_organization_id: actor.organizationId, p_actor_id: actor.id, p_authorization_id: body.id,
+      p_action: action, p_approved_minutes: action === "APPROVE" && body.approvedMinutes !== undefined ? Number(body.approvedMinutes) : null,
+      p_notes: cleanText(body.notes),
     });
-    if (audit.error) throw audit.error;
-    return Response.json({ id: authorization.id, status });
+    if (error) throw error;
+    return Response.json(data);
   } catch (error) { return apiFailure(error, "non-business authorization decision"); }
 }
 

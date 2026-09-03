@@ -1,6 +1,6 @@
-import { actorErrorResponse, requireActor, resolveViewActor } from "../../../db/actor";
+import { requireActor, resolveViewActor } from "../../../db/actor";
 import { getDashboardData } from "../../../db/dashboard";
-import { SupabaseConfigurationError } from "../../../db/supabase";
+import { apiFailure } from "../../../db/http";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +23,6 @@ export async function GET(request: Request) {
     });
     return Response.json(data, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
-    const actorResponse = actorErrorResponse(error);
-    if (actorResponse) return actorResponse;
-    console.error("[horus] Dashboard query failed", error);
-    if (error instanceof SupabaseConfigurationError) {
-      return Response.json({ error: "Database is not configured." }, { status: 503 });
-    }
-    return Response.json({ error: "Could not load dashboard data." }, { status: 502 });
+    return apiFailure(error, "dashboard query");
   }
 }

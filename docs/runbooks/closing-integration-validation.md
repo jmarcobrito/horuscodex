@@ -2,6 +2,8 @@
 
 **Decisão: integração cliente implementada; backend reprovado nos testes locais. Não fazer merge/deploy nem ativar fechamento.**
 
+Atualização posterior de 03/09/2026: os três contraexemplos deste registro foram corrigidos e testados **somente no candidato local**. Ver [nova validação](monthly-write-protection-local-validation.md), com 27 testes SQL e 67 testes da aplicação aprovados. A evidência histórica abaixo permanece; a correção não foi aplicada ao Supabase e não libera publicação.
+
 Continuação do [PR #3](https://github.com/jmarcobrito/horuscodex/pull/3), a partir de `731e825`. Esta evidência substitui a afirmação anterior de que faltava ligar a confirmação à API; não substitui os critérios de proteção do backend.
 
 ## O que foi implementado

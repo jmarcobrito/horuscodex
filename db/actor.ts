@@ -100,7 +100,7 @@ export async function ensureBootstrapAccess(email: string) {
     id: organizationId,
     name: organizationName,
     status: "ACTIVE",
-  });
+  }, { onConflict: "id", ignoreDuplicates: true });
   if (organizationError) throw organizationError;
 
   const { error: policyError } = await admin.from("organization_policies").upsert(
@@ -109,7 +109,7 @@ export async function ensureBootstrapAccess(email: string) {
       organization_id: organizationId,
       monthly_required_minutes: 9_720,
     },
-    { onConflict: "organization_id" },
+    { onConflict: "organization_id", ignoreDuplicates: true },
   );
   if (policyError) throw policyError;
 
@@ -149,7 +149,7 @@ export async function resolveViewActor(actor: HorusActor, viewAsId?: string): Pr
   };
 }
 
-async function findActorRow(authUser: SupabaseAuthUser): Promise<HorusUserRow> {
+async function findActorRow(authUser: SupabaseAuthUser, bindIdentity = false): Promise<HorusUserRow> {
   const email = authUser.email?.trim().toLowerCase();
   if (!email) throw new AuthorizationError("A conta autenticada n\u00e3o possui e-mail.");
 
@@ -163,9 +163,6 @@ async function findActorRow(authUser: SupabaseAuthUser): Promise<HorusUserRow> {
   if (error) throw error;
 
   if (!data) {
-    const allowed = await ensureBootstrapAccess(email);
-    if (!allowed) throw new AuthorizationError();
-
     const result = await admin
       .from("users")
       .select("id,auth_user_id,organization_id,name,email,role,status,organizations(name,status)")
@@ -185,7 +182,7 @@ async function findActorRow(authUser: SupabaseAuthUser): Promise<HorusUserRow> {
     throw new AuthorizationError("Este cadastro j\u00e1 est\u00e1 vinculado a outra identidade.");
   }
 
-  if (!row.auth_user_id) {
+  if (!row.auth_user_id && bindIdentity) {
     const { data: bound, error: bindError } = await admin
       .from("users")
       .update({ auth_user_id: authUser.id, updated_at: new Date().toISOString() })
@@ -216,6 +213,15 @@ export async function getOptionalActor(): Promise<HorusActor | null> {
     email: row.email,
     role: row.role,
   };
+}
+
+// Identity creation/binding belongs to an explicit, verified sign-in, never a page read.
+export async function completeSignInAccess(): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.email) throw new AuthenticationError();
+  if (!await ensureBootstrapAccess(data.user.email)) throw new AuthorizationError();
+  await findActorRow(data.user, true);
 }
 
 export async function requireActor(): Promise<HorusActor> {
