@@ -11,23 +11,35 @@ import { buildSafeEnv } from "../../scripts/verify-workflow-isolated.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const migrations = join(root, "supabase", "migrations");
-const bin = "C:\\Users\\danyel\\AppData\\Local\\Temp\\horus-postgres-tests-bf4dfb1be39545bdb2635ed7a7d24bb1\\pgsql\\bin";
-const exe = name => join(bin, name + ".exe");
+const requiredExecutables = ["initdb", "postgres", "psql"];
+const executable = (bin, name) => join(bin, name + (process.platform === "win32" ? ".exe" : ""));
 const protectedTables = [
   "users", "time_entries", "time_entry_versions", "monthly_timesheets", "hour_balance_lots",
   "hour_balance_transactions", "leave_requests", "occurrences", "non_business_day_authorizations", "audit_logs",
 ];
 
-function run(name, args, options = {}) {
-  return execFileSync(exe(name), args, { encoding: "utf8", windowsHide: true, timeout: 60_000, maxBuffer: 2_000_000, ...options });
-}
-
-function runAsync(name, args, options = {}) {
-  return new Promise(resolveRun => execFile(exe(name), args, { encoding: "utf8", windowsHide: true, timeout: 60_000, maxBuffer: 2_000_000, ...options }, (error, stdout, stderr) => resolveRun({ error, stdout, stderr })));
+function findPostgresBin() {
+  const configured = [process.env.HORUS_TEST_POSTGRES_BIN, process.env.POSTGRES_BIN, process.env.PG_BIN].filter(Boolean);
+  const temporary = readdirSync(tmpdir(), { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name.startsWith("horus-postgres-tests-"))
+    .map(entry => join(tmpdir(), entry.name, "pgsql", "bin"));
+  const common = process.platform === "win32"
+    ? ["17", "16", "15"].map(version => join("C:\\Program Files\\PostgreSQL", version, "bin"))
+    : ["/usr/lib/postgresql/17/bin", "/usr/lib/postgresql/16/bin", "/usr/local/bin", "/usr/bin"];
+  return [...configured, ...temporary, ...common]
+    .find(candidate => requiredExecutables.every(name => existsSync(executable(candidate, name))));
 }
 
 test("sector RPCs are atomic, scoped, race-safe, and service-role only", { timeout: 120_000 }, async () => {
-  assert.ok(["initdb", "pg_ctl", "postgres", "psql"].every(name => existsSync(exe(name))), "required isolated PostgreSQL bin is unavailable");
+  const bin = findPostgresBin();
+  assert.ok(bin, "Isolated PostgreSQL harness unavailable: set HORUS_TEST_POSTGRES_BIN to a local PostgreSQL bin directory");
+  const exe = name => executable(bin, name);
+  const run = (name, args, options = {}) => execFileSync(exe(name), args, {
+    encoding: "utf8", windowsHide: true, timeout: 60_000, maxBuffer: 2_000_000, ...options,
+  });
+  const runAsync = (name, args, options = {}) => new Promise(resolveRun => execFile(exe(name), args, {
+    encoding: "utf8", windowsHide: true, timeout: 60_000, maxBuffer: 2_000_000, ...options,
+  }, (error, stdout, stderr) => resolveRun({ error, stdout, stderr })));
   const target = mkdtempSync(join(tmpdir(), "horus-sector-rpc-"));
   const data = join(target, "data");
   const env = { ...buildSafeEnv(process.env), PG_RESTRICT_EXEC: "1", PGCONNECT_TIMEOUT: "5", PGOPTIONS: "-c statement_timeout=15000 -c lock_timeout=10000" };
@@ -75,6 +87,13 @@ test("sector RPCs are atomic, scoped, race-safe, and service-role only", { timeo
       assert.equal(query(`select to_regprocedure('${signature}') is not null;`), "t", signature);
       for (const role of ["public", "anon", "authenticated"]) assert.equal(query(`select has_function_privilege('${role}','${signature}','execute');`), "f", `${role}:${signature}`);
       assert.equal(query(`select has_function_privilege('service_role','${signature}','execute');`), "t", `service:${signature}`);
+    }
+
+    query("insert into public.users (id, organization_id, name, email, role, status) values ('report-actor-inactive','report-org','RH inativo','report-actor-inactive@example.com','RH','INACTIVE'), ('report-actor-foreign','other-report-org','RH externo','report-actor-foreign@example.com','RH','ACTIVE');");
+    for (const [actor, slug] of [["missing-actor", "missing"], ["report-actor-inactive", "inactive"], ["report-actor-foreign", "foreign"]]) {
+      unchangedFailure(`select public.create_sector('report-org','${actor}','sec_actor_${slug}','Ator ${slug}')`, /Forbidden operation/);
+      unchangedFailure(`select public.update_sector('report-org','${actor}','report-sector-engineering','Engenharia ${slug}','ACTIVE','Teste de acesso')`, /Forbidden operation/);
+      unchangedFailure(`select public.set_contractor_sector('report-org','${actor}','report-person-b','report-sector-engineering','Teste de acesso')`, /Forbidden operation/);
     }
 
     query("create function public.test_fail_sector_audit() returns trigger language plpgsql as $$ begin if new.action in ('SECTOR_CREATED','SECTOR_UPDATED','SECTOR_STATUS_CHANGED','CONTRACTOR_SECTOR_CHANGED') then raise exception 'Injected sector audit failure'; end if; return new; end $$; create trigger test_fail_sector_audit before insert on public.audit_logs for each row execute function public.test_fail_sector_audit();");

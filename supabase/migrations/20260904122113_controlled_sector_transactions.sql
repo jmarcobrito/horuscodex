@@ -16,7 +16,7 @@ begin
   from public.users u join public.organizations o on o.id = u.organization_id
   where u.id = p_actor_id and u.organization_id = p_organization_id
     and u.status = 'ACTIVE' and o.status = 'ACTIVE';
-  if v_role not in ('RH', 'ADMIN', 'DEV') then
+  if v_role is null or v_role not in ('RH', 'ADMIN', 'DEV') then
     raise exception 'Forbidden operation' using errcode = '42501';
   end if;
   if p_sector_id is null or p_sector_id !~ '^sec_.+'
@@ -51,7 +51,7 @@ begin
   from public.users u join public.organizations o on o.id = u.organization_id
   where u.id = p_actor_id and u.organization_id = p_organization_id
     and u.status = 'ACTIVE' and o.status = 'ACTIVE';
-  if v_role not in ('RH', 'ADMIN', 'DEV') then
+  if v_role is null or v_role not in ('RH', 'ADMIN', 'DEV') then
     raise exception 'Forbidden operation' using errcode = '42501';
   end if;
   if length(pg_catalog.btrim(coalesce(p_name, ''))) not between 1 and 120
@@ -94,7 +94,7 @@ begin
   from public.users u join public.organizations o on o.id = u.organization_id
   where u.id = p_actor_id and u.organization_id = p_organization_id
     and u.status = 'ACTIVE' and o.status = 'ACTIVE';
-  if v_role not in ('RH', 'ADMIN', 'DEV') then
+  if v_role is null or v_role not in ('RH', 'ADMIN', 'DEV') then
     raise exception 'Forbidden operation' using errcode = '42501';
   end if;
   if length(pg_catalog.btrim(coalesce(p_reason, ''))) < 5 then

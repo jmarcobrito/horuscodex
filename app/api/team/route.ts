@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode cadastrar colaboradores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Usuário sem permissão para gerenciar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
     const existing = await admin.from("users").select("id").eq("email", email).maybeSingle();
     if (existing.error) throw existing.error;
@@ -94,7 +94,7 @@ export async function PATCH(request: Request) {
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode alterar colaboradores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Usuário sem permissão para gerenciar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
 
     if (body.action === "SET_PASSWORD") {
