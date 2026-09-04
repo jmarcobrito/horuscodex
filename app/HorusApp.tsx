@@ -16,8 +16,9 @@ import { DeveloperViewBanner } from "./DeveloperViewBanner";
 import type { AdminData, AdminUser } from "./admin-types";
 import type { DashboardData, DashboardEntry, DashboardPeriod } from "./dashboard-types";
 import { SelectMenu } from "./SelectMenu";
+import { ReportsView } from "./reports/ReportsView";
 import {
-  BalanceView, EntriesView, formatDate, formatMinutes, Overview, ReportsView,
+  BalanceView, EntriesView, formatDate, formatMinutes, Overview,
   RequestsView, type Role, type Section, TeamView,
 } from "./HorusViews";
 
@@ -41,6 +42,10 @@ const collaboratorNavItems: Array<{ id: Section; label: string; icon: string }> 
   { id: "requests", label: "Solicitações", icon: "◇" },
 ];
 const sectionNames: Record<Section, string> = { overview: "Painel", entries: "Lançamentos", balance: "Banco de horas", requests: "Solicitações", closing: "Fechamento do mês", team: "Pessoas", reports: "Relatórios", admin: "Administração" };
+
+export function navigationItems(role: Role, isDev: boolean) {
+  return role === "rh" ? rhNavItems.filter(item => !item.devOnly || isDev) : collaboratorNavItems;
+}
 
 function minutesBetween(start: string, end: string, breakMinutes: number) {
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -88,7 +93,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const [policyForm, setPolicyForm] = useState({ monthlyHours: minutesToHours(initialDashboard.policy.monthlyRequiredMinutes), minimumNotice: String(initialDashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(initialDashboard.policy.retroactiveBatchThreshold), deadlinePolicy: initialDashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" });
   const calculated = useMemo(() => minutesBetween(entryForm.start, entryForm.end, Number(entryForm.breakMinutes)), [entryForm]);
   const initials = user.name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  const visibleNav = role === "rh" ? rhNavItems.filter((item) => !item.devOnly || isDev) : collaboratorNavItems;
+  const visibleNav = navigationItems(role, isDev);
   const pendingCount = activeSlot?.data ? dashboard.metrics.pendingRequests + dashboard.metrics.pendingOccurrences + dashboard.metrics.pendingAuthorizations : 0;
 
 
@@ -299,8 +304,8 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon">{item.icon}</span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count">{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
     <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
-      {["overview", "entries", "closing", "reports"].includes(section) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview" || section === "reports"} onChange={changePeriod} />}
-      {section !== "admin" && !activeSlot?.data && <section className="panel workspace-status" role={activeSlot?.error ? "alert" : "status"}>
+      {["overview", "entries", "closing"].includes(section) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview"} onChange={changePeriod} />}
+      {section !== "admin" && section !== "reports" && !activeSlot?.data && <section className="panel workspace-status" role={activeSlot?.error ? "alert" : "status"}>
         <h1>{sectionNames[section]}</h1>
         <p>{activeSlot?.error ? "Não foi possível carregar este mês. " + activeSlot.error : activeSlot?.period ? "Carregando o período escolhido…" : "Escolha o mês para consultar esta tela."}</p>
         {activeSlot?.error && <button type="button" className="secondary-button" onClick={() => void refreshDashboard()}>Tentar novamente</button>}
@@ -311,7 +316,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
       {activeSlot?.data && section === "requests" && <RequestsView data={dashboard} role={role} requestFocus={requestFocus} onClearFocus={() => setRequestFocus(undefined)} readOnly={isDev && viewMode === "pj"} onNewOccurrence={() => { setOccurrenceForm({ contractorId: defaultContractorId(), type: "MEDICAL_CERTIFICATE", startDate: today, endDate: today, hours: "8", effect: "CREDITS_HOURS", description: "" }); setModal("occurrence"); }} onNewLeave={() => { setLeaveForm({ contractorId: defaultContractorId(), startDate: today, endDate: today, hours: "8", reason: "" }); setModal("leave"); }} onNewAuthorization={() => { setAuthorizationForm({ contractorId: requestFocus?.contractorId ?? defaultContractorId(), workDate: requestFocus?.workDate ?? today, hours: "8", reason: "" }); setModal("authorization"); }} onDecision={decide} />}
       {activeSlot?.data && section === "closing" && role === "rh" && <ClosingOverview data={dashboard} closingEnabled={Boolean(submitClosing)} onReview={(command, rows) => { setClosingReview(structuredClone({ command, rows })); setModal("closing"); }} onIssue={issue => void openClosingIssue(issue)} />}
       {activeSlot?.data && section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
-      {activeSlot?.data && section === "reports" && role === "rh" && <ReportsView data={dashboard} onPolicy={() => { setPolicyForm({ monthlyHours: minutesToHours(dashboard.policy.monthlyRequiredMinutes), minimumNotice: String(dashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(dashboard.policy.retroactiveBatchThreshold), deadlinePolicy: dashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" }); setModal("policy"); }} />}
+      {activeSlot?.period && section === "reports" && role === "rh" && <ReportsView period={activeSlot.period} onPeriodChange={changePeriod} request={request} isDev={isDev} />}
       {section === "admin" && isDev && role === "rh" && <AdminView data={adminData} loading={loading} onRole={changeUserRole} onStatus={changeUserStatus} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}
     </div></main>
 

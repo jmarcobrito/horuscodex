@@ -32,3 +32,9 @@ test("Developer simulation states that it is read-only", async () => {
   assert.match(html, /Nenhuma ação será realizada em nome desta pessoa/);
   assert.match(html, /Voltar à visão RH/);
 });
+
+test("DEV sees reports in RH view but collaborator simulation does not", async () => {
+  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false });
+  assert.ok(imported.module.navigationItems("rh", true).some(item => item.id === "reports"));
+  assert.ok(!imported.module.navigationItems("pj", true).some(item => item.id === "reports"));
+});
