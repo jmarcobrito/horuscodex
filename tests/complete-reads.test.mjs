@@ -13,6 +13,12 @@ test("dashboard consultation performs no persistence",async()=>{
   await getDashboardData(rh,{year:2026,month:8});
   assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
 });
+test("dashboard does not load the administrative audit ledger", async () => {
+  boundary.tables.audit_logs = Array.from({ length: 5000 }, (_, index) => ({ id: "audit-" + index }));
+  const data = await getDashboardData(rh, { year: 2026, month: 8 });
+  assert.equal("audits" in data, false);
+  assert.equal(boundary.readsByTable.audit_logs ?? 0, 0);
+});
 test("dashboard projects the organization-scoped current sector without changing time data",async()=>{
   boundary.tables.sectors.push({id:"sector-engineering",organization_id:"test-org",name:"Engenharia",status:"ACTIVE"});
   boundary.tables.users.find(user=>user.id==="person-0000").sector_id="sector-engineering";

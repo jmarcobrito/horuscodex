@@ -72,7 +72,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const activeViewAs = isDev && viewMode === "pj" ? viewedContractorId : "";
   const activeKey = workspaceKey(role, section, activeViewAs);
   const activeSlot = workspaces[activeKey];
-  const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [], audits: [] };
+  const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [] };
   const dashboardQuery = periodQuery(activeSlot?.period ?? initialDashboard.period);
   const [loading, setLoading] = useState(false); const [notice, setNotice] = useState("");
   const [modal, setModal] = useState<ModalKind>(null); const [confirmation, setConfirmation] = useState<Confirmation>(null);

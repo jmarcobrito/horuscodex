@@ -31,6 +31,8 @@ export function makeDashboard() {
       email: "ana@example.com",
       initials: "AE",
       status: "ACTIVE",
+      sectorId: null,
+      sectorName: "Sem setor definido",
       lastEntryDate: "2026-08-01",
       lastEntryAt: "2026-08-01T20:00:00Z",
       workedMinutes: 480,
@@ -47,7 +49,6 @@ export function makeDashboard() {
     requests: [],
     occurrences: [],
     authorizations: [],
-    audits: [],
   };
 }
 

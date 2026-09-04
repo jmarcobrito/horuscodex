@@ -1,10 +1,10 @@
 // Only the external database/auth boundaries are replaced. Real readers/handlers run.
 export const boundary = {
   tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0, rpcLog: [], rpcResult: null,
-  maxRows: 1000, reportCountOffsetAfter: null, authId: "auth-rh", authEmail: "rh@example.com", allowWrites: false, authError: null,
+  maxRows: 1000, reportCountOffsetAfter: null, readsByTable: {}, authId: "auth-rh", authEmail: "rh@example.com", allowWrites: false, authError: null,
   reset() {
     this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.failTable = null; this.failAfter = 0;
-    this.maxRows = 1000; this.reportCountOffsetAfter = null; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
+    this.maxRows = 1000; this.reportCountOffsetAfter = null; this.readsByTable = {}; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
     this.allowWrites = false; this.authError = null;
     this.tables = Object.fromEntries(["users","sectors","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
     this.tables.organizations.push({id:"test-org",timezone:"America/Sao_Paulo"});
@@ -47,7 +47,7 @@ function rowsFor(table) {
   return [];
 }
 class Query {
-  constructor(table) { this.table=table; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; this.selected=""; this.applied=false; }
+  constructor(table) { this.table=table; boundary.readsByTable[table] = (boundary.readsByTable[table] ?? 0) + 1; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; this.selected=""; this.applied=false; }
   select(columns,options) {this.selected=columns;this.exact=options?.count==="exact";return this;}
   eq(key,value) {this.filters.push(row=>row[key]===value);return this;}
   is(key,value) {return this.eq(key,value);}
