@@ -29,18 +29,25 @@ beforeEach(() => {
 });
 
 test("RH creates and inactivates sectors inside its organization", async () => {
+  boundary.rpcResult = { data: { id: "sec-engineering", name: "Engenharia", status: "ACTIVE" }, error: null };
   const created = await sectors.POST(request("POST", { name: "Engenharia" }));
   assert.equal(created.status, 201);
   assert.equal(created.headers.get("cache-control"), "private, no-store");
-  assert.equal(boundary.tables.sectors.find(row => row.name === "Engenharia").organization_id, "test-org");
-  assert.equal(boundary.tables.audit_logs.at(-1).action, "SECTOR_CREATED");
+  assert.equal(boundary.rpcLog.length, 1, "create is a single database RPC");
+  assert.match(boundary.rpcLog[0].args.p_sector_id, /^sec_/);
+  assert.deepEqual({ ...boundary.rpcLog[0].args, p_sector_id: "generated" }, {
+    p_organization_id: "test-org", p_actor_id: "test-rh", p_sector_id: "generated", p_name: "Engenharia",
+  });
 
   const id = (await created.json()).id;
+  boundary.rpcResult = { data: { id, name: "Engenharia", status: "INACTIVE" }, error: null };
   const changed = await sectors.PATCH(request("PATCH", { id, name: "Engenharia", status: "INACTIVE", reason: "Reorganização interna" }));
   assert.equal(changed.status, 200);
   assert.equal(changed.headers.get("cache-control"), "private, no-store");
-  assert.equal(boundary.tables.sectors.find(row => row.id === id).status, "INACTIVE");
-  assert.equal(boundary.tables.audit_logs.at(-1).action, "SECTOR_STATUS_CHANGED");
+  assert.deepEqual(boundary.rpcLog[1], { name: "update_sector", args: {
+    p_organization_id: "test-org", p_actor_id: "test-rh", p_sector_id: id,
+    p_name: "Engenharia", p_status: "INACTIVE", p_reason: "Reorganização interna",
+  } });
 });
 
 test("PJ cannot list or mutate sectors", async () => {
@@ -54,33 +61,23 @@ test("PJ cannot list or mutate sectors", async () => {
 });
 
 test("sector assignment rejects another organization and preserves time data", async () => {
-  boundary.tables.sectors.push({ id: "other-sector", organization_id: "other-org", name: "Operações", status: "ACTIVE" });
-  const before = structuredClone(boundary.tables.time_entries);
+  boundary.rpcResult = { data: null, error: { message: "Invalid sector", code: "22023" } };
   const response = await team.PATCH(request("PATCH", { id: "person-0000", action: "SET_SECTOR", sectorId: "other-sector", reason: "Classificação" }));
   assert.equal(response.status, 400);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
-  assert.deepEqual(boundary.tables.time_entries, before);
+  assert.deepEqual(boundary.rpcLog, [{ name: "set_contractor_sector", args: {
+    p_organization_id: "test-org", p_actor_id: "test-rh", p_contractor_id: "person-0000",
+    p_sector_id: "other-sector", p_reason: "Classificação",
+  } }]);
 });
 
 test("sector assignment changes only the contractor sector and its audit record", async () => {
-  boundary.tables.sectors.push({ id: "engineering", organization_id: "test-org", name: "Engenharia", status: "ACTIVE" });
-  const before = structuredClone({
-    timeEntries: boundary.tables.time_entries,
-    timesheets: boundary.tables.monthly_timesheets,
-    lots: boundary.tables.hour_balance_lots,
-    transactions: boundary.tables.hour_balance_transactions,
-    audits: boundary.tables.audit_logs,
-  });
+  boundary.rpcResult = { data: { id: "person-0000", sectorId: "engineering" }, error: null };
   const response = await team.PATCH(request("PATCH", { id: "person-0000", action: "SET_SECTOR", sectorId: "engineering", reason: "Classificação inicial" }));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { id: "person-0000", sectorId: "engineering" });
-  assert.equal(boundary.tables.users.find(row => row.id === "person-0000").sector_id, "engineering");
-  assert.deepEqual(boundary.tables.time_entries, before.timeEntries);
-  assert.deepEqual(boundary.tables.monthly_timesheets, before.timesheets);
-  assert.deepEqual(boundary.tables.hour_balance_lots, before.lots);
-  assert.deepEqual(boundary.tables.hour_balance_transactions, before.transactions);
-  assert.deepEqual(boundary.tables.audit_logs.slice(0, -1), before.audits);
-  assert.equal(boundary.tables.audit_logs.at(-1).action, "CONTRACTOR_SECTOR_CHANGED");
+  assert.equal(boundary.rpcCalls, 1);
+  assert.equal(boundary.writes, 0, "route does not perform a second non-transactional write");
 });
 
 test("sector routes never cache validation, origin, duplicate, or actor failures", async () => {
@@ -94,10 +91,24 @@ test("sector routes never cache validation, origin, duplicate, or actor failures
   assert.equal(crossOrigin.status, 403);
   assert.equal(crossOrigin.headers.get("cache-control"), "private, no-store");
 
+  boundary.rpcResult = { data: { id: "sec-finance", name: "Financeiro", status: "ACTIVE" }, error: null };
   const first = await sectors.POST(request("POST", { name: "Financeiro" }));
   assert.equal(first.status, 201);
+  boundary.rpcResult = { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint \"sectors_org_name_unique\"" } };
   const duplicate = await sectors.POST(request("POST", { name: " financeiro " }));
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.headers.get("cache-control"), "private, no-store");
   assert.deepEqual(await duplicate.json(), { error: "Já existe um setor com este nome." });
+});
+
+test("unique-sector constraint failures are mapped to the required conflict response", async () => {
+  boundary.rpcResult = { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint \"sectors_org_name_unique\"" } };
+  const create = await sectors.POST(request("POST", { name: "Duplicado" }));
+  const rename = await sectors.PATCH(request("PATCH", { id: "sec-existing", name: "Duplicado", status: "ACTIVE", reason: "Renomeação válida" }));
+  for (const response of [create, rename]) {
+    assert.equal(response.status, 409);
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+    assert.deepEqual(await response.json(), { error: "Já existe um setor com este nome." });
+  }
+  assert.deepEqual(boundary.rpcLog.map(call => call.name), ["create_sector", "update_sector"]);
 });

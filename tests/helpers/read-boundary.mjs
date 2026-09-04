@@ -1,9 +1,9 @@
 // Only the external database/auth boundaries are replaced. Real readers/handlers run.
 export const boundary = {
-  tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0,
+  tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0, rpcLog: [], rpcResult: null,
   maxRows: 1000, authId: "auth-rh", authEmail: "rh@example.com", allowWrites: false, authError: null,
   reset() {
-    this.writes = 0; this.rpcCalls = 0; this.failTable = null; this.failAfter = 0;
+    this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.failTable = null; this.failAfter = 0;
     this.maxRows = 1000; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
     this.allowWrites = false; this.authError = null;
     this.tables = Object.fromEntries(["users","sectors","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
@@ -51,7 +51,7 @@ class Query {
   then(resolve,reject) {return Promise.resolve(this.result()).then(resolve,reject);}
 }
 export class SupabaseConfigurationError extends Error {}
-export function getSupabaseAdmin() {return {from:table=>new Query(table),rpc(){boundary.rpcCalls++;throw Error("Forbidden RPC during read");}};}
+export function getSupabaseAdmin() {return {from:table=>new Query(table),rpc(name,args){boundary.rpcCalls++;boundary.rpcLog.push({name,args});return boundary.rpcResult??{data:null,error:{message:"Forbidden RPC during read"}};}};}
 export async function createSupabaseServerClient() {
   return {auth:{
     getUser:async()=>({data:{user:{id:boundary.authId,email:boundary.authEmail}},error:null}),

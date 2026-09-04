@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -109,6 +109,7 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
   const data = join(target, "data");
   const env = {
     ...buildSafeEnv(process.env),
+    PG_RESTRICT_EXEC: "1",
     PGCONNECT_TIMEOUT: "5",
     PGCLIENTENCODING: "UTF8",
     PGOPTIONS: "-c statement_timeout=15000 -c lock_timeout=10000",
@@ -135,10 +136,20 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
   const applyFile = path => run("psql", connection, readFileSync(path, "utf8"));
   let started = false;
   let fixtureLoaded = false;
+  let postgres = null;
 
   try {
     run("initdb", ["-D", data, "-U", "horus_report_runner", "-A", "trust", "--encoding=UTF8", "--no-locale", "--no-instructions"]);
-    run("pg_ctl", ["start", "-D", data, "-l", join(target, "postgres.log"), "-o", `-h 127.0.0.1 -p ${port}`, "-w", "-t", "30"]);
+    postgres = spawn(executable(bin, "postgres"), ["-D", data, "-h", "127.0.0.1", "-p", String(port)], {
+      env, windowsHide: true, stdio: "ignore",
+    });
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try { query("select 1;"); break; }
+      catch (error) {
+        if (attempt === 59) throw error;
+        await new Promise(resolveWait => setTimeout(resolveWait, 100));
+      }
+    }
     started = true;
     assert.equal(query("select current_user;"), "horus_report_runner");
     query("create role anon; create role authenticated; create role service_role bypassrls;");
@@ -227,9 +238,7 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
       // The cluster is temporary; this marker makes clear that no non-fixture database was ever targeted.
       console.log("Fixture cleanup deferred to temporary-cluster shutdown after a failed assertion.");
     }
-    if (started && existsSync(join(data, "postmaster.pid"))) {
-      run("pg_ctl", ["stop", "-D", data, "-m", "fast", "-w", "-t", "30"]);
-    }
+    if (started && postgres && !postgres.killed) postgres.kill();
     console.log("Isolated reporting cluster: " + target);
   }
 });

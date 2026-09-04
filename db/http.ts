@@ -26,6 +26,10 @@ const databaseFailures: Record<string, { status: number; error: string }> = {
   "Reopen reason is required": { status: 409, error: "Informe uma justificativa para reabrir o mês." },
   "Request cannot be cancelled": { status: 409, error: "A solicitação não pode ser cancelada nesta situação." },
   "Request is not approved": { status: 409, error: "A solicitação ainda não foi aprovada." },
+  "Invalid sector values": { status: 400, error: "Dados do setor inválidos." },
+  "Invalid sector": { status: 400, error: "Setor inválido ou inativo." },
+  "Sector not found": { status: 404, error: "Setor não encontrado." },
+  "Contractor not found": { status: 404, error: "Colaborador não encontrado." },
 };
 
 export function privateJson(body: unknown, init: ResponseInit = {}) {
@@ -48,6 +52,10 @@ export function apiFailure(error: unknown, operation: string) {
   }
   // PostgREST returns plain objects, not necessarily Error instances.
   const message = error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : "";
+  const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "";
+  if (code === "23505" && /sectors_org_name_unique/.test(message)) {
+    return privateJson({ error: "Já existe um setor com este nome." }, { status: 409 });
+  }
   const known = Object.hasOwn(databaseFailures, message) ? databaseFailures[message] : undefined;
   // Do not expose/log row contents, SQL details or unrecognized database messages.
   console.error("[horus] " + operation + " failed", known ? message : "Unrecognized database error");
