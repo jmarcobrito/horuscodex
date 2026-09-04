@@ -6,3 +6,4 @@ export { boundary } from "./read-boundary.mjs";
 export * as signInRoute from "../../app/api/auth/sign-in/route";
 export * as reportsRoute from "../../app/api/reports/export/route";
 export * as adminRoute from "../../app/api/admin/users/route";
+export { ReportInputError, getAllReportRows, getReportOptions, getReportPage, parseReportFilters } from "../../db/reports";
