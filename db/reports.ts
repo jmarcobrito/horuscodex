@@ -5,7 +5,7 @@ import type {
 import { actionLabel, balanceLotStatusLabel, balanceMovementLabel, entrySituationLabel, relatedRecordLabel, reportCategoryLabel } from "../app/reports/report-language";
 import type { HorusActor } from "./actor";
 import { validIsoDate } from "./http";
-import { readAllRows } from "./read-all";
+import { ReadLimitExceededError, readAllRows } from "./read-all";
 import { getSupabaseAdmin } from "./supabase";
 
 const PAGE_SIZE = 50 as const;
@@ -212,8 +212,9 @@ export async function getReportPage(actor: HorusActor, filters: ReportFilters): 
 }
 
 /** Private 500-row reader for exports. Counts and IDs must remain stable across every batch. */
-export async function getAllReportRows(actor: HorusActor, filters: ReportFilters): Promise<ReportRow[]> {
+export async function getAllReportRows(actor: HorusActor, filters: ReportFilters, maxRows?: number): Promise<ReportRow[]> {
   assertFilters(filters);
+  if (maxRows !== undefined && (!Number.isSafeInteger(maxRows) || maxRows < 0)) throw new Error("Invalid row limit");
   const options = await getReportOptions(actor, filters.kind);
   validateScopedFilters(filters, options);
   const raw: unknown[] = [], ids = new Set<string>();
@@ -224,6 +225,7 @@ export async function getAllReportRows(actor: HorusActor, filters: ReportFilters
     if (!Array.isArray(result.data) || result.count === null || !Number.isSafeInteger(result.count) || result.count < 0) throw new Error("Incomplete history read");
     expected ??= result.count;
     if (result.count !== expected || (!result.data.length && raw.length < expected)) throw new Error("History changed during read");
+    if (maxRows !== undefined && result.count > maxRows) throw new ReadLimitExceededError(maxRows, result.count);
     for (const row of result.data as { id?: unknown }[]) {
       if (typeof row.id !== "string" || !row.id || ids.has(row.id)) throw new Error("History changed during read");
       ids.add(row.id); raw.push(row);

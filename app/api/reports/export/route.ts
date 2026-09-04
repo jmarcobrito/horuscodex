@@ -1,6 +1,6 @@
 import { requireActor, type HorusActor } from "../../../../db/actor";
 import { apiFailure, privateJson } from "../../../../db/http";
-import { readAllRows } from "../../../../db/read-all";
+import { ReadLimitExceededError, readAllRows } from "../../../../db/read-all";
 import { buildCsv } from "../../../../db/report-csv";
 import { buildCompleteWorkbook, buildCurrentWorkbook } from "../../../../db/report-excel";
 import { buildBalanceLotsExportModel, buildExportModel, type BalanceLotExportRow, type ExportOrganization } from "../../../../db/report-export-model";
@@ -17,6 +17,8 @@ const CONTENT_TYPES = {
   package: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pdf: "application/pdf",
 } as const;
+
+const MAX_EXPORT_ROWS = 20_000;
 
 type ExportFormat = keyof typeof CONTENT_TYPES;
 type BalanceLotViewRow = {
@@ -83,14 +85,14 @@ async function validateIgnoredActor(actor: HorusActor, filters: ReportFilters) {
   }
 }
 
-async function getAllBalanceLots(actor: HorusActor, filters: ReportFilters): Promise<BalanceLotExportRow[]> {
+async function getAllBalanceLots(actor: HorusActor, filters: ReportFilters, maxRows: number): Promise<BalanceLotExportRow[]> {
   let query = getSupabaseAdmin().from("report_balance_lots").select("*", { count: "exact" })
     .eq("organization_id", actor.organizationId).gte("origin_date", filters.from).lte("origin_date", filters.to);
   if (filters.personId) query = query.eq("person_id", filters.personId);
   if (filters.sectorId === "UNASSIGNED") query = query.is("sector_id", null);
   else if (filters.sectorId) query = query.eq("sector_id", filters.sectorId);
   query = query.order("origin_date", { ascending: false }).order("id", { ascending: false });
-  const rows = await readAllRows<BalanceLotViewRow>((from, to) => query.range(from, to) as never);
+  const rows = await readAllRows<BalanceLotViewRow>((from, to) => query.range(from, to) as never, maxRows);
   return rows.map(row => ({
     id: row.id, personId: row.person_id, personName: row.person_name ?? "Não identificado", sectorName: row.sector_name ?? "Sem setor definido",
     type: row.type, originalMinutes: row.original_minutes, remainingMinutes: row.remaining_minutes, reservedMinutes: row.reserved_minutes,
@@ -114,6 +116,9 @@ function download(bytes: Uint8Array, format: ExportFormat, filters: ReportFilter
 }
 
 function exportFailure(error: unknown) {
+  if (error instanceof ReadLimitExceededError) {
+    return privateJson({ error: "Este relatório ultrapassa o limite de 20.000 registros. Reduza o período ou aplique filtros e tente novamente." }, { status: 413 });
+  }
   if (error instanceof ReportInputError) return privateJson({ error: error.message }, { status: 400 });
   return apiFailure(error, "report export");
 }
@@ -133,10 +138,15 @@ export async function GET(request: Request) {
       const entriesFilters = commonFilters(filters, "entries");
       const balancesFilters = commonFilters(filters, "balances");
       const historyFilters = commonFilters(filters, "history");
-      const [organization, entries, balances, lots, history] = await Promise.all([
-        organizationFor(actor), getAllReportRows(actor, entriesFilters), getAllReportRows(actor, balancesFilters),
-        getAllBalanceLots(actor, balancesFilters), getAllReportRows(actor, historyFilters),
-      ]);
+      const organization = await organizationFor(actor);
+      let remaining = MAX_EXPORT_ROWS;
+      const entries = await getAllReportRows(actor, entriesFilters, remaining);
+      remaining -= entries.length;
+      const balances = await getAllReportRows(actor, balancesFilters, remaining);
+      remaining -= balances.length;
+      const lots = await getAllBalanceLots(actor, balancesFilters, remaining);
+      remaining -= lots.length;
+      const history = await getAllReportRows(actor, historyFilters, remaining);
       if (entries.length + balances.length + lots.length + history.length === 0) {
         return privateJson({ error: "Nenhum registro encontrado com estes filtros." }, { status: 422 });
       }
@@ -149,7 +159,7 @@ export async function GET(request: Request) {
       return download(complete, format, filters);
     }
 
-    const [organization, rows] = await Promise.all([organizationFor(actor), getAllReportRows(actor, filters)]);
+    const [organization, rows] = await Promise.all([organizationFor(actor), getAllReportRows(actor, filters, MAX_EXPORT_ROWS)]);
     if (!rows.length) return privateJson({ error: "Nenhum registro encontrado com estes filtros." }, { status: 422 });
     const model = reportModel(actor, organization, filters, rows, generatedAt);
     if (format === "csv") return download(buildCsv(model), format, filters);

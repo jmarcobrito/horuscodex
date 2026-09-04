@@ -125,26 +125,28 @@ type Aggregate = { label: string; sector: string; entries: number; worked: numbe
 
 function aggregateComplete(input: CompleteWorkbookInput, key: "person" | "sector") {
   const totals = new Map<string, Aggregate>();
-  const get = (label: string, sector: string) => {
-    const mapKey = key === "person" ? `${label}\u0000${sector}` : label;
+  const get = (label: string, sector: string, stablePersonId: string) => {
+    const mapKey = key === "person" ? stablePersonId : label;
     const current = totals.get(mapKey) ?? { label, sector: key === "person" ? sector : "", entries: 0, worked: 0, considered: 0, balance: 0, movements: 0 };
     totals.set(mapKey, current);
     return current;
   };
-  for (const row of input.entries.operationalRows) {
+  input.entries.operationalRows.forEach((row, index) => {
     const person = textFrom(row, "personName"), sector = textFrom(row, "sectorName");
-    const current = get(key === "person" ? person : sector, sector);
+    const personId = textFrom(input.entries.technicalRows[index] ?? {}, "personId");
+    const current = get(key === "person" ? person : sector, sector, personId ? `person:${personId}` : `entry-row:${index}`);
     current.entries += 1;
     current.worked += minutesFrom(row, "workedMinutes");
     current.considered += minutesFrom(row, "consideredMinutes");
-  }
-  for (const row of input.balances.operationalRows) {
+  });
+  input.balances.operationalRows.forEach((row, index) => {
     const person = textFrom(row, "personName"), sector = textFrom(row, "sectorName");
-    const current = get(key === "person" ? person : sector, sector);
+    const personId = textFrom(input.balances.technicalRows[index] ?? {}, "personId");
+    const current = get(key === "person" ? person : sector, sector, personId ? `person:${personId}` : `balance-row:${index}`);
     const direction = textFrom(row, "direction");
     current.movements += 1;
     current.balance += direction === "Crédito" ? minutesFrom(row, "minutes") : direction === "Débito" ? -minutesFrom(row, "minutes") : 0;
-  }
+  });
   return [...totals.values()].sort((left, right) => left.label.localeCompare(right.label, "pt-BR") || left.sector.localeCompare(right.sector, "pt-BR"));
 }
 

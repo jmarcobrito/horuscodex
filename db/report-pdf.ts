@@ -9,6 +9,19 @@ const PAGE_HEIGHT = 841.89;
 const MARGIN = 48;
 const TEXT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
+function pdfSafeText(value: string, font: PDFFont) {
+  const support = new Map<string, boolean>();
+  return Array.from(value.normalize("NFC"), character => {
+    let supported = support.get(character);
+    if (supported === undefined) {
+      try { font.encodeText(character); supported = true; }
+      catch { supported = false; }
+      support.set(character, supported);
+    }
+    return supported ? character : "?";
+  }).join("");
+}
+
 function displayTimestamp(value: string | Date, timezone: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
@@ -80,15 +93,15 @@ export async function buildSummaryPdf(model: ReportExportModel) {
   const drawLines = (lines: string[], options: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; gap?: number } = {}) => {
     const size = options.size ?? 10;
     const lineHeight = size + (options.gap ?? 4);
-    ensure(lines.length * lineHeight);
     for (const line of lines) {
+      ensure(lineHeight);
       page.drawText(line, { x: MARGIN, y, size, font: options.font ?? regular, color: options.color ?? rgb(0.12, 0.15, 0.18) });
       y -= lineHeight;
     }
   };
   const paragraph = (value: string, options: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; gap?: number } = {}) => {
     const font = options.font ?? regular, size = options.size ?? 10;
-    drawLines(wrapText(value, font, size), { ...options, font, size });
+    drawLines(wrapText(pdfSafeText(value, font), font, size), { ...options, font, size });
   };
   const section = (title: string) => {
     ensure(32);

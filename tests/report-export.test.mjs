@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test, { beforeEach } from "node:test";
 import { fileURLToPath } from "node:url";
 import ExcelJS from "exceljs";
@@ -100,6 +101,19 @@ function assertNoExecutableStrings(workbook) {
   }
 }
 
+function replaceEntries(count) {
+  const base = structuredClone(boundary.tables.time_entries[0]);
+  boundary.tables.time_entries = Array.from({ length: count }, (_, index) => ({
+    ...base,
+    id: `limit-entry-${String(index).padStart(5, "0")}`,
+  }));
+}
+
+test("dependency override repairs only vulnerable brace-expansion 1.x", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.deepEqual(manifest.overrides, { "brace-expansion@<=1.1.17": "1.1.18" });
+});
+
 test("spreadsheet text neutralization covers every executable prefix", () => {
   for (const prefix of ["=", "+", "-", "@", "\t", "\r"]) assert.equal(safeSpreadsheetText(prefix + "payload"), "'" + prefix + "payload");
   assert.equal(safeSpreadsheetText("texto normal"), "texto normal");
@@ -163,6 +177,32 @@ test("complete Excel package opens every required sheet and preserves representa
   assertNoExecutableStrings(workbook);
 });
 
+test("complete workbook totals use stable person IDs across duplicate names and changed sector labels", async () => {
+  const entryFilters = filters("entries");
+  const balanceFilters = filters("balances");
+  const entries = buildExportModel({
+    organization, actor, filters: entryFilters, generatedAt,
+    report: { kind: "entries", filters: entryFilters, rows: [
+      { id: "entry-person-a", workDate: "2026-08-03", personId: "person-a", personName: "Alex Silva", sectorName: "Setor antigo", startTime: "08:00", endTime: "09:00", breakMinutes: 0, workedMinutes: 60, consideredMinutes: 60, situation: "Dia útil", notes: "" },
+      { id: "entry-person-b", workDate: "2026-08-03", personId: "person-b", personName: "Alex Silva", sectorName: "Setor antigo", startTime: "08:00", endTime: "10:00", breakMinutes: 0, workedMinutes: 120, consideredMinutes: 120, situation: "Dia útil", notes: "" },
+    ] },
+  });
+  const balances = buildExportModel({
+    organization, actor, filters: balanceFilters, generatedAt,
+    report: { kind: "balances", filters: balanceFilters, rows: [
+      { id: "movement-person-a", createdAt: "2026-08-04T12:00:00.000Z", personId: "person-a", personName: "Alex Silva", sectorName: "Setor novo", movement: "Crédito", direction: "credit", minutes: 30, description: "Crédito", status: "Disponível" },
+    ] },
+  });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildCompleteWorkbook({ entries, balances, lots: lotExportFixture(), history: historyExportFixture() }));
+  const rows = workbook.getWorksheet("Resumo geral").getRows(1, workbook.getWorksheet("Resumo geral").rowCount)
+    .filter(row => row.getCell(1).value === "Alex Silva");
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map(row => row.getCell(3).value).sort(), [1, 1]);
+  assert.deepEqual(rows.map(row => row.getCell(7).value).sort(), [0, 1]);
+  assert.equal(rows.find(row => row.getCell(7).value === 1).getCell(2).value, "Setor antigo");
+});
+
 test("PDF opens, has pages and its normalized content excludes technical codes", async () => {
   const fixture = historyExportFixture();
   assert.doesNotMatch(JSON.stringify(fixture.operationalRows), /TIME_ENTRY_CREATED|TimeEntry|audit-1|entry-1|person-1/);
@@ -172,6 +212,23 @@ test("PDF opens, has pages and its normalized content excludes technical codes",
   assert.equal(document.getTitle(), "Histórico de alterações");
   const raw = Buffer.from(bytes).toString("latin1");
   assert.doesNotMatch(raw, /TIME_ENTRY_CREATED|TimeEntry|audit-1|entry-1|person-1/);
+});
+
+test("PDF preserves Portuguese WinAnsi text and safely replaces unsupported Unicode", async () => {
+  const fixture = historyExportFixture();
+  fixture.title = "Histórico 📋 de alterações";
+  fixture.organization.name = "Organização São João 👩🏽‍💻";
+  fixture.filters.push({ label: "Observação", value: "Ação concluída com êxito ✅" });
+  const document = await PDFDocument.load(await buildSummaryPdf(fixture));
+  assert.ok(document.getPageCount() >= 1);
+  assert.equal(document.getTitle(), "Histórico 📋 de alterações");
+});
+
+test("PDF paginates a paragraph longer than one page line by line", async () => {
+  const fixture = entryExportFixture();
+  fixture.filters = [{ label: "Observação", value: "conteúdo ".repeat(3000) }];
+  const document = await PDFDocument.load(await buildSummaryPdf(fixture));
+  assert.ok(document.getPageCount() >= 5);
 });
 
 beforeEach(() => boundary.reset());
@@ -228,6 +285,39 @@ test("export route returns private 422 before generating an empty artifact", asy
   assert.equal(response.status, 422);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
   assert.match((await response.json()).error, /Nenhum registro/);
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
+test("export route rejects 20,001 rows from the first exact count without bulk paging", async () => {
+  replaceEntries(20_001);
+  const response = await route.GET(new Request("https://horus.invalid/api/reports/export?kind=entries&from=2026-08-01&to=2026-08-31&format=csv"));
+  assert.equal(response.status, 413);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.match((await response.json()).error, /20\.000.*Reduza o período.*filtros/i);
+  assert.equal(boundary.rangeCallsByTable.report_time_entries, 1);
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
+test("export route accepts exactly 20,000 operational rows", async () => {
+  replaceEntries(20_000);
+  const response = await route.GET(new Request("https://horus.invalid/api/reports/export?kind=entries&from=2026-08-01&to=2026-08-31&format=csv"));
+  assert.equal(response.status, 200);
+  assert.equal((await response.text()).split("\r\n").length, 20_001);
+  assert.equal(boundary.rangeCallsByTable.report_time_entries, 40);
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
+test("complete package shares the 20,000-row allowance and stops datasets sequentially", async () => {
+  replaceEntries(20_000);
+  const response = await route.GET(new Request("https://horus.invalid/api/reports/export?kind=entries&from=2026-08-01&to=2026-08-31&format=package"));
+  assert.equal(response.status, 413);
+  assert.equal(boundary.rangeCallsByTable.report_time_entries, 40);
+  assert.equal(boundary.rangeCallsByTable.report_balance_transactions, 1);
+  assert.equal(boundary.rangeCallsByTable.report_balance_lots ?? 0, 0);
+  assert.equal(boundary.rangeCallsByTable.report_audit_events ?? 0, 0);
   assert.equal(boundary.writes, 0);
   assert.equal(boundary.rpcCalls, 0);
 });

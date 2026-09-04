@@ -1,9 +1,23 @@
 type Page<T> = { data: T[] | null; error: unknown; count: number | null };
 
+export class ReadLimitExceededError extends Error {
+  readonly limit: number;
+  readonly actual: number;
+
+  constructor(limit: number, actual: number) {
+    super(`Read limit ${limit} exceeded by exact count ${actual}`);
+    this.name = "ReadLimitExceededError";
+    this.limit = limit;
+    this.actual = actual;
+  }
+}
+
 /** Complete, deterministically ordered reads. A failed/inconsistent page is not an empty result. */
 export async function readAllRows<T extends { id: string }>(
   fetchPage: (from: number, to: number) => PromiseLike<Page<T>>,
+  maxRows?: number,
 ): Promise<T[]> {
+  if (maxRows !== undefined && (!Number.isSafeInteger(maxRows) || maxRows < 0)) throw new Error("Invalid row limit");
   const rows: T[] = [];
   const ids = new Set<string>();
   let expected: number | undefined;
@@ -17,6 +31,7 @@ export async function readAllRows<T extends { id: string }>(
     if (page.count !== expected || (!page.data.length && rows.length < expected)) {
       throw new Error("History changed during read");
     }
+    if (maxRows !== undefined && page.count > maxRows) throw new ReadLimitExceededError(maxRows, page.count);
     for (const row of page.data) {
       if (!row.id || ids.has(row.id)) throw new Error("History changed during read");
       ids.add(row.id); rows.push(row);
