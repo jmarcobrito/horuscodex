@@ -12,6 +12,16 @@ test("dashboard consultation performs no persistence",async()=>{
   await getDashboardData(rh,{year:2026,month:8});
   assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
 });
+test("dashboard projects the organization-scoped current sector without changing time data",async()=>{
+  boundary.tables.sectors.push({id:"sector-engineering",organization_id:"test-org",name:"Engenharia",status:"ACTIVE"});
+  boundary.tables.users.find(user=>user.id==="person-0000").sector_id="sector-engineering";
+  const before=structuredClone(boundary.tables.time_entries);
+  const data=await getDashboardData(rh,{year:2026,month:8});
+  assert.deepEqual(data.contractors.find(person=>person.id==="person-0000")?.sectorId,"sector-engineering");
+  assert.deepEqual(data.contractors.find(person=>person.id==="person-0000")?.sectorName,"Engenharia");
+  assert.equal(data.contractors.find(person=>person.id==="person-0001")?.sectorName,"Sem setor definido");
+  assert.deepEqual(boundary.tables.time_entries,before);assert.equal(boundary.writes,0);
+});
 test("dashboard includes every row beyond service cap and retains inactive history",async()=>{
   const data=await getDashboardData(rh,{year:2026,month:8});
   assert.equal(data.entries.length,1105);assert.equal(data.contractors.length,1105);

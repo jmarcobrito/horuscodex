@@ -10,7 +10,7 @@ import { readAllRows } from "./read-all";
 import { deadlineStatus } from "./workflow-rules";
 
 type PeriodInput = { year?: number; month?: number; from?: string; to?: string };
-type UserRow = { id: string; name: string; email: string; status: "ACTIVE" | "INACTIVE" };
+type UserRow = { id: string; name: string; email: string; status: "ACTIVE" | "INACTIVE"; sector_id: string | null; sectors: { name: string } | { name: string }[] | null };
 type EntryRow = { id: string; contractor_id: string; work_date: string; start_time: string; end_time: string; break_minutes: number; calculated_minutes: number; eligible_minutes: number; non_business_day_status: string; notes: string; created_at: string; updated_at: string };
 type LotRow = { id: string; contractor_id: string; type: "CREDIT" | "DEBIT"; original_minutes: number; remaining_minutes: number; reserved_minutes: number; origin_date: string; deadline_date: string; status: string };
 type TransactionRow = { id: string; contractor_id: string; lot_id: string; type: string; minutes: number; description: string; created_at: string };
@@ -45,7 +45,7 @@ function delayDays(entry: EntryRow) {
 
 export async function getDashboardData(actor: HorusActor, input: PeriodInput = {}): Promise<DashboardData> {
   const period = resolveDashboardPeriod(input); const admin = getSupabaseAdmin();
-  let usersQuery = admin.from("users").select("id,name,email,status", { count: "exact" }).eq("organization_id", actor.organizationId).eq("role", "PJ").order("name").order("id");
+  let usersQuery = admin.from("users").select("id,name,email,status,sector_id,sectors!users_sector_organization_fkey(name)", { count: "exact" }).eq("organization_id", actor.organizationId).eq("role", "PJ").order("name").order("id");
   let entriesQuery = admin.from("time_entries").select("id,contractor_id,work_date,start_time,end_time,break_minutes,calculated_minutes,eligible_minutes,non_business_day_status,notes,created_at,updated_at", { count: "exact" }).eq("organization_id", actor.organizationId).gte("work_date", period.from).lte("work_date", period.to).order("work_date", { ascending: false }).order("id");
   let timesheetsQuery = admin.from("monthly_timesheets").select("id,contractor_id,year,month,required_minutes,credited_minutes,worked_minutes,considered_minutes,status,closed_at,closed_by", { count: "exact" }).eq("organization_id", actor.organizationId).order("id");
   let lotsQuery = admin.from("hour_balance_lots").select("id,contractor_id,type,original_minutes,remaining_minutes,reserved_minutes,origin_date,deadline_date,status", { count: "exact" }).eq("organization_id", actor.organizationId).order("origin_date").order("id");
@@ -97,7 +97,8 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
     const workedMinutes = sum(userEntries, (entry) => entry.calculated_minutes); const consideredMinutes = sum(userEntries, (entry) => entry.eligible_minutes) + sum(userTimesheets, (row) => row.credited_minutes);
     const requiredMinutes = userTimesheets.length ? sum(userTimesheets, (row) => row.required_minutes) : requiredPerMonth * keys.size;
     const delays = userEntries.map(delayDays); const statuses = new Set(userTimesheets.map((row) => row.status));
-    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt: userEntries[0]?.created_at ?? null, workedMinutes, consideredMinutes, requiredMinutes, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: delays.length ? Math.round(sum(delays, (value) => value) / delays.length) : 0, retroactiveEntries: delays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
+    const sector = Array.isArray(user.sectors) ? user.sectors[0] : user.sectors;
+    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, sectorId: user.sector_id ?? null, sectorName: sector?.name ?? "Sem setor definido", lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt: userEntries[0]?.created_at ?? null, workedMinutes, consideredMinutes, requiredMinutes, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: delays.length ? Math.round(sum(delays, (value) => value) / delays.length) : 0, retroactiveEntries: delays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
   });
   const balanceLots: DashboardBalanceLot[] = lots.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, type: row.type, originalMinutes: row.original_minutes, remainingMinutes: row.remaining_minutes, reservedMinutes: row.reserved_minutes, originDate: row.origin_date, deadlineDate: row.deadline_date, status: row.status }));
   const balanceTransactions: DashboardBalanceTransaction[] = transactions.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, lotId: row.lot_id, type: row.type, minutes: row.minutes, description: row.description, createdAt: row.created_at }));

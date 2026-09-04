@@ -1,6 +1,6 @@
 const forbiddenOrigin = () => Response.json(
   { error: "Origem da solicitação não autorizada." },
-  { status: 403 },
+  { status: 403, headers: { "cache-control": "private, no-store" } },
 );
 
 function firstHeaderValue(value: string | null) {

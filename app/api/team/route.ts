@@ -1,5 +1,5 @@
 import { requireActor } from "../../../db/actor";
-import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { apiFailure, cleanText, privateJson, readJson } from "../../../db/http";
 import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
@@ -139,6 +139,32 @@ export async function PATCH(request: Request) {
       });
       if (audit.error) throw audit.error;
       return Response.json({ id: body.id, message: "Senha do colaborador atualizada." });
+    }
+
+    if (body.action === "SET_SECTOR") {
+      const sectorId = typeof body.sectorId === "string" && body.sectorId ? body.sectorId : null;
+      const reason = cleanText(body.reason);
+      if (reason.length < 5) return privateJson({ error: "Informe a justificativa da alteração." }, { status: 400 });
+      const current = await admin.from("users").select("*")
+        .eq("id", body.id).eq("organization_id", actor.organizationId).eq("role", "PJ").maybeSingle();
+      if (current.error) throw current.error;
+      if (!current.data) return privateJson({ error: "Colaborador não encontrado." }, { status: 404 });
+      if (sectorId) {
+        const sector = await admin.from("sectors").select("id").eq("id", sectorId)
+          .eq("organization_id", actor.organizationId).eq("status", "ACTIVE").maybeSingle();
+        if (sector.error) throw sector.error;
+        if (!sector.data) return privateJson({ error: "Setor inválido ou inativo." }, { status: 400 });
+      }
+      const update = { sector_id: sectorId, updated_at: new Date().toISOString() };
+      const changed = await admin.from("users").update(update).eq("id", body.id).eq("organization_id", actor.organizationId);
+      if (changed.error) throw changed.error;
+      const audit = await admin.from("audit_logs").insert({
+        id: crypto.randomUUID(), organization_id: actor.organizationId, user_id: actor.id,
+        action: "CONTRACTOR_SECTOR_CHANGED", entity_type: "User", entity_id: body.id,
+        previous_value: current.data, new_value: { ...current.data, ...update }, reason,
+      });
+      if (audit.error) throw audit.error;
+      return privateJson({ id: body.id, sectorId });
     }
 
     if (!["ACTIVE", "INACTIVE"].includes(String(body.status))) {

@@ -6,7 +6,7 @@ export const boundary = {
     this.writes = 0; this.rpcCalls = 0; this.failTable = null; this.failAfter = 0;
     this.maxRows = 1000; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
     this.allowWrites = false; this.authError = null;
-    this.tables = Object.fromEntries(["users","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
+    this.tables = Object.fromEntries(["users","sectors","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
     this.tables.organizations.push({id:"test-org",timezone:"America/Sao_Paulo"});
     for (let n = 0; n < 1105; n++) {
       const id = "person-" + String(n).padStart(4,"0");
@@ -20,8 +20,8 @@ export const boundary = {
   },
 };
 class Query {
-  constructor(table) { this.table=table; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; }
-  select(_columns,options) {this.exact=options?.count==="exact";return this;}
+  constructor(table) { this.table=table; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; this.selected=""; this.applied=false; }
+  select(columns,options) {this.selected=columns;this.exact=options?.count==="exact";return this;}
   eq(key,value) {this.filters.push(row=>row[key]===value);return this;}
   is(key,value) {return this.eq(key,value);}
   gte(key,value) {this.filters.push(row=>row[key]>=value);return this;}
@@ -29,7 +29,7 @@ class Query {
   order(key,options) {this.orders.push([key,options?.ascending!==false]);return this;}
   limit(n) {this.to=this.from+n-1;return this;}
   range(from,to) {this.from=from;this.to=to;return this;}
-  insert() {boundary.writes++;throw Error("Forbidden write during read");}
+  insert(values) {boundary.writes++;if(!boundary.allowWrites)throw Error("Forbidden write during read");this.insertValues=Array.isArray(values)?values:[values];return this;}
   update(values) {boundary.writes++;if(!boundary.allowWrites)throw Error("Forbidden write during read");this.updateValues=values;return this;}
   upsert() {boundary.writes++;throw Error("Forbidden write during read");}
   async maybeSingle() {
@@ -38,9 +38,15 @@ class Query {
   result() {
     if(boundary.failTable===this.table && this.from>=boundary.failAfter) return {data:null,count:null,error:{message:"Synthetic page failure"}};
     const rows=boundary.tables[this.table].filter(row=>this.filters.every(f=>f(row)));
-    if(this.updateValues) rows.forEach(row=>Object.assign(row,this.updateValues));
+    if(!this.applied&&this.insertValues){boundary.tables[this.table].push(...structuredClone(this.insertValues));this.applied=true;}
+    if(!this.applied&&this.updateValues){rows.forEach(row=>Object.assign(row,this.updateValues));this.applied=true;}
     rows.sort((a,b)=>{for(const [key,asc] of this.orders){const cmp=a[key]<b[key]?-1:a[key]>b[key]?1:0;if(cmp)return asc?cmp:-cmp;}return 0;});
-    return {data:structuredClone(rows.slice(this.from,Math.min(this.to+1,this.from+boundary.maxRows))),count:this.exact?rows.length:null,error:null};
+    const data=structuredClone(rows.slice(this.from,Math.min(this.to+1,this.from+boundary.maxRows)));
+    if(this.table==="users"&&this.selected.includes("sectors!users_sector_organization_fkey")) for(const user of data){
+      const sector=boundary.tables.sectors.find(row=>row.id===user.sector_id&&row.organization_id===user.organization_id);
+      user.sectors=sector?{name:sector.name}:null;
+    }
+    return {data,count:this.exact?rows.length:null,error:null};
   }
   then(resolve,reject) {return Promise.resolve(this.result()).then(resolve,reject);}
 }

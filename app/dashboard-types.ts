@@ -11,6 +11,8 @@ export type DashboardContractor = {
   email: string;
   initials: string;
   status: "ACTIVE" | "INACTIVE";
+  sectorId: string | null;
+  sectorName: string;
   lastEntryDate: string | null;
   lastEntryAt: string | null;
   workedMinutes: number;
