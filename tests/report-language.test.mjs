@@ -27,7 +27,7 @@ test("all actions currently produced by Horus have natural labels and categories
     ["TIME_ENTRY_CREATED", "entries"], ["TIMESHEET_CLOSED", "closing"],
     ["NON_BUSINESS_AUTH_APPROVE", "approval"], ["OCCURRENCE_REQUESTED", "request"],
     ["ORGANIZATION_POLICY_CHANGED", "policy"], ["UNRECOGNIZED_CODE", "unknown"],
-  ].map(([action, category]) => [action, language.historyCategory(action)])), {
+  ].map(([action]) => [action, language.historyCategory(action)])), {
     CONTRACTOR_SECTOR_CHANGED: "registration", SECTOR_CREATED: "registration", CONTRACTOR_STATUS_CHANGED: "access", USER_ROLE_CHANGED: "access",
     TIME_ENTRY_CREATED: "entries", TIMESHEET_CLOSED: "closing", NON_BUSINESS_AUTH_APPROVE: "approval", OCCURRENCE_REQUESTED: "request", ORGANIZATION_POLICY_CHANGED: "policy", UNRECOGNIZED_CODE: "unknown",
   });
@@ -52,4 +52,31 @@ test("every current action has its hand-derived history category", () => {
   };
   for (const [action, category] of Object.entries(expected)) assert.equal(language.historyCategory(action), category, action);
   assert.equal(language.historyCategory("UNRECOGNIZED_CODE"), "unknown");
+});
+
+test("every report code has a hand-derived Portuguese presentation label", () => {
+  const categories = {
+    entries: { regular: "Lançamento regular", retroactive: "Lançamento retroativo", non_business: "Dia não útil", with_notes: "Com observação" },
+    balances: { CREDIT: "Crédito", DEBIT: "Débito", COMPENSATION: "Compensação", RESERVATION: "Reserva", RELEASE: "Liberação", CONSUMPTION: "Utilização", REVERSAL: "Estorno", EXPIRATION: "Expiração", ADJUSTMENT: "Ajuste" },
+    history: { entries: "Lançamentos", closing: "Fechamento mensal", approval: "Aprovações", request: "Solicitações", registration: "Cadastros", access: "Acessos", policy: "Políticas" },
+  };
+  for (const [kind, labels] of Object.entries(categories)) {
+    for (const [code, expected] of Object.entries(labels)) assert.equal(language.reportCategoryLabel(kind, code), expected, `${kind}:${code}`);
+  }
+  const movements = categories.balances;
+  for (const [code, expected] of Object.entries(movements)) assert.equal(language.balanceMovementLabel(code), expected, code);
+  const lotStatuses = {
+    AVAILABLE: "Disponível", RESERVED: "Reservado", CONSUMED: "Consumido", EXPIRED: "Expirado", CANCELLED: "Cancelado",
+    OVERDUE_AVAILABLE: "Disponível após vencimento", OVERDUE: "Vencido", PARTIALLY_COMPENSATED: "Parcialmente compensado", SETTLED: "Compensado", ADJUSTED: "Ajustado",
+  };
+  for (const [code, expected] of Object.entries(lotStatuses)) assert.equal(language.balanceLotStatusLabel(code), expected, code);
+});
+
+test("persisted entry situations and monthly timesheet history receive natural labels", () => {
+  assert.deepEqual(Object.fromEntries([
+    ["NOT_APPLICABLE", "Dia útil"], ["AUTHORIZED", "Autorizado"], ["PENDING_AUTHORIZATION", "Aguardando autorização"], ["REJECTED", "Recusado"],
+  ].map(([code]) => [code, language.entrySituationLabel(code)])), {
+    NOT_APPLICABLE: "Dia útil", AUTHORIZED: "Autorizado", PENDING_AUTHORIZATION: "Aguardando autorização", REJECTED: "Recusado",
+  });
+  assert.equal(language.relatedRecordLabel("MonthlyTimesheet", "2026-08-01", "Ana Silva"), "Fechamento de agosto de 2026 — Ana Silva");
 });

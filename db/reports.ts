@@ -2,7 +2,7 @@ import type {
   BalanceReportRow, EntryReportRow, HistoryReportRow, ReportColumn, ReportFilters, ReportKind,
   ReportOption, ReportOptions, ReportResponse, ReportRow,
 } from "../app/reports/report-types";
-import { actionLabel, balanceMovementLabel, entrySituationLabel, relatedRecordLabel } from "../app/reports/report-language";
+import { actionLabel, balanceLotStatusLabel, balanceMovementLabel, entrySituationLabel, relatedRecordLabel, reportCategoryLabel } from "../app/reports/report-language";
 import type { HorusActor } from "./actor";
 import { validIsoDate } from "./http";
 import { readAllRows } from "./read-all";
@@ -105,7 +105,7 @@ export async function getReportOptions(actor: HorusActor, kind: ReportKind): Pro
   return {
     people: people.map(option), actors: actors.map(option),
     sectors: [{ value: "UNASSIGNED", label: "Sem setor definido" }, ...sectors.map(option)],
-    categories: REPORT_CATEGORIES[kind].map(value => ({ value, label: value })),
+    categories: REPORT_CATEGORIES[kind].map(value => ({ value, label: reportCategoryLabel(kind, value) })),
   };
 }
 
@@ -169,7 +169,7 @@ function balanceDirection(row: BalanceViewRow): BalanceReportRow["direction"] {
 }
 
 function mapBalance(row: BalanceViewRow): BalanceReportRow {
-  return { id: row.id, createdAt: row.created_at, personId: row.person_id, personName: row.person_name ?? "Não identificado", sectorName: row.sector_name ?? "Sem setor definido", movement: balanceMovementLabel(row.type), direction: balanceDirection(row), minutes: row.minutes, description: row.description ?? "", status: row.lot_status ?? "" };
+  return { id: row.id, createdAt: row.created_at, personId: row.person_id, personName: row.person_name ?? "Não identificado", sectorName: row.sector_name ?? "Sem setor definido", movement: balanceMovementLabel(row.type), direction: balanceDirection(row), minutes: row.minutes, description: row.description ?? "", status: balanceLotStatusLabel(row.lot_status ?? "") };
 }
 
 function mapHistory(row: AuditViewRow): HistoryReportRow {

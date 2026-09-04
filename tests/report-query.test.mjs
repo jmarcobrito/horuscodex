@@ -74,6 +74,39 @@ test("report options preserve inactive historical people and sectors", async () 
   assert.deepEqual(options.sectors.find(option => option.value === "UNASSIGNED"), { value: "UNASSIGNED", label: "Sem setor definido" });
 });
 
+test("report options expose Portuguese labels for every allowed category", async () => {
+  assert.deepEqual((await getReportOptions(rh, "entries")).categories, [
+    { value: "regular", label: "Lançamento regular" }, { value: "retroactive", label: "Lançamento retroativo" }, { value: "non_business", label: "Dia não útil" }, { value: "with_notes", label: "Com observação" },
+  ]);
+  assert.deepEqual((await getReportOptions(rh, "balances")).categories, [
+    { value: "CREDIT", label: "Crédito" }, { value: "DEBIT", label: "Débito" }, { value: "COMPENSATION", label: "Compensação" }, { value: "RESERVATION", label: "Reserva" }, { value: "RELEASE", label: "Liberação" }, { value: "CONSUMPTION", label: "Utilização" }, { value: "REVERSAL", label: "Estorno" }, { value: "EXPIRATION", label: "Expiração" }, { value: "ADJUSTMENT", label: "Ajuste" },
+  ]);
+  assert.deepEqual((await getReportOptions(rh, "history")).categories, [
+    { value: "entries", label: "Lançamentos" }, { value: "closing", label: "Fechamento mensal" }, { value: "approval", label: "Aprovações" }, { value: "request", label: "Solicitações" }, { value: "registration", label: "Cadastros" }, { value: "access", label: "Acessos" }, { value: "policy", label: "Políticas" },
+  ]);
+});
+
+test("entry rows translate every persisted non-business status", async () => {
+  for (const [id, non_business_day_status] of [["entry-situation-na", "NOT_APPLICABLE"], ["entry-situation-authorized", "AUTHORIZED"], ["entry-situation-pending", "PENDING_AUTHORIZATION"], ["entry-situation-rejected", "REJECTED"]]) {
+    boundary.tables.time_entries.push({ id, organization_id: "test-org", contractor_id: "person-0000", work_date: "2026-09-04", start_time: "08:00:00", end_time: "09:00:00", break_minutes: 0, calculated_minutes: 60, eligible_minutes: 60, non_business_day_status, notes: "Situação", created_at: "2026-09-04T12:00:00Z", updated_at: "2026-09-04T12:00:00Z" });
+  }
+  const response = await getReportPage(rh, filters({ kind: "entries" }));
+  assert.deepEqual(Object.fromEntries(response.rows.filter(row => row.id.startsWith("entry-situation-")).map(row => [row.id, row.situation])), {
+    "entry-situation-na": "Dia útil", "entry-situation-authorized": "Autorizado", "entry-situation-pending": "Aguardando autorização", "entry-situation-rejected": "Recusado",
+  });
+});
+
+test("closing and reopening audit rows use the persisted MonthlyTimesheet entity label", async () => {
+  boundary.tables.audit_logs.push(
+    { id: "audit-closing", organization_id: "test-org", user_id: "test-rh", action: "TIMESHEET_CLOSED", entity_type: "MonthlyTimesheet", entity_id: "ts-person-0000", reason: "Fechamento", created_at: "2026-09-03T12:00:00Z", affected_user_id: "person-0000", related_date: "2026-08-01", category: "closing" },
+    { id: "audit-reopening", organization_id: "test-org", user_id: "test-rh", action: "TIMESHEET_REOPENED", entity_type: "MonthlyTimesheet", entity_id: "ts-person-0000", reason: "Reabertura", created_at: "2026-09-04T12:00:00Z", affected_user_id: "person-0000", related_date: "2026-08-01", category: "closing" },
+  );
+  const response = await getReportPage(rh, filters({ kind: "history", category: "closing" }));
+  assert.deepEqual(response.rows.map(row => [row.action, row.relatedRecord]), [
+    ["Reabriu o mês do colaborador", "Fechamento de agosto de 2026 — person-0000"], ["Fechou o mês do colaborador", "Fechamento de agosto de 2026 — person-0000"],
+  ]);
+});
+
 test("complete report reader uses stable 500-row batches without silent truncation", async () => {
   const rows = await getAllReportRows(rh, filters({ kind: "history" }));
   assert.equal(rows.length, 1105);
