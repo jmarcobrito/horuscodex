@@ -11,7 +11,16 @@ export function entityLabel(entity:string){return ENTITY[entity]??"Registro"}
 const MOVEMENT:Record<string,string>={CONSUMPTION:"Utilização",CREDIT:"Crédito",DEBIT:"Débito",RESERVATION:"Reserva",RELEASE:"Liberação"};
 export function balanceMovementLabel(movement:string){return MOVEMENT[movement]??"Movimentação"}
 export function entrySituationLabel(s:string){return ({APPROVED:"Aprovado",PENDING:"Pendente",REJECTED:"Recusado",CANCELLED:"Cancelado"} as Record<string,string>)[s]??"Situação não informada"}
-export function historyCategory(a:string){if(a.startsWith("TIME_ENTRY"))return "entries";if(a.startsWith("TIMESHEET"))return "closing";if(a.includes("POLICY"))return "policy";if(a==="CONTRACTOR_SECTOR_CHANGED"||a.startsWith("SECTOR_")||a.includes("CREATED")||a.includes("UTILIZE"))return "registration";if(a.includes("PASSWORD")||a.includes("ROLE")||a==="CONTRACTOR_STATUS_CHANGED"||a.startsWith("USER_"))return "access";if(/_(APPROVE|REJECT|CANCEL|NEEDS_ADJUSTMENT)$/.test(a))return "approval";if(a.includes("REQUEST"))return "request";return "unknown"}
+const HISTORY_CATEGORIES: Record<string, string> = {
+  TIME_ENTRY_CREATED: "entries", TIME_ENTRY_UPDATED: "entries", TIMESHEET_CLOSED: "closing", TIMESHEET_REOPENED: "closing",
+  NON_BUSINESS_AUTH_REQUESTED: "request", NON_BUSINESS_AUTH_APPROVE: "approval", NON_BUSINESS_AUTH_REJECT: "approval", NON_BUSINESS_AUTH_NEEDS_ADJUSTMENT: "approval",
+  OCCURRENCE_CREATED_APPROVED: "approval", OCCURRENCE_REQUESTED: "request", OCCURRENCE_APPROVE: "approval", OCCURRENCE_REJECT: "approval", OCCURRENCE_CANCEL: "request",
+  LEAVE_REQUEST_CREATED: "request", LEAVE_REQUEST_APPROVE: "approval", LEAVE_REQUEST_REJECT: "approval", LEAVE_REQUEST_CANCEL: "request", LEAVE_REQUEST_UTILIZE: "request",
+  CONTRACTOR_CREATED: "registration", CONTRACTOR_PASSWORD_SET: "access", CONTRACTOR_STATUS_CHANGED: "access", CONTRACTOR_SECTOR_CHANGED: "registration",
+  USER_PASSWORD_SET: "access", USER_ROLE_CHANGED: "access", USER_STATUS_CHANGED: "access", ORGANIZATION_POLICY_CHANGED: "policy",
+  SECTOR_CREATED: "registration", SECTOR_UPDATED: "registration", SECTOR_STATUS_CHANGED: "registration",
+};
+export function historyCategory(a:string){return HISTORY_CATEGORIES[a]??"unknown"}
 export function relatedRecordLabel(entity:string,date:string|null,person:string|null){const detail=entity==="TimeEntry"?(date?`Lançamento de ${formatDate(date)}`:"Lançamento de horas"):entity==="Timesheet"?(date?`Fechamento de ${monthYear(date)}`:"Fechamento mensal"):"Registro relacionado";return [detail,person].filter(Boolean).join(" — ")}
 function formatDate(d:string|null){if(!d)return "";const [y,m,day]=d.slice(0,10).split("-");return `${day}/${m}/${y}`}
 function monthYear(d:string|null){if(!d)return "";const [y,m]=d.slice(0,10).split("-");return `${new Date(Number(y),Number(m)-1).toLocaleString("pt-BR",{month:"long"})} de ${y}`}

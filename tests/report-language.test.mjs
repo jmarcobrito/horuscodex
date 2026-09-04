@@ -39,3 +39,17 @@ test("all actions currently produced by Horus have natural labels and categories
   assert.equal(language.entityLabel("Unknown"), "Registro");
   assert.equal(language.balanceMovementLabel("BOGUS"), "Movimentação");
 });
+
+test("every current action has its hand-derived history category", () => {
+  const expected = {
+    TIME_ENTRY_CREATED: "entries", TIME_ENTRY_UPDATED: "entries", TIMESHEET_CLOSED: "closing", TIMESHEET_REOPENED: "closing",
+    NON_BUSINESS_AUTH_REQUESTED: "request", NON_BUSINESS_AUTH_APPROVE: "approval", NON_BUSINESS_AUTH_REJECT: "approval", NON_BUSINESS_AUTH_NEEDS_ADJUSTMENT: "approval",
+    OCCURRENCE_CREATED_APPROVED: "approval", OCCURRENCE_REQUESTED: "request", OCCURRENCE_APPROVE: "approval", OCCURRENCE_REJECT: "approval", OCCURRENCE_CANCEL: "request",
+    LEAVE_REQUEST_CREATED: "request", LEAVE_REQUEST_APPROVE: "approval", LEAVE_REQUEST_REJECT: "approval", LEAVE_REQUEST_CANCEL: "request", LEAVE_REQUEST_UTILIZE: "request",
+    CONTRACTOR_CREATED: "registration", CONTRACTOR_PASSWORD_SET: "access", CONTRACTOR_STATUS_CHANGED: "access", CONTRACTOR_SECTOR_CHANGED: "registration",
+    USER_PASSWORD_SET: "access", USER_ROLE_CHANGED: "access", USER_STATUS_CHANGED: "access", ORGANIZATION_POLICY_CHANGED: "policy",
+    SECTOR_CREATED: "registration", SECTOR_UPDATED: "registration", SECTOR_STATUS_CHANGED: "registration",
+  };
+  for (const [action, category] of Object.entries(expected)) assert.equal(language.historyCategory(action), category, action);
+  assert.equal(language.historyCategory("UNRECOGNIZED_CODE"), "unknown");
+});
