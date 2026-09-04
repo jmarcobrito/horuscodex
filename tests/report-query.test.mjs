@@ -57,6 +57,52 @@ test("report returns 50 newest rows and exact paging metadata", async () => {
   assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 1105, pageCount: 23 });
 });
 
+test("entry summary covers every filtered row beyond the current 50-row page", async () => {
+  boundary.tables.sectors.push({ id: "sector-summary-entries", organization_id: "test-org", name: "Resumo de lançamentos", status: "ACTIVE" });
+  for (let index = 0; index < 75; index++) boundary.tables.users[index].sector_id = "sector-summary-entries";
+  const response = await getReportPage(rh, filters({ kind: "entries", sectorId: "sector-summary-entries", page: 2 }));
+  assert.equal(response.rows.length, 25);
+  assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 75, pageCount: 2 });
+  assert.deepEqual(response.summary, { workedMinutes: 4500, consideredMinutes: 4500 });
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
+test("balance summary covers credit, debit, reservation and utilization across all filtered rows", async () => {
+  boundary.tables.sectors.push({ id: "sector-summary-balances", organization_id: "test-org", name: "Resumo do banco", status: "ACTIVE" });
+  boundary.tables.users.find(user => user.id === "person-0001").sector_id = "sector-summary-balances";
+  boundary.tables.hour_balance_lots.push({ id: "lot-summary", organization_id: "test-org", contractor_id: "person-0001", type: "CREDIT", original_minutes: 9999, remaining_minutes: 9999, reserved_minutes: 0, origin_date: "2026-08-01", deadline_date: "2026-11-01", status: "AVAILABLE", created_at: "2026-08-01T12:00:00Z" });
+  const movements = [
+    ["CREDIT", 10], ["DEBIT", 20], ["RESERVATION", 30], ["CONSUMPTION", 40],
+  ];
+  for (const [movementIndex, [type, minutes]] of movements.entries()) {
+    for (let index = 0; index < 15; index++) boundary.tables.hour_balance_transactions.push({
+      id: `transaction-summary-${movementIndex}-${String(index).padStart(2, "0")}`,
+      organization_id: "test-org", contractor_id: "person-0001", lot_id: "lot-summary", type, minutes,
+      description: "Resumo filtrado", created_at: `2026-08-${String(10 + movementIndex).padStart(2, "0")}T12:${String(index).padStart(2, "0")}:00Z`,
+    });
+  }
+  boundary.tables.hour_balance_transactions.push({ id: "transaction-outside-summary-sector", organization_id: "test-org", contractor_id: "person-0002", lot_id: "lot-credit", type: "CREDIT", minutes: 9999, description: "Fora do filtro", created_at: "2026-08-20T12:00:00Z" });
+  const response = await getReportPage(rh, filters({ kind: "balances", sectorId: "sector-summary-balances", page: 2 }));
+  assert.equal(response.rows.length, 10);
+  assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 60, pageCount: 2 });
+  assert.deepEqual(response.summary, { creditMinutes: 150, debitMinutes: 900, reservationMinutes: 450, utilizationMinutes: 600 });
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
+test("history summary counts every filtered event and distinct affected person beyond one page", async () => {
+  boundary.tables.sectors.push({ id: "sector-summary-history", organization_id: "test-org", name: "Resumo do histórico", status: "ACTIVE" });
+  for (let index = 0; index < 75; index++) boundary.tables.users[index].sector_id = "sector-summary-history";
+  boundary.tables.audit_logs.push({ id: "audit-summary-duplicate-person", organization_id: "test-org", user_id: "test-rh", action: "TIME_ENTRY_UPDATED", entity_type: "TimeEntry", entity_id: "entry-person-0000", reason: "Segundo evento", created_at: "2026-08-05T12:00:00Z", affected_user_id: "person-0000", related_date: "2026-08-03", category: "entries" });
+  const response = await getReportPage(rh, filters({ kind: "history", sectorId: "sector-summary-history", actorId: "test-rh", category: "entries", page: 2 }));
+  assert.equal(response.rows.length, 26);
+  assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 76, pageCount: 2 });
+  assert.deepEqual(response.summary, { events: 76, affectedPeople: 75 });
+  assert.equal(boundary.writes, 0);
+  assert.equal(boundary.rpcCalls, 0);
+});
+
 test("foreign filter identifiers are rejected instead of producing empty reports", async () => {
   await assert.rejects(() => getReportPage(rh, filters({ personId: "person-other-org" })), /Pessoa, setor ou responsável inválido para esta organização/);
 });

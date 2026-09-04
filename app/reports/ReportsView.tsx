@@ -6,7 +6,7 @@ import { ExportMenu } from "./ExportMenu";
 import { ReportFilters, emptyReportOptions } from "./ReportFilters";
 import { ReportTable } from "./ReportTable";
 import {
-  changeReportFilters, changeReportKind, clearReportFilters, createReportLoader, reportFilters,
+  changeReportFilters, changeReportKind, changeReportPeriod, clearReportFilters, createReportLoader, reportFilters,
   type ReportLoadState, type ReportRequest,
 } from "./report-client";
 import type { ReportFilters as Filters, ReportKind } from "./report-types";
@@ -19,11 +19,14 @@ export const REPORT_TABS = [
 
 export function ReportsView({ period, onPeriodChange, request, isDev }: { period: DashboardPeriod; onPeriodChange: (period: DashboardPeriod) => void; request: ReportRequest; isDev: boolean }) {
   const [selection, setSelection] = useState<Filters>(() => reportFilters({ from: period.from, to: period.to }));
-  const filters = useMemo(() => ({ ...selection, from: period.from, to: period.to }), [selection, period.from, period.to]);
+  const filters = useMemo(() => changeReportPeriod(selection, { from: period.from, to: period.to }), [selection, period.from, period.to]);
   const loader = useMemo(() => createReportLoader(request), [request]);
   const [state, setState] = useState<ReportLoadState>(() => ({ status: "loading", filters, response: null, message: null }));
   const [retry, setRetry] = useState(0);
   const activeTab = REPORT_TABS.find(tab => tab.value === filters.kind) ?? REPORT_TABS[0];
+
+  // Reconcile before commit so the loading effect observes only the new period on page 1.
+  if (filters !== selection) setSelection(filters);
 
   useEffect(() => {
     let current = true;

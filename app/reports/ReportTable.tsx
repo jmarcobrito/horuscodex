@@ -22,24 +22,20 @@ function cellValue(row: ReportRow, key: string) {
   return typeof value === "string" || typeof value === "number" ? String(value) : "—";
 }
 
-function summaryValue(value: number | undefined, hours = true) {
-  return value === undefined ? "Não informado" : hours ? formatMinutes(value) : String(value);
-}
-
 function ReportSummary({ report }: { report: ReportResponse }) {
   if (report.kind === "entries") return <section className="timesheet-summary" aria-label="Resumo dos lançamentos">
-    <div><span>Horas trabalhadas</span><strong>{summaryValue(report.summary.workedMinutes)}</strong></div>
-    <div><span>Horas consideradas</span><strong>{summaryValue(report.summary.consideredMinutes)}</strong></div>
+    <div><span>Horas trabalhadas</span><strong>{formatMinutes(report.summary.workedMinutes)}</strong></div>
+    <div><span>Horas consideradas</span><strong>{formatMinutes(report.summary.consideredMinutes)}</strong></div>
   </section>;
   if (report.kind === "balances") return <section className="timesheet-summary" aria-label="Resumo do banco de horas">
-    <div><span>Créditos</span><strong>{summaryValue(report.summary.creditMinutes)}</strong></div>
-    <div><span>Débitos</span><strong>{summaryValue(report.summary.debitMinutes)}</strong></div>
-    <div><span>Reservas</span><strong>{summaryValue(report.summary.reservationMinutes)}</strong></div>
-    <div><span>Utilizações</span><strong>{summaryValue(report.summary.utilizationMinutes)}</strong></div>
+    <div><span>Créditos</span><strong>{formatMinutes(report.summary.creditMinutes)}</strong></div>
+    <div><span>Débitos</span><strong>{formatMinutes(report.summary.debitMinutes)}</strong></div>
+    <div><span>Reservas</span><strong>{formatMinutes(report.summary.reservationMinutes)}</strong></div>
+    <div><span>Utilizações</span><strong>{formatMinutes(report.summary.utilizationMinutes)}</strong></div>
   </section>;
   return <section className="timesheet-summary" aria-label="Resumo do histórico">
-    <div><span>Alterações encontradas</span><strong>{summaryValue(report.pagination.total, false)}</strong></div>
-    <div><span>Pessoas afetadas</span><strong>{summaryValue(report.summary.affectedPeople, false)}</strong></div>
+    <div><span>Alterações encontradas</span><strong>{report.summary.events}</strong></div>
+    <div><span>Pessoas afetadas</span><strong>{report.summary.affectedPeople}</strong></div>
   </section>;
 }
 

@@ -75,6 +75,7 @@ test("contextual summaries use natural hour labels", async () => {
   const balancesHtml = renderToStaticMarkup(createElement(table.ReportTable, { report: balances, isDev: false, onPageChange() {} }));
   for (const label of ["Horas trabalhadas", "Horas consideradas", "08:00", "07:30"]) assert.match(entriesHtml, new RegExp(label));
   for (const label of ["Créditos", "Débitos", "Reservas", "Utilizações"]) assert.match(balancesHtml, new RegExp(label));
+  assert.doesNotMatch(entriesHtml + balancesHtml, /Não informado/);
 });
 
 test("the old report cards are replaced at the app integration boundary", async () => {

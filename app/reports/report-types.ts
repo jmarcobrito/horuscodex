@@ -9,4 +9,11 @@ export type EntryReportRow = { id:string; workDate:string; personId:string; pers
 export type BalanceReportRow = { id:string; createdAt:string; personId:string; personName:string; sectorName:string; movement:string; direction:"credit"|"debit"|"reservation"|"release"|"neutral"; minutes:number; description:string; status:string };
 export type HistoryReportRow = { id:string; createdAt:string; actorId:string; actorName:string; action:string; affectedPersonId:string|null; affectedPersonName:string; relatedRecord:string; reason:string; technical:{actionCode:string; entityType:string; entityId:string} };
 export type ReportRow = EntryReportRow | BalanceReportRow | HistoryReportRow;
-export type ReportResponse = { kind:ReportKind; filters:ReportFilters; columns:ReportColumn[]; rows:ReportRow[]; summary:Record<string,number>; options:ReportOptions; pagination:{page:number;pageSize:50;total:number;pageCount:number} };
+export type EntryReportSummary = { workedMinutes:number; consideredMinutes:number };
+export type BalanceReportSummary = { creditMinutes:number; debitMinutes:number; reservationMinutes:number; utilizationMinutes:number };
+export type HistoryReportSummary = { events:number; affectedPeople:number };
+type ReportResponseBase = { filters:ReportFilters; columns:ReportColumn[]; options:ReportOptions; pagination:{page:number;pageSize:50;total:number;pageCount:number} };
+export type ReportResponse =
+  | ReportResponseBase & { kind:"entries"; rows:EntryReportRow[]; summary:EntryReportSummary }
+  | ReportResponseBase & { kind:"balances"; rows:BalanceReportRow[]; summary:BalanceReportSummary }
+  | ReportResponseBase & { kind:"history"; rows:HistoryReportRow[]; summary:HistoryReportSummary };

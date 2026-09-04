@@ -5,12 +5,17 @@ import { runnerImport } from "vite";
 const options = { configFile: false, envDir: false };
 
 function fixture(filters, rows = [{ id: "row-1" }]) {
+  const summary = filters.kind === "entries"
+    ? { workedMinutes: 60, consideredMinutes: 60 }
+    : filters.kind === "balances"
+      ? { creditMinutes: 60, debitMinutes: 0, reservationMinutes: 0, utilizationMinutes: 0 }
+      : { events: rows.length, affectedPeople: rows.length };
   return {
     kind: filters.kind,
     filters,
     columns: [{ key: "personName", label: "Colaborador" }],
     rows,
-    summary: {},
+    summary,
     options: { people: [], sectors: [], actors: [], categories: [] },
     pagination: { page: filters.page, pageSize: 50, total: rows.length, pageCount: rows.length ? 1 : 0 },
   };
@@ -53,6 +58,29 @@ test("tab and filter changes preserve compatible values and reset paging", async
   });
 });
 
+test("changing the report period resets page 3 and starts one request for the new period", async () => {
+  const { module: client } = await runnerImport("./app/reports/report-client.ts", options);
+  const pageThree = client.reportFilters({
+    kind: "entries", from: "2026-08-01", to: "2026-08-31", page: 3,
+    personId: "person-1", sectorId: "sector-1", category: "regular",
+  });
+  const september = client.changeReportPeriod(pageThree, { from: "2026-09-01", to: "2026-09-30" });
+  assert.deepEqual(september, { ...pageThree, from: "2026-09-01", to: "2026-09-30", page: 1 });
+  assert.strictEqual(client.changeReportPeriod(september, { from: "2026-09-01", to: "2026-09-30" }), september);
+
+  const requests = [];
+  const loader = client.createReportLoader(async url => {
+    requests.push(url);
+    return Response.json(fixture(september));
+  });
+  await loader.load(september);
+  assert.equal(requests.length, 1);
+  const requested = new URL(requests[0], "https://horus.invalid");
+  assert.equal(requested.searchParams.get("from"), "2026-09-01");
+  assert.equal(requested.searchParams.get("to"), "2026-09-30");
+  assert.equal(requested.searchParams.get("page"), "1");
+});
+
 test("a late response cannot replace the newest filter selection", async () => {
   const { module: client } = await runnerImport("./app/reports/report-client.ts", options);
   const augustResponse = deferred();
@@ -92,6 +120,11 @@ test("failed and mismatched consultations never become empty successful reports"
   await wrong.load(filters);
   assert.equal(wrong.current().status, "error");
   assert.equal(wrong.current().filters.from, "2026-09-01");
+
+  const incomplete = client.createReportLoader(async () => Response.json({ ...fixture(filters), summary: {} }));
+  await incomplete.load(filters);
+  assert.equal(incomplete.current().status, "error");
+  assert.equal(incomplete.current().message, "O resumo do relatório está incompleto.");
 });
 
 test("export URL reuses the visible query and changes only the format", async () => {

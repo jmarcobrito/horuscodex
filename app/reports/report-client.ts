@@ -42,6 +42,11 @@ export function changeReportFilters(filters: ReportFilters, change: Partial<Pick
   return { ...filters, ...change, page: 1 };
 }
 
+export function changeReportPeriod(filters: ReportFilters, period: Pick<ReportFilters, "from" | "to">): ReportFilters {
+  if (filters.from === period.from && filters.to === period.to) return filters;
+  return { ...filters, from: period.from, to: period.to, page: 1 };
+}
+
 export function clearReportFilters(filters: ReportFilters): ReportFilters {
   return { ...filters, personId: null, sectorId: null, category: null, actorId: null, page: 1 };
 }
@@ -79,6 +84,19 @@ async function responseError(response: Response) {
   return "Não foi possível carregar o relatório.";
 }
 
+function finiteSummaryValue(summary: unknown, key: string) {
+  return Boolean(summary && typeof summary === "object" && Number.isFinite((summary as Record<string, unknown>)[key]));
+}
+
+function completeSummary(report: ReportResponse) {
+  const keys = report.kind === "entries"
+    ? ["workedMinutes", "consideredMinutes"]
+    : report.kind === "balances"
+      ? ["creditMinutes", "debitMinutes", "reservationMinutes", "utilizationMinutes"]
+      : ["events", "affectedPeople"];
+  return keys.every(key => finiteSummaryValue(report.summary, key));
+}
+
 export function createReportLoader(request: ReportRequest) {
   let requestId = 0;
   let abortController: AbortController | null = null;
@@ -104,6 +122,10 @@ export function createReportLoader(request: ReportRequest) {
         if (id !== requestId) return state;
         if (!report || !Array.isArray(report.rows) || !report.filters || !sameFilters(filters, report.filters)) {
           state = { status: "error", filters, response: null, message: "A resposta não corresponde aos filtros escolhidos." };
+          return state;
+        }
+        if (!completeSummary(report)) {
+          state = { status: "error", filters, response: null, message: "O resumo do relatório está incompleto." };
           return state;
         }
         state = { status: report.rows.length ? "ready" : "empty", filters, response: report, message: null };
