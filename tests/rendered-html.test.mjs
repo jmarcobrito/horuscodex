@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships protected Horus workflows backed by server data", async () => {
-  const [app, page, actor, entries, dashboard, team, adminRoute, adminView, selectMenu, signIn, google, signInScreen] = await Promise.all([
+  const [app, page, actor, entries, dashboard, team, adminRoute, adminView, administrationView, sectorsPanel, selectMenu, signIn, google, signInScreen] = await Promise.all([
     readFile(new URL("../app/HorusApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/actor.ts", import.meta.url), "utf8"),
@@ -12,6 +12,8 @@ test("ships protected Horus workflows backed by server data", async () => {
     readFile(new URL("../app/api/team/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/AdminView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AdministrationView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/SectorsPanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/SelectMenu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/sign-in/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/google/route.ts", import.meta.url), "utf8"),
@@ -47,11 +49,16 @@ test("ships protected Horus workflows backed by server data", async () => {
   assert.match(actor, /resolveViewActor/);
   assert.match(app, /MODO DEV/);
   assert.match(app, /Administração/);
+  assert.match(app, /\/api\/sectors/);
+  assert.match(app, /SET_SECTOR/);
   assert.match(adminRoute, /actor\.role !== "DEV"/);
   assert.match(adminRoute, /USER_ROLE_CHANGED/);
   assert.match(adminRoute, /USER_STATUS_CHANGED/);
   assert.match(adminView, /Visualizar como/);
   assert.match(adminView, /Este perfil não pode ser rebaixado/);
+  assert.match(administrationView, /Configurar políticas/);
+  assert.match(sectorsPanel, /Novo setor/);
+  assert.doesNotMatch(sectorsPanel, /Excluir setor/);
   assert.match(selectMenu, /role="listbox"/);
   assert.match(selectMenu, /aria-selected/);
   assert.doesNotMatch(app, /<select/);

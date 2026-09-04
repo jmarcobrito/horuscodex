@@ -38,3 +38,11 @@ test("DEV sees reports in RH view but collaborator simulation does not", async (
   assert.ok(imported.module.navigationItems("rh", true).some(item => item.id === "reports"));
   assert.ok(!imported.module.navigationItems("pj", true).some(item => item.id === "reports"));
 });
+
+test("Administration stays in RH navigation and never enters collaborator simulation", async () => {
+  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false });
+  assert.ok(imported.module.navigationItems("rh", false).some(item => item.id === "admin"), "RH and ADMIN share the administrative navigation");
+  assert.ok(imported.module.navigationItems("rh", true).some(item => item.id === "admin"), "real DEV sees Administration in RH view");
+  assert.ok(!imported.module.navigationItems("pj", false).some(item => item.id === "admin"), "PJ does not see Administration");
+  assert.ok(!imported.module.navigationItems("pj", true).some(item => item.id === "admin"), "DEV simulation does not see Administration");
+});
