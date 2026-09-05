@@ -1,6 +1,6 @@
 # Horus — Painel: Resumo do mês
 
-Data: 05/09/2026. Visual escolhido pelo usuário: opção 1. Estado: especificação para revisão; aplicativo ainda não alterado.
+Data: 05/09/2026. Visual escolhido pelo usuário: opção 1. Estado: especificação aprovada pelo usuário; plano detalhado em `../plans/2026-09-05-horus-month-overview.md`. Aplicativo ainda não alterado nesta entrega.
 
 ## Resultado esperado
 
