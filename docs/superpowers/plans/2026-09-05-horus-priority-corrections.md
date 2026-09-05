@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1 e 2 foram implementadas e validadas localmente; tarefas 3–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–4 foram implementadas e validadas localmente; tarefas 5–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -185,7 +185,7 @@ return { requiredMinutes: stored + estimatedMonths * requiredPerMonth, estimated
 
 **Interfaces:** exportar `dashboardDisplay(data: DashboardData)`, retornando `{ fullMonth: boolean; workedMinutes: number; entryEligibleMinutes: number; monthlyContext: { creditedMinutes: number; requiredMinutes: number; projectedBalanceMinutes: number } | null; validCreditMinutes: number; reservedCreditMinutes: number; availableCreditMinutes: number; daysByPerson: Record<string, number> }`. Manter `metrics.positiveBalanceMinutes` como total de créditos válidos para não trocar silenciosamente o significado dos consumidores antigos.
 
-- [ ] Escrever o teste da função com `runnerImport` e fixture existente:
+- [x] Escrever o teste da função com `runnerImport` e fixture existente:
 
 ```js
 test("available credit excludes reservations without changing lots", async () => {
@@ -205,12 +205,12 @@ test("available credit excludes reservations without changing lots", async () =>
 
 Importar `test`, `assert`, `runnerImport` e `makeWorkflowDashboard` de seus caminhos já usados nas suítes existentes. Adicionar lotes EXPIRED, CONSUMED, CANCELLED, SETTLED e DEBIT que não entram em crédito disponível. OVERDUE_AVAILABLE entra conforme projeção da política já feita em `db/dashboard.ts`. Não duplicar a regra de vencimento no navegador.
 
-- [ ] Rodar `node --test tests/dashboard-display.test.mjs`; a falha inicial deve ser a ausência da função. Implementar seleção dos créditos válidos usando os mesmos estados aceitos atualmente em `getDashboardData`; calcular por lote `Math.max(0, remainingMinutes - reservedMinutes)` e somar. Dias = datas distintas de lançamento por pessoa, não horas divididas por jornada.
-- [ ] Usar `asFullMonth(data.period)` para `fullMonth`. Para intervalo livre, mostrar horas trabalhadas e horas consideradas dos lançamentos (`sum(entry.eligibleMinutes)`) como valores das datas. Mostrar abonos/carga/projeção de folhas em área “Contexto dos meses consultados — valores mensais completos, sem rateio”. Não apresentar `data.timesheet.consideredMinutes` ou sua projeção híbrida como resultado diário.
-- [ ] Calcular a projeção do contexto mensal a partir de `monthlyTimesheets.consideredMinutes` completos menos a carga mensal agregada; se `monthlyTimesheets` estiver ausente, retornar `monthlyContext: null` e mostrar “Contexto mensal indisponível”, não zero. Tratar null em todos os consumidores. Folhas fechadas usam valores persistidos, sem recálculo.
-- [ ] Renomear “Preenchimento” em Painel e Pessoas para “Horas em relação à carga mensal”; em intervalo parcial, ocultar o percentual híbrido e mostrar “Consulte um mês completo”. Acrescentar “Dias com lançamento” sem sugerir faltas. Em Banco, exibir “Créditos válidos”, “Reservado para folgas” e “Disponível para usar”, com “Saldo atual do banco; não é uma posição histórica do mês selecionado”. Manter déficit separado.
-- [ ] Acrescentar teste de um dia sem lançamento e folha com 480 min de abono: horas consideradas dos dias = 0; abono no contexto mensal = 480; não aparece como abono daquele dia. Testar estados vazios, erro/indisponibilidade e duas entradas no mesmo dia contando apenas uma data.
-- [ ] Rodar as duas suítes, conferir nomes/valores no preview fictício e fazer commit específico. Corrigir textos existentes sem reorganizar o layout inteiro do painel.
+- [x] Rodar `node --test tests/dashboard-display.test.mjs`; a falha inicial deve ser a ausência da função. Implementar seleção dos créditos válidos usando os mesmos estados aceitos atualmente em `getDashboardData`; calcular por lote `Math.max(0, remainingMinutes - reservedMinutes)` e somar. Dias = datas distintas de lançamento por pessoa, não horas divididas por jornada.
+- [x] Usar `asFullMonth(data.period)` para `fullMonth`. Para intervalo livre, mostrar horas trabalhadas e horas consideradas dos lançamentos (`sum(entry.eligibleMinutes)`) como valores das datas. Mostrar abonos/carga/projeção de folhas em área “Contexto dos meses consultados — valores mensais completos, sem rateio”. Não apresentar `data.timesheet.consideredMinutes` ou sua projeção híbrida como resultado diário.
+- [x] Calcular a projeção do contexto mensal a partir de `monthlyTimesheets.consideredMinutes` completos menos a carga mensal agregada; se `monthlyTimesheets` estiver ausente, retornar `monthlyContext: null` e mostrar “Contexto mensal indisponível”, não zero. Tratar null em todos os consumidores. Folhas fechadas usam valores persistidos, sem recálculo.
+- [x] Renomear “Preenchimento” em Painel e Pessoas para “Horas em relação à carga mensal”; em intervalo parcial, ocultar o percentual híbrido e mostrar “Consulte um mês completo”. Acrescentar “Dias com lançamento” sem sugerir faltas. Em Banco, exibir “Créditos válidos”, “Reservado para folgas” e “Disponível para usar”, com “Saldo atual do banco; não é uma posição histórica do mês selecionado”. Manter déficit separado.
+- [x] Acrescentar teste de um dia sem lançamento e folha com 480 min de abono: horas consideradas dos dias = 0; abono no contexto mensal = 480; não aparece como abono daquele dia. Testar estados vazios, erro/indisponibilidade e duas entradas no mesmo dia contando apenas uma data.
+- [x] Rodar as duas suítes, conferir nomes/valores no preview fictício e fazer commit específico. Corrigir textos existentes sem reorganizar o layout inteiro do painel.
 
 ### Tarefa 5 — datas de registro no fuso correto
 

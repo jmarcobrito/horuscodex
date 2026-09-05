@@ -118,3 +118,42 @@ Revisão local: consumidores de `buildPeriodSummary`/`requiredForPerson` conferi
 Limites: nenhuma conexão ao Supabase de produção, leitura de credenciais, recálculo ou alteração em agosto. As provas de preservação usam dados fictícios, não uma nova auditoria do banco real. Nenhum push, PR ou deploy. Build completo isolado e PostgreSQL continuam na tarefa 7.
 
 Próxima etapa: tarefa 4 — distinguir informações do mês, dias com lançamento e saldo livre, evitando indicadores com significados misturados. Tarefas 4–7 e a reorganização visual completa permanecem pendentes.
+
+## Checkpoint seguinte — tarefa 4 concluída localmente
+
+Base: `a1d8e24`. Autorização: executar a próxima etapa dos indicadores, mantendo a área isolada e sem subagentes. Este checkpoint substitui a retomada anterior.
+
+Implementado:
+
+- Função pura `app/dashboard-display.ts` separa horas trabalhadas/consideradas dos lançamentos, contexto mensal completo, dias distintos por pessoa e créditos válidos/reservados/disponíveis.
+- Intervalos livres mostram apenas as horas dos lançamentos dentro das datas. Abonos, carga e projeção dos meses aparecem em “Contexto dos meses consultados”, com aviso de valores completos, sem rateio.
+- A projeção mensal usa os totais de `monthlyTimesheets.consideredMinutes`, incluindo valores persistidos de folhas fechadas, menos a carga agregada. Não reutiliza a projeção híbrida das datas. Ausência de metadados resulta em “Contexto mensal indisponível”, não zero.
+- Painel e Pessoas mostram “Dias com lançamento” e “Horas em relação à carga mensal”. Duas entradas no mesmo dia contam uma data; fora de um mês completo o percentual é substituído por “Consulte um mês completo”. Não se infere falta.
+- O banco apresenta “Disponível para usar”, “Créditos válidos”, “Reservado para folgas” e déficit separado. Disponível soma o restante menos reservas por lote, limitado a zero por lote. Créditos expirados/consumidos/cancelados/liquidados e débitos não entram; a situação de vencimento continua definida no servidor.
+- Aviso explícito: o banco mostra o saldo atual, não uma posição histórica do mês. O contrato de `metrics.positiveBalanceMinutes` não foi alterado.
+- Ajustes CSS limitados ao espaçamento de Pessoas e à área de contexto mensal, inclusive empilhamento em tela estreita. Nenhuma reorganização completa do painel.
+
+| Verificação da tarefa 4 | Resultado observado |
+|---|---|
+| Baseline direcionado | 11 testes passaram |
+| TDD da função de apresentação | 6 testes inicialmente falharam pela função ausente, conforme plano; passaram após implementação |
+| TDD de renderização real | 4 falhas esperadas: contexto ausente, indisponibilidade omitida, dias ausentes e saldo reservado tratado como disponível |
+| Crédito reservado | 10h válidas − 8h reservadas = 2h disponíveis; déficit de 1h permanece separado |
+| Casos de saldo | Lotes inutilizáveis excluídos; OVERDUE_AVAILABLE incluído; reserva excessiva em um lote não reduz o saldo livre de outro |
+| Abono versus dia | Teste: dia vazio = 0h; abono mensal de 8h permanece no contexto; projeção usa 900 − 600 = +300 min persistidos, não −120 min híbridos |
+| Dias e períodos | Duas entradas no mesmo dia contam uma data; pessoas sem entradas têm zero; mês completo reconhecido pelas datas, incluindo fevereiro bissexto |
+| Preservação | Objetos fictícios comparados integralmente antes/depois; função não modifica entradas, lotes, folhas ou métricas de origem |
+| Suíte completa | 190 testes passaram, zero falhas/ignorados |
+| Lint e TypeScript | Código de saída 0 em ambos |
+| Preview de intervalo vazio | Em 10/08, 00:00 trabalhadas e consideradas; contexto mensal separado; percentual oculto |
+| Preview com abono fictício | Em 10/08, zero horas do dia; 01:00 de abono no contexto, carga 24:00 e projeção mensal −10:00 |
+| Metadados indisponíveis | Mensagem explícita, sem cartões mensais falsamente zerados |
+| Banco vazio e Pessoas | Rótulos novos conferidos; créditos e déficit separados; inativo permanece visível em Pessoas |
+| Visual | Janela normal e 390×844 conferidas; contexto empilhado e legível; largura restaurada |
+| Consultas | No último cenário, log registra somente GET do intervalo; nenhuma chamada de fechamento |
+
+Superpowers orientou execução pelo plano, testes antes da implementação e verificação antes de concluir. Revisão local do diff e dos consumidores, sem delegação. Esta alteração é restrita à apresentação; backend, rotas, permissões, SQL, fechamento e relatórios/exportações permanecem inalterados.
+
+Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, dependência nova, recálculo, push, PR ou deploy. A conferência visual de banco nesta rodada usou saldo zero; os valores de reserva e disponibilidade não zero foram verificados nos testes da função e de renderização real. Build completo isolado, PostgreSQL e matriz integrada de release continuam reservados para a tarefa 7.
+
+Próxima etapa: tarefa 5 — datas de registro no fuso da organização e nomes claros para atraso/último envio. Tarefas 5–7 e a reorganização visual completa continuam pendentes.
