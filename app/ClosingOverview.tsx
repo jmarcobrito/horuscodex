@@ -3,20 +3,30 @@ import { useState } from "react";
 import type { DashboardData } from "./dashboard-types";
 import { formatDate, formatMinutes, monthLabel } from "./HorusViews";
 import { buildClosingRows, makeClosingCommand, type ClosingCommand, type ClosingIssue, type ClosingRow, type ClosingStatus } from "./closing-model";
+import { resolveReviewIds, type ReviewScope } from "./overview-model";
+import { ReviewScopeBanner } from "./ReviewScopeBanner";
 
 const labels: Record<ClosingStatus, string> = { UNKNOWN: "Situação mensal não disponível", NO_RECORD: "Sem registro mensal", NO_ENTRIES: "Sem lançamentos", PENDING: "Com pendências", READY: "Pronto para revisar", CLOSED: "Fechado" };
-export function ClosingOverview({ data, onReview, onIssue, closingEnabled = false }: {
+export function ClosingOverview({ data, onReview, onIssue, closingEnabled = false, reviewScope, onClearReviewScope, statusFilter = "all", scopeRevision = 0 }: {
   data: DashboardData; onReview: (command: ClosingCommand, rows: ClosingRow[]) => void; onIssue: (issue: ClosingIssue) => void; closingEnabled?: boolean;
+  reviewScope?: ReviewScope; onClearReviewScope?: () => void; statusFilter?: ClosingStatus | "all"; scopeRevision?: number;
 }) {
-  const rows = buildClosingRows(data);
-  const [selection, setSelection] = useState<{ data: DashboardData; ids: string[]; acknowledged: string[] }>({ data, ids: [], acknowledged: [] });
-  const current = selection.data === data ? selection : { data, ids: [], acknowledged: [] };
+  const allRows = buildClosingRows(data);
+  const allowedIds = resolveReviewIds(data, reviewScope ?? { personId: null, sectorId: null });
+  const rows = allRows.filter(row => allowedIds.has(row.contractorId) && (statusFilter === "all" || row.status === statusFilter));
+  const visibleIds = new Set(rows.map(row => row.contractorId));
+  const scopeKey = JSON.stringify([reviewScope?.personId ?? null, reviewScope?.sectorId ?? null, statusFilter, scopeRevision]);
+  const [selection, setSelection] = useState<{ data: DashboardData; scopeKey: string; ids: string[]; acknowledged: string[] }>({ data, scopeKey, ids: [], acknowledged: [] });
+  const [selectionError, setSelectionError] = useState("");
+  const current = selection.data === data && selection.scopeKey === scopeKey ? selection : { data, scopeKey, ids: [], acknowledged: [] };
   const closed = rows.filter(row => row.status === "CLOSED"), open = rows.filter(row => row.status !== "CLOSED");
   const update = (id: string, checked: boolean) => setSelection({ ...current, ids: checked ? [...new Set([...current.ids, id])] : current.ids.filter(value => value !== id) });
-  const acknowledge = (id: string, checked: boolean) => setSelection({ data, ids: current.ids.filter(value => value !== id), acknowledged: checked ? [...new Set([...current.acknowledged, id])] : current.acknowledged.filter(value => value !== id) });
+  const acknowledge = (id: string, checked: boolean) => setSelection({ data, scopeKey, ids: current.ids.filter(value => value !== id), acknowledged: checked ? [...new Set([...current.acknowledged, id])] : current.acknowledged.filter(value => value !== id) });
   function review() {
     if (!current.ids.length) return;
-    onReview(makeClosingCommand(data.period, rows, current.ids, current.acknowledged), rows);
+    if (!current.ids.every(id => visibleIds.has(id))) { setSelectionError("A seleção mudou. Confira as pessoas novamente."); return; }
+    setSelectionError("");
+    onReview(makeClosingCommand(data.period, allRows, current.ids, current.acknowledged), allRows);
   }
   function person(row: ClosingRow) {
     const selectable = row.status === "READY" || (row.status === "NO_ENTRIES" && current.acknowledged.includes(row.contractorId));
@@ -42,6 +52,9 @@ export function ClosingOverview({ data, onReview, onIssue, closingEnabled = fals
     </article>;
   }
   return <>
+    {reviewScope && onClearReviewScope && <ReviewScopeBanner data={data} scope={reviewScope} onClear={onClearReviewScope} />}
+    {statusFilter !== "all" && <p className="review-scope-status">Situação recebida: {labels[statusFilter]}</p>}
+    {selectionError && <p role="alert">{selectionError}</p>}
     <section className="page-heading closing-heading"><div><span className="eyebrow">{closingEnabled ? "CONFERÊNCIA E FECHAMENTO" : "SOMENTE CONFERÊNCIA"}</span><h1>Fechamento do mês</h1><p>{monthLabel(data.period)} · {closingEnabled ? "Selecione uma pessoa ou a equipe. O mês só será fechado após sua confirmação." : "Fechamento temporariamente indisponível. Você pode consultar o mês e suas pendências."}</p></div></section>
     <div className="closing-toolbar">
       <button type="button" className="secondary-button" disabled={!rows.some(row => row.status === "READY")} onClick={() => setSelection({ ...current, ids: rows.filter(row => row.status === "READY").map(row => row.contractorId) })}>Selecionar prontos para revisar</button>

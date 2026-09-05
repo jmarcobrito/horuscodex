@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { runnerImport } from "vite";
+import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
+const opts = { configFile: false, envDir: false };
+const render = (view, data, extra = {}) => renderToStaticMarkup(createElement(view, { data, role: "rh", onNew() {}, onEdit() {}, onHistory() {}, onReview() {}, onIssue() {}, onClearReviewScope() {}, ...extra }));
+test("received scope restricts both daily entries and people without entries, and inactive targeted consultation", async () => {
+  const { module: { EntriesView } } = await runnerImport("./app/HorusViews.tsx", opts);
+  const data = makeWorkflowDashboard(); data.contractors[0].sectorId = null;
+  const before = structuredClone(data);
+  const html = render(EntriesView, data, { displayMode: "day", workDate: "2026-08-03", reviewScope: { personId: null, sectorId: "__unassigned__" } });
+  assert.match(html, /Ana Exemplo/); assert.doesNotMatch(html, /Bruno Teste|Carla Teste/);
+  assert.match(html, /Limpar filtros recebidos/); assert.deepEqual(data, before);
+  data.entries = []; data.monthlyTimesheets = undefined;
+  const inactive = render(EntriesView, data, { contractorId: "person-2", reviewScope: { personId: "person-2", sectorId: null } });
+  assert.match(inactive, /Resumo de Bruno Teste/);
+  assert.match(inactive, /Horas abonadas<\/span><strong>Não disponível/);
+});
+test("bank scope filters lots, transactions and totals consistently without exposing another person", async () => {
+  const { module: { BalanceView } } = await runnerImport("./app/HorusViews.tsx", opts);
+  const data = makeWorkflowDashboard();
+  data.balanceLots = data.contractors.slice(0,2).map((p,i) => ({ id:p.id, contractorId:p.id, contractorName:p.name, type:"DEBIT", originalMinutes:60*(i+1), remainingMinutes:60*(i+1), reservedMinutes:0, originDate:"2026-08-01", deadlineDate:"2026-12-01", status:"OPEN" }));
+  data.balanceTransactions = data.contractors.slice(0,2).map(p => ({ id:p.id, contractorId:p.id, contractorName:p.name, lotId:p.id, type:"DEBIT", minutes:60, description:p.name+" movimento", createdAt:"2026-08-01T12:00:00Z" }));
+  const html = render(BalanceView, data, { reviewScope:{personId:"person-1",sectorId:null} });
+  assert.match(html, /Ana Exemplo movimento/); assert.doesNotMatch(html, /Bruno Teste/);
+  assert.match(html, /Déficits pendentes<\/span><strong>01:00/);
+});
+test("closing scope never renders hidden people as selectable and retains unavailable and empty safeguards", async () => {
+  const { module: { ClosingOverview } } = await runnerImport("./app/ClosingOverview.tsx", opts);
+  const data = makeWorkflowDashboard();
+  const extra = { reviewScope: { personId: "person-1", sectorId: null }, statusFilter: "READY" };
+  const html = render(ClosingOverview, data, extra);
+  assert.match(html, /Selecionar Ana Exemplo/); assert.doesNotMatch(html, /Bruno Teste|Carla Teste/);
+  data.entries = [];
+  assert.match(render(ClosingOverview, data, { ...extra, statusFilter: "NO_ENTRIES" }), /Conferi este mês sem lançamentos/);
+  data.monthlyTimesheets = undefined;
+  assert.match(render(ClosingOverview, data, { ...extra, statusFilter: "UNKNOWN" }), /aria-label="Selecionar Ana Exemplo" disabled/);
+});
