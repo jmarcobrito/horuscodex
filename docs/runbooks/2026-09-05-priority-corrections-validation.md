@@ -222,3 +222,65 @@ Superpowers orientou execução pelo plano, testes antes da implementação e ve
 Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, recálculo persistido, fechamento, push, PR ou deploy. Build completo isolado, PostgreSQL, matriz de respostas atrasadas e teste responsivo integrado de release continuam na tarefa 7. As comparações numéricas dos campos novos foram verificadas nos testes de renderização; o preview manteve a versão fictícia antiga com esses campos ausentes.
 
 Próxima etapa: tarefa 7 — revisão integrada, compilação isolada e cenários PostgreSQL fictícios. Publicação depende das verificações e da aprovação específica do release. A reorganização visual completa continua em entrega separada.
+
+## Checkpoint seguinte — tarefa 7, validação local integrada concluída
+
+Data: 2026-09-05. Código validado: `6e08cc0`, na branch `feature/reports-redesign-design`. Este checkpoint substitui a retomada anterior. Autorização desta etapa: validação integrada local, sem publicação e sem subagentes.
+
+### Isolamento e compilação
+
+- `npm run verify:workflow` criou `C:\Users\danyel\AppData\Local\Temp\horus-workflow-check-rKqKtA`, copiando fontes rastreadas e dependências locais, excluindo arquivos de ambiente/credenciais. Processos usam `buildSafeEnv`, sem variáveis Supabase e com telemetria desativada.
+- Vinext compilou; os **209 testes da aplicação passaram**, sem falhas, cancelamentos ou testes ignorados; lint terminou com sucesso. A primeira execução completa retornou código 1 no Next porque não conseguiu baixar Manrope/Sora do Google Fonts. Isso foi falha de ambiente, não build aprovado.
+- Repetição autorizada de Next e `tsc --noEmit`, na mesma cópia e ainda com ambiente filtrado: compilação Next concluída, rotas geradas e **código final 0**. Não foi necessário alterar código, fontes, certificados ou proteções do projeto. Não se afirma que a primeira execução única passou: todas as etapas passaram considerando a repetição documentada.
+- Preview iniciado na mesma cópia isolada, com `tests/browser/vite.config.ts`, ambiente filtrado e porta 4177. Não foi feita outra cópia por `preview:workflow`. Interface exibe “TESTE LOCAL — dados fictícios; sem Supabase”. Nenhuma chamada real de produção foi usada para navegação ou escrita.
+
+### PostgreSQL exclusivamente fictício
+
+Executáveis existentes: `C:\Users\danyel\AppData\Local\Temp\horus-postgres-tests-bf4dfb1be39545bdb2635ed7a7d24bb1\pgsql\bin`. Nenhum software foi instalado. Comando: `node scripts/verify-closing-postgres.mjs --bin <pasta acima> --candidate`.
+
+O procedimento original do plano omitia `--candidate`; corrigido somente na documentação. Esse modo instala no cluster fictício novo as funções do SQL existente `20260903171101`, já publicado conforme `production-release-validation.md`. Sem o sinalizador, o executor testa apenas sua base antiga. Nenhum arquivo SQL foi alterado, nenhuma migração foi criada e nada foi aplicado no Supabase.
+
+A primeira tentativa não iniciou o servidor por restrição de processo do Windows (`pg_ctl: não pôde criar token restrito`, erro 87), com cluster fictício retido em `horus-closing-db-c7769R`, sem `postmaster.pid`. A repetição fora dessa restrição foi autorizada, usando o mesmo executor seguro, que criou **outro** cluster novo:
+
+- PostgreSQL **17.11**, `127.0.0.1:58703`.
+- Diretório: `C:\Users\danyel\AppData\Local\Temp\horus-closing-db-0HZ7JT`.
+- **39 testes passaram; zero falhas; código de saída 0**.
+- Executor confirmou `Test server stopped`. Arquivos sintéticos foram retidos; nenhum banco real ou diretório de dados existente foi aberto.
+
+Casos observados: preservação integral de linhas ao instalar/repetir as funções, rollback de instalação adulterada, fechamento repetido sem reescrever dias/versões, fechamento independente de outra pessoa, falha de auditoria sem alteração parcial, autorização pendente e ajuste bloqueando o mês, ocorrência sobreposta, mês fechado recusando edição/recalculo, aprovação atômica, atores de outra organização recusados, concorrência entre edição/aprovação/fechamento, reabertura fictícia preservando versões, créditos vencidos conforme política e reserva anterior preservada. Esses resultados validam fixtures e regras executadas, não constituem inspeção dos dados reais.
+
+### Matriz integrada de navegação e regressão
+
+| Cenário | Evidência desta execução | Resultado / limite |
+|---|---|---|
+| RH, fechamento individual | Ana selecionada; revisão mostrou nome/mês e aviso de preservação; confirmação fictícia moveu apenas Ana para “Mês fechado” | Passou no navegador |
+| RH, fechamento coletivo | Seleção dos dois prontos, revisão explícita e resultado “Equipe selecionada fechada” | Passou no navegador; Carla sem registro não foi inventada/incluída |
+| Preservação após fechamento coletivo | Snapshot visível de dias e versões antes/depois, 2.035 caracteres, idêntico | Passou no simulador; complementado pela comparação integral no PostgreSQL |
+| Resultado parcial | Ana fechada e Bruno impedido, explicação por pessoa, “Envio encerrado” desabilitado | Passou; painel de chamadas mostrou um envio por pessoa, sem repetição |
+| Resultado incerto | Ana não confirmada; Bruno não enviado; orientação para consultar antes de repetir | Passou; painel de chamadas mostrou somente um POST, sem continuação/reenvio automático |
+| Mês sem lançamentos | Carla com folha existente e abono: seleção desabilitada até conferência explícita | Passou; não confundido com folha ausente |
+| Mês fechado | Ana exibida no grupo fechado sem seleção; metadados antigos ausentes como “Não informado” | Passou |
+| Metadados indisponíveis | Todas as seleções e revisão desabilitadas; números indisponíveis, não zero | Passou |
+| Pendência / requer ajuste | Navegador bloqueou Ana com dia não autorizado e atalho à pendência; suíte PostgreSQL bloqueou NEEDS_ADJUSTMENT sem mudar histórico | Passou nas camadas indicadas; não criada fixture adicional de ajuste na UI |
+| Falha de leitura | Setembro exibiu erro e “Tentar novamente”, sem manter números antigos como sucesso; tentativa explícita recuperou | Passou |
+| Resposta atrasada | Com agosto atrasado, troca setembro → agosto → setembro permaneceu em setembro e 06:00 após a resposta antiga | Passou no navegador; reducers também cobertos nos 209 testes |
+| Colaborador | “Meu mês”, “Banco de horas”, “Solicitações”; próprio lançamento e histórico; sem fechamento de equipe | Passou; autorização real das rotas verificada nas suítes |
+| DEV/RH e DEV como colaborador | Visão RH mantém áreas administrativas; visualizar Ana mostra somente leitura, sem registrar/editar; retorno à visão RH disponível | Passou |
+| Histórico diário | Campos antigos preservados como “Não informado”; autoria, fuso e comparação antes/depois visíveis | Passou; autoria paginada e falhas de leitura cobertas nos testes da tarefa 6 e repetidas na suíte completa |
+| Conferência por dia | Opção “Por dia” mantém aviso de somente conferência, fechamento mensal separado e ausência de lançamento não tratada como falta | Passou no navegador |
+| Aprovações | Escopo “Todas as datas”, pessoa/tipo/situação explícitos, aviso de independência do Painel e vazio contextual | Passou; filtros e rejeição de resposta de outro escopo cobertos nas suítes |
+| Relatórios | Três tipos, filtros e quatro exportações disponíveis; histórico usa “Quem realizou”, “O que aconteceu”, “Pessoa afetada”, “Motivo” e ações naturais | Passou no navegador |
+| Arquivos exportados | Testes reais de CSV, Excel atual/pacote e PDF executados na suíte: abertura, tipos, totais, cabeçalhos, paginação e neutralização de fórmulas | Passou nos testes; não repetido download manual no navegador |
+| Teclado e foco | Histórico abre com foco em Fechar, Tab permanece no diálogo e Escape fecha devolvendo foco ao botão de origem | Passou no navegador |
+| Tela ampla e estreita | 1440×1000 e 390×844; painel adapta cartões/filtros e menu móvel abre Lançamentos; histórico cabe na tela estreita | Passou nas áreas inspecionadas; tamanho original restaurado |
+| Densidade da tabela | Acompanhamento das pessoas mantém rolagem horizontal interna; em 390 px, contêiner de 346 px para tabela de cerca de 1.045 px | Limitação visual conhecida; reorganização pertence à Entrega B, não foi disfarçada como tabela compacta |
+
+Os controles expandidos do simulador sobrepuseram um botão de período durante o ensaio; a ação foi identificada sem efeito na consulta, os controles foram recolhidos e o cenário foi repetido com resultado observado. Não se contou a tentativa sem efeito como validação. Não foi detectada regressão funcional nos cenários acima, mas isso não equivale a garantia de ausência de qualquer defeito ou teste de produção.
+
+### Revisão e próxima etapa
+
+Consumidores de escopo de aprovações, resumo, saldos, histórico e chaves de workspace revisados diretamente. Diff completo `54be4957d4e944f800935b0cafdf2c025a6cfeba..6e08cc0`: 32 arquivos, sem SQL, migração, dependência ou alteração de política; `git diff --check` sem erros. A execução atual modifica apenas estes registros documentais.
+
+Superpowers orientou a execução pelo plano e a verificação antes de concluir; nenhum subagente usado. Nenhum acesso ao Supabase, leitura de credenciais, alteração em dados reais de agosto, push, PR, merge ou deploy nesta etapa. A prova de preservação é local/fictícia; não se afirma ter comparado o banco de produção.
+
+**Próxima etapa:** mediante autorização, preparar a publicação controlada do aplicativo (PR/revisão, versão anterior recuperável e preview identificado). Aprovação específica do release continua obrigatória antes de produção. Nenhum comando Supabase deve integrar a publicação. O redesenho visual completo do painel e novas regras permanecem fora deste pacote.

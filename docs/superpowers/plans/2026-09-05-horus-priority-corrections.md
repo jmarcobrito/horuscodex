@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–6 foram implementadas e validadas localmente; a tarefa 7 continua pendente. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–6 e a validação local integrada da tarefa 7 foram concluídas. PR, preview externo e liberação de produção continuam pendentes de autorização específica. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -266,10 +266,10 @@ assert.deepEqual(h.historyFields(version).find(f => f.label === "Autorização d
 
 **Files:** criar `docs/runbooks/2026-09-05-priority-corrections-validation.md`; usar `scripts/verify-workflow-isolated.mjs`, `scripts/verify-closing-postgres.mjs` e as suítes existentes sem modificar suas proteções.
 
-- [ ] Procurar todos os consumidores alterados com `rg -n "approvalsScope|positiveBalanceMinutes|buildPeriodSummary|HistoryState|HistoryVersion|workspaceKey" app db tests`; conferir contratos, fixtures e ausência de indicadores com significado trocado.
-- [ ] Verificar `git diff --name-only` e `git diff --check`: nenhum arquivo de migração, SQL de produção, política ou dependência deve integrar o pacote. Novos arquivos precisam estar rastreados para o verificador isolado copiá-los; adicionar somente caminhos revisados, nunca `git add .` sem inspeção.
-- [ ] Rodar `npm run verify:workflow`: build Vinext, testes da aplicação, lint, build Next e TypeScript numa cópia sem ambiente real. Guardar saídas e contagens reais no runbook. Se rede/fontes bloquearem a compilação, registrar falha de ambiente e obter autorização, sem classificar como teste aprovado.
-- [ ] Resolver a instalação local PostgreSQL e rodar o verificador com o procedimento abaixo. Se não estiver no PATH, parar essa verificação e localizar a pasta registrada na execução anterior ou solicitar a localização; não instalar automaticamente. O script cria cluster fictício próprio; não pode receber Supabase, PGDATA existente ou base real.
+- [x] Procurar todos os consumidores alterados com `rg -n "approvalsScope|positiveBalanceMinutes|buildPeriodSummary|HistoryState|HistoryVersion|workspaceKey" app db tests`; conferir contratos, fixtures e ausência de indicadores com significado trocado.
+- [x] Verificar `git diff --name-only` e `git diff --check`: nenhum arquivo de migração, SQL de produção, política ou dependência deve integrar o pacote. Novos arquivos precisam estar rastreados para o verificador isolado copiá-los; adicionar somente caminhos revisados, nunca `git add .` sem inspeção.
+- [x] Rodar `npm run verify:workflow`: build Vinext, testes da aplicação, lint, build Next e TypeScript numa cópia sem ambiente real. Guardar saídas e contagens reais no runbook. Se rede/fontes bloquearem a compilação, registrar falha de ambiente e obter autorização, sem classificar como teste aprovado. A primeira execução parou nas fontes; Next e TypeScript passaram na repetição autorizada, na mesma cópia e com ambiente filtrado.
+- [x] Resolver a instalação local PostgreSQL e rodar o verificador com o procedimento abaixo. Se não estiver no PATH, parar essa verificação e localizar a pasta registrada na execução anterior ou solicitar a localização; não instalar automaticamente. O script cria cluster fictício próprio; não pode receber Supabase, PGDATA existente ou base real.
 
 ```powershell
 $horusInitdb = Get-Command initdb -CommandType Application -ErrorAction Stop
@@ -279,11 +279,13 @@ foreach ($horusExecutable in @('initdb.exe', 'pg_ctl.exe', 'psql.exe')) {
     throw 'Instalação PostgreSQL local incompleta; não iniciar testes.'
   }
 }
-node scripts/verify-closing-postgres.mjs --bin $horusPgBin
+node scripts/verify-closing-postgres.mjs --bin $horusPgBin --candidate
 if ($LASTEXITCODE -ne 0) { throw 'Verificação PostgreSQL falhou.' }
 ```
-- [ ] Rodar preview isolado (`npm run preview:workflow`) e conferir: RH; colaborador; DEV/RH; DEV como colaborador; mês sem dados; mês fechado; falha de leitura; resposta atrasada; seleção individual/coletiva; fechamento bloqueado por ajuste; resultado parcial/incerto sem reenvio; histórico; relatórios/exportações inalterados. Todas as ações de escrita apenas sobre fixtures.
-- [ ] Registrar no runbook uma tabela para cada cenário com resultado real, evidência e falhas. Não marcar “passou” antes de observar o resultado. Conferir teclado/foco e janela ampla/estreita nas áreas tocadas.
+O sinalizador `--candidate` é necessário para testar no cluster novo as proteções mensais do SQL existente, já publicado conforme o runbook de release de 03/09. Não cria uma migração neste pacote nem autoriza execução remota. Sem ele, o executor usa apenas a base antiga. Executáveis locais foram localizados no caminho registrado no runbook, sem nova instalação.
+
+- [x] Rodar preview isolado (`npm run preview:workflow`) e conferir: RH; colaborador; DEV/RH; DEV como colaborador; mês sem dados; mês fechado; falha de leitura; resposta atrasada; seleção individual/coletiva; fechamento bloqueado por ajuste; resultado parcial/incerto sem reenvio; histórico; relatórios/exportações inalterados. Todas as ações de escrita apenas sobre fixtures. Usada a mesma cópia isolada do verificador, em 4177, com ambiente filtrado; distinção entre evidência de navegador e testes automatizados registrada no runbook (ajuste e arquivos exportados verificados nas suítes, não por nova escrita/download no navegador).
+- [x] Registrar no runbook uma tabela para cada cenário com resultado real, evidência e falhas. Não marcar “passou” antes de observar o resultado. Conferir teclado/foco e janela ampla/estreita nas áreas tocadas.
 - [ ] Após autorização de execução e revisão local, preparar PR com: achados F01–F07 cobertos; arquivos; testes; ausência de migrações; prova de leitura sem gravação; limites; instrução de reversão da versão do aplicativo. Não incluir dados pessoais ou capturas reais no PR.
 - [ ] Preview publicado somente quando autorizado e identificado seu ambiente. Se usa banco de produção, limitar a navegação a leitura; nenhum cadastro, edição, aprovação ou fechamento de teste. Não copiar chaves privilegiadas para variáveis públicas.
 - [ ] Antes de produção, apresentar resultado do PR/preview e pedir aprovação específica do release. Confirmar versão anterior recuperável. Publicar somente o aplicativo, sem comandos Supabase; depois verificar leitura e navegação. Qualquer regressão bloqueia a entrega e exige reverter o aplicativo, não o banco.
