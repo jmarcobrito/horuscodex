@@ -82,7 +82,8 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     const mode = controls.historyMode;
     if (mode === "slow") await pause(2500);
     if (mode === "error") return Response.json({ error: "Falha fictícia no histórico" }, { status: 503 });
-    return Response.json({ versions: mode === "empty" ? [] : structuredClone(versions[id] ?? []) });
+    const names = new Map([...august.contractors.map(person => [person.id, person.name] as const), ["test-rh", "Marina Exemplo"] as const]);
+    return Response.json({ timezone: "America/Sao_Paulo", versions: mode === "empty" ? [] : structuredClone(versions[id] ?? []).map(version => ({ ...version, changed_by_name: names.get(version.changed_by) ?? null })) });
   };
   const raw = (entry: DashboardEntry) => ({ start_time: entry.startTime, end_time: entry.endTime, break_minutes: entry.breakMinutes, calculated_minutes: entry.calculatedMinutes, notes: entry.notes });
   const { request, calls } = createMockRequest({

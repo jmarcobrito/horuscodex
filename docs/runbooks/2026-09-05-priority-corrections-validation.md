@@ -188,3 +188,37 @@ Superpowers orientou execução pelo plano, testes antes da implementação e ve
 Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, recálculo persistido, fechamento, push, PR ou deploy. Datas inválidas e outro fuso foram verificados nos testes puros, de leitura e renderização conforme os casos acima, não inseridos em dados reais. Build completo isolado, PostgreSQL e matriz integrada de release continuam reservados para a tarefa 7.
 
 Próxima etapa: tarefa 6 — autoria e campos do histórico diário, sem regravar versões. Tarefas 6–7 e a reorganização visual completa continuam pendentes.
+
+## Checkpoint seguinte — tarefa 6 concluída localmente
+
+Base: `c740cc8`. Autorização: completar os detalhes e responsáveis do histórico diário, na área isolada existente e sem subagentes. Este checkpoint substitui a retomada anterior.
+
+Implementado:
+
+- Rota de histórico continua autorizando o lançamento antes de ler versões. Resolve somente os autores citados, com seleção `id,name` e filtro da organização, sem carregar o diretório completo ou enviar e-mails/perfis. IDs são divididos em grupos de 100 para limitar o tamanho da URL; cada grupo usa leitura paginada completa.
+- Resposta acrescenta `changed_by_name` e `timezone`. Autor ausente ou de outra organização fica sem nome; falha de leitura não vira autoria desconhecida silenciosamente. Fuso ausente/inválido interrompe a consulta.
+- Comparação inclui “Horas consideradas” e “Autorização do dia”, com nomes naturais. Campos ausentes em versões antigas continuam “Não informado”; situação desconhecida recebe aviso, sem substituir o conteúdo gravado.
+- Estados de autorização foram conferidos no SQL local: lançamentos usam NOT_APPLICABLE, PENDING_AUTHORIZATION, AUTHORIZED e REJECTED. NEEDS_ADJUSTMENT também recebe rótulo defensivo conforme o plano; nenhuma regra transacional foi alterada.
+- Interface prefere o nome resolvido e mantém compatibilidade com o mapa local. Nome é o cadastro resolvido hoje, não um nome histórico imutável. Data/hora usam o fuso da resposta; fixtures antigas usam fallback explícito de São Paulo.
+- `openHistory` conserva o identificador que rejeita respostas antigas e armazena o fuso junto às versões. Comparação, carregamento, erro, nova tentativa e vazio continuam distintos.
+
+| Verificação da tarefa 6 | Resultado observado |
+|---|---|
+| Baseline direcionado | 31 testes passaram |
+| TDD | 6 falhas esperadas nos testes novos: campos, nome/fuso, autoria completa, falha paginada e configuração; passaram após implementação. Fixture teve falha de contrato antes do alinhamento |
+| Suítes direcionadas | 38 testes de histórico, leitura e visualização DEV passaram |
+| Suíte completa | 209 testes passaram, zero falhas/cancelados/ignorados |
+| Lint e TypeScript | Código de saída 0 em ambos |
+| Autoria | RH e DEV resolvidos; ausente/fora da organização permanecem null; seleção limitada aos IDs citados e `id,name` |
+| Paginação | 1.105 versões e autores com limite fictício de 50 por página retornam completos; falha na segunda página de autores/versões impede sucesso parcial |
+| Permissões | Colaborador não abre lançamento alheio; bloqueio ocorre antes da leitura de versões; acesso ao próprio lançamento preservado |
+| Preservação | Conteúdo integral das tabelas e versões fictícias igual antes/depois; zero gravações e zero RPC nas consultas verificadas |
+| Campos e fuso | Zero horas preservado como 00:00; 120 min como 02:00; situação desconhecida explicitada; São Paulo/Tóquio e virada da meia-noite testados na renderização real |
+| Preview | Campos novos, antes/depois e responsável visíveis; ausência antiga como Não informado; carregamento lento explícito; erro seguido de Tentar novamente recupera versões; histórico vazio do inativo acessível |
+| Revisão local | Diff, consumidores e proteção contra respostas atrasadas revisados; nenhuma mudança de permissões, escrita, SQL ou dependências |
+
+Superpowers orientou execução pelo plano, testes antes da implementação e verificação antes de concluir. Sem delegação. O preview antigo estava sem servidor e exibia código anterior em memória; foi reiniciado com ambiente filtrado e configuração fictícia sem Supabase, em 127.0.0.1:4176. A nova aba foi conferida com os campos atuais. Não foi necessário alterar a configuração do navegador ou proteções de rede.
+
+Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, recálculo persistido, fechamento, push, PR ou deploy. Build completo isolado, PostgreSQL, matriz de respostas atrasadas e teste responsivo integrado de release continuam na tarefa 7. As comparações numéricas dos campos novos foram verificadas nos testes de renderização; o preview manteve a versão fictícia antiga com esses campos ausentes.
+
+Próxima etapa: tarefa 7 — revisão integrada, compilação isolada e cenários PostgreSQL fictícios. Publicação depende das verificações e da aprovação específica do release. A reorganização visual completa continua em entrega separada.

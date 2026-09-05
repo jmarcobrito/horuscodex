@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–5 foram implementadas e validadas localmente; tarefas 6–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–6 foram implementadas e validadas localmente; a tarefa 7 continua pendente. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -242,7 +242,7 @@ test("same civil day is not retroactive", () => {
 
 **Interfaces:** resposta continua `{ versions }` e acrescenta `timezone: string`; cada versão acrescenta `changed_by_name: string | null`. `HistoryVersion` aceita esse campo opcional para compatibilidade; estado `ready` aceita `timezone?: string`. O endpoint real sempre retorna timezone; fixtures antigas usam fallback explícito America/Sao_Paulo, não fuso do navegador. Nome armazenado/resolvido hoje não deve ser descrito como nome histórico imutável.
 
-- [ ] Acrescentar testes de campos:
+- [x] Acrescentar testes de campos:
 
 ```js
 const version = makeHistoryVersion();
@@ -256,11 +256,11 @@ assert.deepEqual(h.historyFields(version).find(f => f.label === "Autorização d
   { label: "Autorização do dia", before: "Aguardando autorização", after: "Autorizado" });
 ```
 
-- [ ] Rodar `node --test tests/entry-history.test.mjs`; confirmar falha porque os campos não existem. Na rota, depois de autorizar o lançamento, consultar somente autores citados nas versões, com `organization_id` da sessão e seleção `id,name`, paginada/completa. Não enviar diretório completo, e-mails ou perfis administrativos. Ler timezone da organização. Se a consulta de autoria falhar, retornar erro com nova tentativa; nome realmente não encontrado é null.
-- [ ] Acrescentar a `fields` as chaves `eligible_minutes` e `non_business_day_status`. Formatar a primeira com `formatMinutes`, a segunda com mapa natural: NOT_APPLICABLE → Regular; PENDING_AUTHORIZATION → Aguardando autorização; AUTHORIZED → Autorizado; REJECTED → Rejeitado; NEEDS_ADJUSTMENT → Requer ajuste. Confirmar os demais valores contra os tipos SQL existentes antes de completar o mapa; desconhecido → “Situação não reconhecida”, nunca substituir o dado gravado.
-- [ ] `EntryHistory` prefere `version.changed_by_name`, mantém fallback de `names` para compatibilidade e “Responsável não identificado” quando ambos faltarem. Passar `timeZone` ao `Intl.DateTimeFormat`; manter “Data não disponível” para instant inválido. `openHistory` armazena `timezone` junto com versions; conservar proteção contra resposta atrasada e botão de nova tentativa.
-- [ ] Testar autor RH e DEV com nome resolvido, autor ausente, tentativa de autor de outra organização, colaborador tentando abrir lançamento alheio, mais de 1000 versões, erro na segunda página, campo antigo ausente e horário próximo à meia-noite. A fixture deve provar `versions` e tabelas intactas e zero RPC/mutações após a consulta.
-- [ ] Rodar `node --test tests/entry-history.test.mjs tests/complete-reads.test.mjs tests/developer-view-contract.test.mjs`; conferir antes/depois no preview fictício, revisar e fazer commit da tarefa.
+- [x] Rodar `node --test tests/entry-history.test.mjs`; confirmar falha porque os campos não existem. Na rota, depois de autorizar o lançamento, consultar somente autores citados nas versões, com `organization_id` da sessão e seleção `id,name`, paginada/completa. Não enviar diretório completo, e-mails ou perfis administrativos. Ler timezone da organização. Se a consulta de autoria falhar, retornar erro com nova tentativa; nome realmente não encontrado é null.
+- [x] Acrescentar a `fields` as chaves `eligible_minutes` e `non_business_day_status`. Formatar a primeira com `formatMinutes`, a segunda com mapa natural: NOT_APPLICABLE → Regular; PENDING_AUTHORIZATION → Aguardando autorização; AUTHORIZED → Autorizado; REJECTED → Rejeitado; NEEDS_ADJUSTMENT → Requer ajuste. Confirmar os demais valores contra os tipos SQL existentes antes de completar o mapa; desconhecido → “Situação não reconhecida”, nunca substituir o dado gravado.
+- [x] `EntryHistory` prefere `version.changed_by_name`, mantém fallback de `names` para compatibilidade e “Responsável não identificado” quando ambos faltarem. Passar `timeZone` ao `Intl.DateTimeFormat`; manter “Data não disponível” para instant inválido. `openHistory` armazena `timezone` junto com versions; conservar proteção contra resposta atrasada e botão de nova tentativa.
+- [x] Testar autor RH e DEV com nome resolvido, autor ausente, tentativa de autor de outra organização, colaborador tentando abrir lançamento alheio, mais de 1000 versões, erro na segunda página, campo antigo ausente e horário próximo à meia-noite. A fixture deve provar `versions` e tabelas intactas e zero RPC/mutações após a consulta.
+- [x] Rodar `node --test tests/entry-history.test.mjs tests/complete-reads.test.mjs tests/developer-view-contract.test.mjs`; conferir antes/depois no preview fictício, revisar e fazer commit da tarefa.
 
 ### Tarefa 7 — revisão integrada e liberação controlada
 

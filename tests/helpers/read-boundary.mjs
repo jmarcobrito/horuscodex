@@ -3,7 +3,7 @@ export const boundary = {
   tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0, rpcLog: [], rpcResult: null, readRpcCalls: {}, readRpcLog: [],
   maxRows: 1000, reportCountOffsetAfter: null, readsByTable: {}, rangeCallsByTable: {}, authId: "auth-rh", authEmail: "rh@example.com", allowWrites: false, authError: null,
   reset() {
-    this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.readRpcCalls = {}; this.readRpcLog = []; this.failTable = null; this.failAfter = 0;
+    this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.readRpcCalls = {}; this.readRpcLog = []; this.failTable = null; this.failAfter = 0; this.authorReads = [];
     this.maxRows = 1000; this.reportCountOffsetAfter = null; this.readsByTable = {}; this.rangeCallsByTable = {}; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
     this.allowWrites = false; this.authError = null;
     this.tables = Object.fromEntries(["users","sectors","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
@@ -87,6 +87,7 @@ class Query {
   constructor(table) { this.table=table; boundary.readsByTable[table] = (boundary.readsByTable[table] ?? 0) + 1; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; this.selected=""; this.applied=false; }
   select(columns,options) {this.selected=columns;this.exact=options?.count==="exact";return this;}
   eq(key,value) {this.filters.push(row=>row[key]===value);return this;}
+  in(key,values) {this.filters.push(row=>values.includes(row[key]));if(key==="id")this.selectedIds=[...values];return this;}
   is(key,value) {return this.eq(key,value);}
   neq(key,value) {this.filters.push(row=>row[key]!==value);return this;}
   not(key,operator,value) {if(operator==="is")this.filters.push(row=>value===null?row[key]!==null:row[key]!==value);return this;}
@@ -102,6 +103,7 @@ class Query {
     const result=this.result(); return {...result,data:result.data?.[0]??null};
   }
   result() {
+    if(this.table==="users"&&this.selected==="id,name") boundary.authorReads.push({columns:this.selected,ids:this.selectedIds??null});
     if(boundary.failTable===this.table && this.from>=boundary.failAfter) return {data:null,count:null,error:{message:"Synthetic page failure"}};
     const rows=rowsFor(this.table).filter(row=>this.filters.every(f=>f(row)));
     if(!this.applied&&this.insertValues){boundary.tables[this.table].push(...structuredClone(this.insertValues));this.applied=true;}

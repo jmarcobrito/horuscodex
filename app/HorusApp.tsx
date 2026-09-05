@@ -305,10 +305,10 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     setHistoryEntry(entry); setHistoryState({ status: "loading", entryId: entry.id }); setModal("history");
     try {
       const response = await request("/api/time-entries/" + entry.id + "/history", { cache: "no-store" });
-      const result = await response.json() as { versions?: HistoryVersion[]; error?: string };
+      const result = await response.json() as { versions?: HistoryVersion[]; timezone?: string; error?: string };
       if (!response.ok) throw Error(result.error || "Não foi possível carregar o histórico.");
       if (!Array.isArray(result.versions) || result.versions.some(version => !version || !version.previous_data || !version.new_data)) throw Error("A resposta do histórico está incompleta.");
-      if (token === historyRequestId.current) setHistoryState({ status: "ready", entryId: entry.id, versions: result.versions });
+      if (token === historyRequestId.current) setHistoryState({ status: "ready", entryId: entry.id, versions: result.versions, timezone: result.timezone });
     } catch (error) {
       if (token === historyRequestId.current) setHistoryState({ status: "error", entryId: entry.id, message: error instanceof Error ? error.message : "Não foi possível carregar o histórico." });
     }

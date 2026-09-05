@@ -3,6 +3,15 @@ import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
 
+test("fixture history resolves names and timezone without changing stored versions", async () => {
+  const server=createWorkflowServer(); const before=server.snapshot();
+  const response=await server.request("/api/time-entries/entry-1/history"); const body=await response.json();
+  assert.equal(body.timezone,"America/Sao_Paulo");
+  assert.equal(body.versions[0].changed_by_name,"Ana Exemplo");
+  assert.equal(body.versions[0].previous_data.eligible_minutes,undefined);
+  assert.deepEqual(server.snapshot(),before);
+});
+
 test("fixture registration indicators are scoped to the consulted entries", async () => {
   const server = createWorkflowServer();
   const before = server.snapshot();

@@ -10,6 +10,69 @@ const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizati
 const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
 
+function historyFixture() {
+  boundary.tables.users.push({id:"test-dev",organization_id:"test-org",name:"DEV Exemplo",role:"DEV",status:"ACTIVE"});
+  boundary.tables.time_entry_versions = ["test-rh", "test-dev", "missing-author", "person-other-org"].map((author,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{notes:"Antiga"},new_data:{notes:"Nova"},changed_by:author,change_reason:"Ensaio",changed_at:"2026-08-04T01:00:00Z"}));
+}
+const consultHistory = (id="entry-person-0000") => historyRoute.GET(new Request("http://127.0.0.1/history"),{params:Promise.resolve({id})});
+
+test("history resolves only referenced organization authors and preserves every stored snapshot", async()=>{
+  historyFixture();
+  const before=structuredClone(boundary.tables);
+  const response=await consultHistory(); const body=await response.json();
+  assert.equal(response.status,200); assert.equal(body.timezone,"America/Sao_Paulo");
+  const versions=new Map(body.versions.map(v=>[v.changed_by,v]));
+  assert.equal(versions.get("test-rh").changed_by_name,"RH");
+  assert.equal(versions.get("test-dev").changed_by_name,"DEV Exemplo");
+  assert.equal(versions.get("missing-author").changed_by_name,null);
+  assert.equal(versions.get("person-other-org").changed_by_name,null);
+  assert.ok(boundary.authorReads.length>0);
+  assert.deepEqual([...new Set(boundary.authorReads.flatMap(read=>read.ids))].sort(),["missing-author","person-other-org","test-dev","test-rh"]);
+  assert.deepEqual(Object.keys(body).sort(),["timezone","versions"]);
+  for(const v of body.versions) { assert.equal(v.email,undefined); assert.equal(v.role,undefined); }
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history returns all authors and versions beyond the service cap", async()=>{
+  boundary.tables.time_entry_versions=boundary.tables.users.filter(u=>u.role==="PJ"&&u.organization_id==="test-org").map((u,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{},new_data:{},changed_by:u.id,change_reason:null,changed_at:"2026-08-04T01:00:00Z"}));
+  boundary.maxRows=50;
+  const before=structuredClone(boundary.tables);
+  const response=await consultHistory(); const body=await response.json();
+  assert.equal(response.status,200); assert.equal(body.versions.length,1105);
+  assert.ok(body.versions.every(v=>v.changed_by_name===v.changed_by));
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history fails visibly on incomplete author or version pages", async()=>{
+  for(const table of ["users","time_entry_versions"]) {
+    boundary.reset();
+    boundary.tables.time_entry_versions=boundary.tables.users.slice(0,110).map((u,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{},new_data:{},changed_by:u.id,change_reason:null,changed_at:"2026-08-04T01:00:00Z"}));
+    boundary.maxRows=50; boundary.failTable=table; boundary.failAfter=50;
+    const before=structuredClone(boundary.tables);
+    const response=await consultHistory();
+    assert.equal(response.status,502); assert.equal((await response.json()).versions,undefined);
+    assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+  }
+});
+
+test("history denies another person's entry before reading versions", async()=>{
+  historyFixture();
+  boundary.authId="auth-person-0001"; boundary.authEmail="person-0001@example.com";
+  assert.equal((await consultHistory()).status,404);
+  assert.equal(boundary.readsByTable.time_entry_versions,undefined);
+  assert.equal((await consultHistory("entry-person-0001")).status,200);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history refuses missing or invalid organization timezone without rewriting data", async()=>{
+  for(const timezone of [null,"Not/A_Zone"]) {
+    boundary.reset(); historyFixture(); boundary.tables.organizations[0].timezone=timezone;
+    const before=structuredClone(boundary.tables);
+    assert.equal((await consultHistory()).status,502);
+    assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+  }
+});
+
 test("registration dates use the organization timezone without rewriting timestamps", async () => {
   boundary.tables.time_entries[0].created_at = "2026-08-04T01:00:00Z";
   const before = structuredClone(boundary.tables);
