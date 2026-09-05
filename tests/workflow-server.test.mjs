@@ -2,6 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
+
+test("fixture registration indicators are scoped to the consulted entries", async () => {
+  const server = createWorkflowServer();
+  const before = server.snapshot();
+  const data = await (await server.request("/api/dashboard?from=2026-08-10&to=2026-08-10")).json();
+  assert.equal(data.timezone,"America/Sao_Paulo");
+  assert.equal(data.contractors[0].lastEntryAt,null);
+  assert.equal(data.contractors[0].lastEntryDate,null);
+  assert.equal(data.contractors[0].averageDelayDays,null);
+  assert.equal(data.contractors[0].unavailableRegistrationDates,0);
+  assert.deepEqual(server.snapshot(),before);
+});
 test("fixture uses the same missing-month estimates and never invents inactive requirements", async () => {
   const server = createWorkflowServer();
   const before = server.snapshot();

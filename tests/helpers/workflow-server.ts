@@ -3,6 +3,7 @@ import type { ClosingSubmit, ClosingResult } from "../../app/closing-model";
 import type { HistoryVersion } from "../../app/EntryHistory";
 import { monthPeriod } from "../../app/period";
 import { buildPeriodSummary, requiredForPerson } from "../../db/dashboard-summary";
+import { civilDate, registrationDelayDays } from "../../db/civil-date";
 import { makeWorkflowDashboard, makeHistoryVersion } from "../fixtures/monthly-workflow.mjs";
 import { makeAdminData } from "../fixtures/dashboard.mjs";
 import { createMockRequest } from "./mock-request.mjs";
@@ -34,6 +35,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     while (cursor <= end) { months.push(getMonth(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)); cursor.setUTCDate(1); cursor.setUTCMonth(cursor.getUTCMonth() + 1); }
     const data = structuredClone(months[0] ?? august);
     data.period = period;
+    data.timezone = "America/Sao_Paulo";
     const approvalsScope = url.searchParams.get("approvalsScope") ?? "period";
     if (approvalsScope !== "all" && approvalsScope !== "period") throw Error("Escopo fictício inválido");
     data.approvalsScope = approvalsScope;
@@ -62,6 +64,13 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       person.estimatedRequiredMonths = requirement.estimatedMonths;
       person.fillPercentage = person.requiredMinutes ? Math.min(100, Math.round(person.consideredMinutes / person.requiredMinutes * 100)) : 0;
       person.timesheetStatus = sheets[0]?.status ?? "OPEN";
+      const delays = entries.map(e => registrationDelayDays(e.workDate, e.createdAt, data.timezone!));
+      const validDelays = delays.filter((value): value is number => value !== null);
+      person.averageDelayDays = validDelays.length ? Math.round(validDelays.reduce((n, value) => n + value, 0) / validDelays.length) : null;
+      person.unavailableRegistrationDates = delays.length - validDelays.length;
+      person.retroactiveEntries = validDelays.filter(value => value > 0).length;
+      person.lastEntryDate = entries.map(e => e.workDate).sort().at(-1) ?? null;
+      person.lastEntryAt = entries.filter(e => civilDate(e.createdAt, data.timezone!) !== null).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]?.createdAt ?? null;
     }
     const summary = buildPeriodSummary({ users: data.contractors, entries: data.entries, timesheets: data.monthlyTimesheets ?? [], requiredPerMonth: 480, monthCount: months.length });
     data.timesheet = { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: data.monthlyTimesheets?.every(m => m.status === "CLOSED") ? "CLOSED" : "OPEN" };

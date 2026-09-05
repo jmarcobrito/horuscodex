@@ -5,6 +5,7 @@ import type {
 import { projectMonthlyTimesheet, type MonthlyTimesheetRow } from "./monthly-timesheet-view";
 import type { HorusActor } from "./actor";
 import { buildPeriodSummary, requiredForPerson } from "./dashboard-summary";
+import { civilDate, registrationDelayDays } from "./civil-date";
 import { getSupabaseAdmin } from "./supabase";
 import { readAllRows } from "./read-all";
 import { deadlineStatus } from "./workflow-rules";
@@ -37,10 +38,6 @@ function monthKeys(from: string, to: string) {
 }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
 function sum<T>(rows: T[], value: (row: T) => number) { return rows.reduce((total, row) => total + value(row), 0); }
-function delayDays(entry: EntryRow) {
-  const created = new Date(entry.created_at); const worked = new Date(entry.work_date + "T00:00:00Z");
-  return Math.max(0, Math.floor((Date.UTC(created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate()) - worked.getTime()) / 86_400_000));
-}
 
 export async function getDashboardData(actor: HorusActor, input: PeriodInput = {}): Promise<DashboardData> {
   const period = resolveDashboardPeriod(input); const admin = getSupabaseAdmin();
@@ -84,7 +81,9 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const summaryTimesheets = timesheets.map(row => ({ contractorId: row.contractor_id, year: row.year, month: row.month, requiredMinutes: row.required_minutes, creditedMinutes: row.credited_minutes }));
   const policyRow = policyResult.data; const requiredPerMonth = policyRow?.monthly_required_minutes ?? 9_720;
   const deadlinePolicy = (policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE") === "ALLOW_AFTER_DEADLINE" ? "ALLOW_AFTER_DEADLINE" : "BLOCK_AFTER_DEADLINE";
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: organizationResult.data?.timezone ?? "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const timezone = organizationResult.data?.timezone;
+  if (typeof timezone !== "string" || !timezone.trim()) throw new Error("Fuso horário da organização não informado.");
+  const today = civilDate(new Date().toISOString(), timezone)!;
   const lots = (lotsResult as LotRow[]).filter((lot) => !["CONSUMED", "CANCELLED", "SETTLED"].includes(lot.status) && lot.remaining_minutes > 0).map(lot => {
     if (!["AVAILABLE", "RESERVED", "OVERDUE_AVAILABLE", "OVERDUE", "EXPIRED"].includes(lot.status)) return lot;
     const status = deadlineStatus(lot.type, lot.deadline_date, deadlinePolicy, today);
@@ -99,9 +98,15 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
     const userEntries = entries.filter((entry) => entry.contractor_id === user.id); const userTimesheets = timesheets.filter((row) => row.contractor_id === user.id);
     const workedMinutes = sum(userEntries, (entry) => entry.calculated_minutes); const consideredMinutes = sum(userEntries, (entry) => entry.eligible_minutes) + sum(userTimesheets, (row) => row.credited_minutes);
     const { requiredMinutes, estimatedMonths } = requiredForPerson(summaryTimesheets.filter(row => row.contractorId === user.id), user.status === "ACTIVE", requiredPerMonth, keys.size);
-    const delays = userEntries.map(delayDays); const statuses = new Set(userTimesheets.map((row) => row.status));
+    const delays = userEntries.map(entry => registrationDelayDays(entry.work_date, entry.created_at, timezone));
+    const validDelays = delays.filter((value): value is number => value !== null);
+    const lastEntryAt = userEntries.reduce<string | null>((latest, entry) => {
+      if (civilDate(entry.created_at, timezone) === null) return latest;
+      return latest === null || Date.parse(entry.created_at) > Date.parse(latest) ? entry.created_at : latest;
+    }, null);
+    const statuses = new Set(userTimesheets.map((row) => row.status));
     const sector = Array.isArray(user.sectors) ? user.sectors[0] : user.sectors;
-    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, sectorId: user.sector_id ?? null, sectorName: sector?.name ?? "Sem setor definido", lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt: userEntries[0]?.created_at ?? null, workedMinutes, consideredMinutes, requiredMinutes, estimatedRequiredMonths: estimatedMonths, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: delays.length ? Math.round(sum(delays, (value) => value) / delays.length) : 0, retroactiveEntries: delays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
+    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, sectorId: user.sector_id ?? null, sectorName: sector?.name ?? "Sem setor definido", lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt, workedMinutes, consideredMinutes, requiredMinutes, estimatedRequiredMonths: estimatedMonths, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: validDelays.length ? Math.round(sum(validDelays, (value) => value) / validDelays.length) : null, unavailableRegistrationDates: delays.length - validDelays.length, retroactiveEntries: validDelays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
   });
   const balanceLots: DashboardBalanceLot[] = lots.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, type: row.type, originalMinutes: row.original_minutes, remainingMinutes: row.remaining_minutes, reservedMinutes: row.reserved_minutes, originDate: row.origin_date, deadlineDate: row.deadline_date, status: row.status }));
   const balanceTransactions: DashboardBalanceTransaction[] = transactions.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, lotId: row.lot_id, type: row.type, minutes: row.minutes, description: row.description, createdAt: row.created_at }));
@@ -118,6 +123,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const statuses = new Set(timesheets.map((row) => row.status));
   return {
     approvalsScope: input.approvalsScope ?? "period",
+    timezone,
     period,
     monthlyTimesheets: timesheets.map(row => projectMonthlyTimesheet(row, names)),
     metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, estimatedRequiredPersonMonths: summary.estimatedRequiredPersonMonths, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT" && lot.status !== "EXPIRED"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED" || row.status === "NEEDS_ADJUSTMENT").length },

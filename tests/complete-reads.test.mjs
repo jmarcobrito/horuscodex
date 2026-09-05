@@ -10,6 +10,51 @@ const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizati
 const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
 
+test("registration dates use the organization timezone without rewriting timestamps", async () => {
+  boundary.tables.time_entries[0].created_at = "2026-08-04T01:00:00Z";
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData(rh,{year:2026,month:8});
+  const person = data.contractors.find(p=>p.id==="person-0000");
+  assert.equal(person.averageDelayDays,0);
+  assert.equal(person.retroactiveEntries,0);
+  assert.equal(person.unavailableRegistrationDates,0);
+  assert.equal(data.timezone,"America/Sao_Paulo");
+  assert.equal(person.lastEntryAt,"2026-08-04T01:00:00Z");
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("latest submission is the greatest valid instant, not the latest work-date row", async () => {
+  const original = boundary.tables.time_entries[0];
+  boundary.tables.time_entries = [
+    {...original,id:"older-work",work_date:"2026-08-01",created_at:"2026-08-05T01:00:00Z"},
+    {...original,id:"latest-work",work_date:"2026-08-03",created_at:"2026-08-03T12:00:00Z"},
+    {...original,id:"bad-time",work_date:"2026-08-02",created_at:"invalid"},
+  ];
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData({...rh,id:original.contractor_id,role:"PJ"},{year:2026,month:8});
+  const person = data.contractors[0];
+  assert.equal(person.lastEntryDate,"2026-08-03");
+  assert.equal(person.lastEntryAt,"2026-08-05T01:00:00Z");
+  assert.equal(person.averageDelayDays,2); // Mean of 3 and 0, rounded; invalid excluded.
+  assert.equal(person.retroactiveEntries,1);
+  assert.equal(person.unavailableRegistrationDates,1);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("no valid registration date is unavailable, not a zero-delay average", async () => {
+  boundary.tables.time_entries[0].created_at = "invalid";
+  const data = await getDashboardData({...rh,id:"person-0000",role:"PJ"},{year:2026,month:8});
+  assert.equal(data.contractors[0].averageDelayDays,null);
+  assert.equal(data.contractors[0].lastEntryAt,null);
+  assert.equal(data.contractors[0].unavailableRegistrationDates,1);
+});
+
+test("missing organization timezone fails consultation instead of assuming a timezone", async () => {
+  delete boundary.tables.organizations[0].timezone;
+  await assert.rejects(()=>getDashboardData(rh,{year:2026,month:8}),/fuso/i);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
 test("monthly requirements agree per person and team, estimate only missing active months, and preserve all source data", async () => {
   boundary.tables.organization_policies[0].monthly_required_minutes = 120;
   const before = structuredClone(boundary.tables);

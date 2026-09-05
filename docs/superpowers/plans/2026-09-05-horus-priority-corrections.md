@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–4 foram implementadas e validadas localmente; tarefas 5–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–5 foram implementadas e validadas localmente; tarefas 6–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -218,7 +218,7 @@ Importar `test`, `assert`, `runnerImport` e `makeWorkflowDashboard` de seus cami
 
 **Interfaces:** `civilDate(instant: string, timeZone: string): string | null`; `registrationDelayDays(workDate: string, createdAt: string, timeZone: string): number | null`. Retorno null indica data inválida; não converter para atraso zero silenciosamente. Fuso inválido da organização deve produzir erro de configuração/consulta, não usar o fuso do computador.
 
-- [ ] Criar teste puro:
+- [x] Criar teste puro:
 
 ```js
 import test from "node:test";
@@ -231,10 +231,10 @@ test("same civil day is not retroactive", () => {
 });
 ```
 
-- [ ] Rodar `node --test tests/civil-date.test.mjs`; confirmar falha pela função ausente. Implementar com `Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date)` e montar YYYY-MM-DD pelos tipos de parte, sem depender da ordem da string localizada. Diferença = dias entre as duas datas civis interpretadas à meia-noite UTC, limitada a zero para registro antecipado. Validar data trabalhada com `validPeriodDate` existente ou função equivalente sem coerção de data inexistente.
-- [ ] Substituir `delayDays` em `db/dashboard.ts` pelo helper, usando o timezone já lido de `organizations`. Média usa somente datas válidas; acrescentar contador `unavailableRegistrationDates?: number` por pessoa para sinalizar registros desconsiderados no indicador. Não alterar `created_at` nem `work_date`.
-- [ ] Atualizar rótulos: “Dias entre trabalho e registro” e “Registrados após a data trabalhada”; quando há datas inválidas, indicar a quantidade sem avaliar atraso dessas linhas. Diferenciar “Última data trabalhada” de “Último envio”: o último envio deve ser o maior `created_at`, não a data de envio da primeira linha ordenada por trabalho.
-- [ ] Em leituras completas, alterar apenas a fixture para o caso 22h e verificar contador zero mais conteúdo intacto. Testar mudança de mês/ano e outro timezone IANA válido. Rodar as duas suítes, revisar e fazer commit.
+- [x] Rodar `node --test tests/civil-date.test.mjs`; confirmar falha pela função ausente. Implementar com `Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date)` e montar YYYY-MM-DD pelos tipos de parte, sem depender da ordem da string localizada. Diferença = dias entre as duas datas civis interpretadas à meia-noite UTC, limitada a zero para registro antecipado. Validar data trabalhada com `validPeriodDate` existente ou função equivalente sem coerção de data inexistente.
+- [x] Substituir `delayDays` em `db/dashboard.ts` pelo helper, usando o timezone já lido de `organizations`. Média usa somente datas válidas; acrescentar contador `unavailableRegistrationDates?: number` por pessoa para sinalizar registros desconsiderados no indicador. Não alterar `created_at` nem `work_date`.
+- [x] Atualizar rótulos: “Dias entre trabalho e registro” e “Registrados após a data trabalhada”; quando há datas inválidas, indicar a quantidade sem avaliar atraso dessas linhas. Diferenciar “Última data trabalhada” de “Último envio”: o último envio deve ser o maior `created_at`, não a data de envio da primeira linha ordenada por trabalho.
+- [x] Em leituras completas, alterar apenas a fixture para o caso 22h e verificar contador zero mais conteúdo intacto. Testar mudança de mês/ano e outro timezone IANA válido. Rodar as duas suítes, revisar e fazer commit.
 
 ### Tarefa 6 — completar o histórico diário sem regravar versões
 

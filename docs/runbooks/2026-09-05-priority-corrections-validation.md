@@ -157,3 +157,34 @@ Superpowers orientou execução pelo plano, testes antes da implementação e ve
 Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, dependência nova, recálculo, push, PR ou deploy. A conferência visual de banco nesta rodada usou saldo zero; os valores de reserva e disponibilidade não zero foram verificados nos testes da função e de renderização real. Build completo isolado, PostgreSQL e matriz integrada de release continuam reservados para a tarefa 7.
 
 Próxima etapa: tarefa 5 — datas de registro no fuso da organização e nomes claros para atraso/último envio. Tarefas 5–7 e a reorganização visual completa continuam pendentes.
+
+## Checkpoint seguinte — tarefa 5 concluída localmente
+
+Base: `68d536e`. Autorização: executar a etapa de datas no fuso da empresa, na mesma área isolada e sem subagentes. Este checkpoint substitui a retomada anterior.
+
+Implementado:
+
+- `db/civil-date.ts` converte instantes em datas civis no fuso da organização, com partes explícitas de ano/mês/dia. O indicador conta dias de calendário, inclusive nas viradas de mês/ano e mudanças de horário de verão.
+- Registro às 22h de São Paulo não aparece como feito no dia seguinte. Datas inválidas ou sem fuso ficam fora da média, com contador explícito. Sem datas válidas, a média é indisponível, não zero.
+- Fuso ausente ou inválido interrompe a consulta, sem assumir o fuso do computador. A data de hoje usada na apresentação de vencimentos também usa a conversão civil; nenhuma política ou lote é alterado.
+- Painel distingue “Última data trabalhada” de “Último envio”. O envio usa o maior instante válido dentro da consulta, e não a primeira linha ordenada por dia trabalhado. Horário exibido no fuso retornado pelo servidor.
+- Painel e Pessoas usam “Dias entre trabalho e registro”; o painel também mostra “Registrados após a data trabalhada”. Registros com data inválida recebem aviso de exclusão do cálculo.
+- Simulador local alinhado aos indicadores calculados somente sobre os lançamentos consultados. Nenhum registro ou versão de origem é regravado.
+
+| Verificação da tarefa 5 | Resultado observado |
+|---|---|
+| Baseline direcionado | 27 testes passaram |
+| TDD | Falhas reproduzidas: função ausente, dia UTC incorreto, último envio incorreto, média inválida, fuso assumido e rótulos ausentes; testes passaram após implementação |
+| Datas civis | 22h/virada do dia, mês, ano, ano bissexto, offset explícito, Tóquio, horário de verão em Nova York, datas inválidas e registro antecipado |
+| Último envio | Maior instante válido selecionado independentemente da data trabalhada; inválido excluído |
+| Preservação | Comparação integral das tabelas fictícias antes/depois; zero gravações e zero RPC nas consultas verificadas |
+| Suíte completa | 201 testes passaram; zero falhas, cancelados ou ignorados |
+| Lint e TypeScript | Código de saída 0 em ambos |
+| Preview fictício | Painel exibe 03/08/2026 e envio às 15:00 para o instante 18:00Z; pessoa sem envios mostra indisponibilidade; rótulo conferido em Pessoas |
+| Revisão | Diff e consumidores revisados localmente; nenhuma alteração de SQL, rotas de escrita, permissões ou dependências |
+
+Superpowers orientou execução pelo plano, testes antes da implementação e verificação antes de concluir. Sem delegação. A tabela conserva sua rolagem horizontal existente; a reorganização visual completa do painel continua fora desta etapa.
+
+Limites: nenhum acesso ao Supabase, credenciais ou dados reais de agosto; nenhuma migração, recálculo persistido, fechamento, push, PR ou deploy. Datas inválidas e outro fuso foram verificados nos testes puros, de leitura e renderização conforme os casos acima, não inseridos em dados reais. Build completo isolado, PostgreSQL e matriz integrada de release continuam reservados para a tarefa 7.
+
+Próxima etapa: tarefa 6 — autoria e campos do histórico diário, sem regravar versões. Tarefas 6–7 e a reorganização visual completa continuam pendentes.
