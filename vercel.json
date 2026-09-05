@@ -4,7 +4,8 @@
   "buildCommand": "npm run build:vercel",
   "git": {
     "deploymentEnabled": {
-      "release/monthly-review-2026-09-03": false
+      "release/monthly-review-2026-09-03": false,
+      "feature/reports-redesign-design": false
     }
   }
 }
