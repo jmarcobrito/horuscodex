@@ -34,10 +34,15 @@ const ENTITY_LABELS: Record<string, string> = {
   TimeEntry: "Lançamento de horas",
   Timesheet: "Fechamento mensal",
   MonthlyTimesheet: "Fechamento mensal",
+  HourBalanceLot: "Saldo do banco de horas",
+  BalanceLot: "Saldo do banco de horas",
   Occurrence: "Ocorrência",
-  LeaveRequest: "Folga",
+  LeaveRequest: "Solicitação de folga",
+  Leave: "Solicitação de folga",
+  NonBusinessDayAuthorization: "Autorização de dia não útil",
+  NonBusinessAuthorization: "Autorização de dia não útil",
   Contractor: "Colaborador",
-  User: "Usuário",
+  User: "Colaborador ou usuário",
   OrganizationPolicy: "Política da organização",
   Sector: "Setor",
 };
@@ -130,6 +135,9 @@ export const safeUnknownActionLabel = "Registrou uma alteração no Horus";
 export function actionLabel(action: string) { return ACTION_LABELS[action] ?? safeUnknownActionLabel; }
 export function entityLabel(entity: string) { return ENTITY_LABELS[entity] ?? "Registro"; }
 export function balanceMovementLabel(movement: string) { return BALANCE_MOVEMENT_LABELS[movement] ?? "Movimentação"; }
+export function balanceDirectionLabel(direction: string) {
+  return ({ credit: "Crédito", debit: "Débito", reservation: "Reserva", release: "Liberação", neutral: "Neutro" } as Record<string, string>)[direction] ?? "Neutro";
+}
 export function balanceLotStatusLabel(status: string) { return BALANCE_LOT_STATUS_LABELS[status] ?? "Situação não informada"; }
 export function entrySituationLabel(status: string) { return ENTRY_SITUATION_LABELS[status] ?? "Situação não informada"; }
 export function reportCategoryLabel(kind: string, category: string) { return REPORT_CATEGORY_LABELS[kind]?.[category] ?? "Categoria não informada"; }
@@ -140,7 +148,9 @@ export function relatedRecordLabel(entity: string, date: string | null, person: 
     ? date ? `Lançamento de ${formatDate(date)}` : "Lançamento de horas"
     : entity === "Timesheet" || entity === "MonthlyTimesheet"
       ? date ? `Fechamento de ${monthYear(date)}` : "Fechamento mensal"
-      : "Registro relacionado";
+      : ENTITY_LABELS[entity]
+        ? date ? `${ENTITY_LABELS[entity]} de ${formatDate(date)}` : ENTITY_LABELS[entity]
+        : "Registro relacionado";
   return [detail, person].filter(Boolean).join(" — ");
 }
 

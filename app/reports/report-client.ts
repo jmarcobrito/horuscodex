@@ -97,6 +97,12 @@ function completeSummary(report: ReportResponse) {
   return keys.every(key => finiteSummaryValue(report.summary, key));
 }
 
+function validReportTimezone(value: unknown) {
+  if (typeof value !== "string" || !value) return false;
+  try { new Intl.DateTimeFormat("pt-BR", { timeZone: value }).format(0); return true; }
+  catch { return false; }
+}
+
 export function createReportLoader(request: ReportRequest) {
   let requestId = 0;
   let abortController: AbortController | null = null;
@@ -126,6 +132,10 @@ export function createReportLoader(request: ReportRequest) {
         }
         if (!completeSummary(report)) {
           state = { status: "error", filters, response: null, message: "O resumo do relatório está incompleto." };
+          return state;
+        }
+        if (!validReportTimezone(report.timezone)) {
+          state = { status: "error", filters, response: null, message: "O fuso horário do relatório está inválido." };
           return state;
         }
         state = { status: report.rows.length ? "ready" : "empty", filters, response: report, message: null };

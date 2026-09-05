@@ -156,6 +156,8 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
 
     const migrationName = readdirSync(migrations).find(name => name.endsWith("_reporting_foundation.sql"));
     assert.ok(migrationName);
+    const summaryMigrationName = readdirSync(migrations).find(name => name.endsWith("_report_summary.sql"));
+    assert.ok(summaryMigrationName);
     for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql") && name < migrationName).sort()) {
       applyFile(join(migrations, name));
     }
@@ -166,6 +168,10 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
     assert.equal(query(historyBaselineSql()), baselineBefore, "reporting migration changed a protected fixture dataset");
     applyFile(join(migrations, migrationName));
     assert.equal(query(historyBaselineSql()), baselineBefore, "idempotent reinstall changed a protected fixture dataset");
+    applyFile(join(migrations, summaryMigrationName));
+    assert.equal(query(historyBaselineSql()), baselineBefore, "report summary migration changed a protected fixture dataset");
+    applyFile(join(migrations, summaryMigrationName));
+    assert.equal(query(historyBaselineSql()), baselineBefore, "report summary reinstall changed a protected fixture dataset");
     console.log("Protected fixture baseline preserved before, after, and after reinstall:\n" + baselineBefore);
 
     applyFile(join(root, "tests", "backend", "reporting-foundation-fixture.sql"));
@@ -178,6 +184,7 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
     assert.equal(service("select is_retroactive::text || ':' || has_notes::text from public.report_time_entries where id='report-entry-a';"), "true:true");
     assert.equal(service("select affected_user_id from public.report_audit_events where id='report-audit-old';"), "report-person-a");
     assert.equal(service("select affected_user_id from public.report_audit_events where id='report-audit-json';"), "report-person-b");
+    assert.equal(service("select affected_user_id || ':' || related_date from public.report_audit_events where id='report-audit-authorization';"), "report-person-a:2026-08-09");
     assert.equal(service("select sector_name from public.report_audit_events where id='report-audit-json';"), "Sem setor definido");
     assert.equal(service("select count(*) from public.report_time_entries where organization_id='other-report-org';"), "1");
     assert.equal(service("select sector_name from public.report_balance_transactions where id='report-transaction-a';"), "Engenharia");
@@ -192,7 +199,37 @@ test("reporting foundation is isolated, additive, scoped and service-role only",
     service("select count(*) from public.report_audit_events;");
     assert.equal(query("select count(*) from public.audit_logs where id like 'report-%';"), auditCountBefore);
 
+    query(`
+      insert into public.audit_logs(id,organization_id,user_id,action,entity_type,entity_id,new_value,created_at)
+      select 'report-large-audit-' || lpad(series::text, 5, '0'), 'report-org', 'report-actor-a',
+        'TIME_ENTRY_UPDATED', 'User',
+        case when series % 2 = 0 then 'report-person-a' else 'report-person-b' end,
+        jsonb_build_object('contractor_id', case when series % 2 = 0 then 'report-person-a' else 'report-person-b' end),
+        '2026-08-20 12:00:00+00'::timestamptz
+      from generate_series(1, 5000) as series;
+    `);
+    const aggregateBaseline = query(historyBaselineSql());
+    assert.deepEqual(JSON.parse(service("select public.report_summary('report-org','entries','2026-08-01','2026-08-31','report-person-a','report-sector-engineering','retroactive',null);")), {
+      rowCount: 1, timezone: "America/Sao_Paulo", workedMinutes: 480, consideredMinutes: 480,
+    });
+    assert.deepEqual(JSON.parse(service("select public.report_summary('report-org','balances','2026-09-01','2026-09-30','report-person-a','report-sector-engineering','RESERVATION',null);")), {
+      rowCount: 1, timezone: "America/Sao_Paulo", creditMinutes: 0, debitMinutes: 0, reservationMinutes: 60, utilizationMinutes: 0,
+    });
+    assert.deepEqual(JSON.parse(service("select public.report_summary('report-org','history','2026-08-20','2026-08-20',null,'report-sector-engineering','entries','report-actor-a');")), {
+      rowCount: 2500, timezone: "America/Sao_Paulo", events: 2500, affectedPeople: 1,
+    });
+    assert.equal(query(historyBaselineSql()), aggregateBaseline, "read-only report summaries changed protected history");
+
     assert.equal(query("select relrowsecurity from pg_class where oid='public.sectors'::regclass;"), "t");
+    assert.equal(query("select provolatile::text || ':' || prosecdef::text from pg_proc where oid='public.report_summary(text,text,date,date,text,text,text,text)'::regprocedure;"), "s:false");
+    assert.equal(query("select has_function_privilege('service_role','public.report_summary(text,text,date,date,text,text,text,text)','execute');"), "t");
+    for (const role of ["public", "anon", "authenticated"]) {
+      assert.equal(query(`select has_function_privilege('${role}','public.report_summary(text,text,date,date,text,text,text,text)','execute');`), "f", `report_summary:${role}`);
+    }
+    assert.throws(
+      () => query("set role anon; select public.report_summary('report-org','history','2026-08-20','2026-08-20',null,null,null,null);"),
+      /permission denied/i,
+    );
     assert.equal(query("select has_table_privilege('service_role','public.sectors','select,insert,update')::text || ':' || has_table_privilege('service_role','public.sectors','delete')::text;"), "true:false");
     for (const role of ["public", "anon", "authenticated"]) {
       assert.equal(query(`select has_table_privilege('${role}','public.sectors','select,insert,update,delete');`), "f", role);

@@ -17,3 +17,19 @@ test("reporting foundation is additive and service-role only", async () => {
     assert.doesNotMatch(sql, new RegExp(`\\b(insert into|update)\\s+public\\.${table}\\b`, "i"));
   }
 });
+
+test("report summaries use an additive read-only service-role aggregate", async () => {
+  const name = (await readdir(new URL("../supabase/migrations/", import.meta.url)))
+    .find(file => file.endsWith("_report_summary.sql"));
+  assert.ok(name);
+  const sql = await readFile(new URL("../supabase/migrations/" + name, import.meta.url), "utf8");
+  assert.match(sql, /create or replace function public\.report_summary\s*\(/i);
+  assert.match(sql, /\bstable\b/i);
+  assert.match(sql, /security invoker/i);
+  assert.match(sql, /revoke all on function public\.report_summary[\s\S]*from public, anon, authenticated/i);
+  assert.match(sql, /grant execute on function public\.report_summary[\s\S]*to service_role/i);
+  assert.doesNotMatch(sql, /\bdelete\s+from\b|\btruncate\b|\bdrop\s+table\b/i);
+  for (const table of ["time_entries", "time_entry_versions", "monthly_timesheets", "hour_balance_lots", "hour_balance_transactions", "leave_requests", "occurrences", "non_business_day_authorizations", "audit_logs"]) {
+    assert.doesNotMatch(sql, new RegExp(`\\b(insert into|update)\\s+public\\.${table}\\b`, "i"));
+  }
+});

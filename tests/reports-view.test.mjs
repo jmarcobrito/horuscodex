@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { runnerImport } from "vite";
@@ -11,7 +12,7 @@ const period = { from: "2026-09-01", to: "2026-09-30", year: 2026, month: 9 };
 function report(kind, overrides = {}) {
   const filters = { kind, from: period.from, to: period.to, personId: null, sectorId: null, category: null, actorId: null, page: 1, pageSize: 50 };
   return {
-    kind, filters, columns: [], rows: [], summary: {},
+    kind, timezone: "America/Sao_Paulo", filters, columns: [], rows: [], summary: {},
     options: {
       people: [{ value: "person-1", label: "Ana Exemplo", description: "Ativo" }],
       sectors: [{ value: "UNASSIGNED", label: "Sem setor definido" }],
@@ -76,6 +77,50 @@ test("contextual summaries use natural hour labels", async () => {
   for (const label of ["Horas trabalhadas", "Horas consideradas", "08:00", "07:30"]) assert.match(entriesHtml, new RegExp(label));
   for (const label of ["Créditos", "Débitos", "Reservas", "Utilizações"]) assert.match(balancesHtml, new RegExp(label));
   assert.doesNotMatch(entriesHtml + balancesHtml, /Não informado/);
+});
+
+test("history timestamps render in the organization timezone across midnight", async () => {
+  const { module: table } = await runnerImport("./app/reports/ReportTable.tsx", options);
+  const history = report("history", {
+    timezone: "Pacific/Kiritimati",
+    columns: [{ key: "createdAt", label: "Data e hora" }],
+    rows: [{
+      id: "event-midnight", createdAt: "2026-09-04T12:30:00Z", actorId: "rh-1", actorName: "João RH",
+      action: "Criou um lançamento de horas", affectedPersonId: "person-1", affectedPersonName: "Ana Exemplo",
+      relatedRecord: "Lançamento de 05/09/2026 — Ana Exemplo", reason: "Conferência",
+      technical: { actionCode: "TIME_ENTRY_CREATED", entityType: "TimeEntry", entityId: "entry-1" },
+    }],
+    summary: { events: 1, affectedPeople: 1 },
+    pagination: { page: 1, pageSize: 50, total: 1, pageCount: 1 },
+  });
+  const html = renderToStaticMarkup(createElement(table.ReportTable, { report: history, isDev: false, onPageChange() {} }));
+  assert.match(html, /05\/09\/2026[^<]*02:30/);
+  assert.doesNotMatch(html, /04\/09\/2026[^<]*09:30/);
+});
+
+test("actual report responses render every required operational column", async () => {
+  const fixture = fileURLToPath(new URL("./helpers/read-boundary.mjs", import.meta.url));
+  const [{ module: harness }, { module: table }] = await Promise.all([
+    runnerImport("./tests/helpers/read-harness.ts", {
+      configFile: false,
+      envDir: false,
+      resolve: { alias: ["./supabase", "../../../db/supabase", "../../../../db/supabase"].map(find => ({ find, replacement: fixture })) },
+    }),
+    runnerImport("./app/reports/ReportTable.tsx", options),
+  ]);
+  harness.boundary.reset();
+  const actor = { id: "test-rh", authUserId: "auth-rh", organizationId: "test-org", organizationName: "Fictícia", name: "RH", email: "rh@example.com", role: "RH" };
+  const base = { from: "2026-08-01", to: "2026-08-31", page: 1, pageSize: 50, personId: null, sectorId: null, category: null, actorId: null };
+  const expectations = {
+    entries: ["Data trabalhada", "Colaborador", "Setor", "Entrada", "Saída", "Intervalo", "Horas trabalhadas", "Horas consideradas", "Situação do dia", "Observação"],
+    balances: ["Data", "Colaborador", "Setor", "Tipo de movimentação", "Crédito ou débito", "Quantidade de horas", "Origem ou descrição", "Situação relacionada"],
+    history: ["Data e hora", "Quem realizou", "O que aconteceu", "Pessoa afetada", "Registro relacionado", "Motivo"],
+  };
+  for (const [kind, labels] of Object.entries(expectations)) {
+    const response = await harness.getReportPage(actor, { ...base, kind });
+    const html = renderToStaticMarkup(createElement(table.ReportTable, { report: response, isDev: false, onPageChange() {} }));
+    for (const label of labels) assert.match(html, new RegExp(`>${label}<`), `${kind}: ${label}`);
+  }
 });
 
 test("the old report cards are replaced at the app integration boundary", async () => {

@@ -12,6 +12,7 @@ function fixture(filters, rows = [{ id: "row-1" }]) {
       : { events: rows.length, affectedPeople: rows.length };
   return {
     kind: filters.kind,
+    timezone: "America/Sao_Paulo",
     filters,
     columns: [{ key: "personName", label: "Colaborador" }],
     rows,
@@ -125,6 +126,15 @@ test("failed and mismatched consultations never become empty successful reports"
   await incomplete.load(filters);
   assert.equal(incomplete.current().status, "error");
   assert.equal(incomplete.current().message, "O resumo do relatório está incompleto.");
+
+  const missingTimezone = client.createReportLoader(async () => {
+    const response = fixture(filters);
+    delete response.timezone;
+    return Response.json(response);
+  });
+  await missingTimezone.load(filters);
+  assert.equal(missingTimezone.current().status, "error");
+  assert.equal(missingTimezone.current().message, "O fuso horário do relatório está inválido.");
 });
 
 test("export URL reuses the visible query and changes only the format", async () => {

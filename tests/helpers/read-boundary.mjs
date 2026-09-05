@@ -1,9 +1,9 @@
 // Only the external database/auth boundaries are replaced. Real readers/handlers run.
 export const boundary = {
-  tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0, rpcLog: [], rpcResult: null,
+  tables: {}, failTable: null, failAfter: 0, writes: 0, rpcCalls: 0, rpcLog: [], rpcResult: null, readRpcCalls: {}, readRpcLog: [],
   maxRows: 1000, reportCountOffsetAfter: null, readsByTable: {}, rangeCallsByTable: {}, authId: "auth-rh", authEmail: "rh@example.com", allowWrites: false, authError: null,
   reset() {
-    this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.failTable = null; this.failAfter = 0;
+    this.writes = 0; this.rpcCalls = 0; this.rpcLog = []; this.rpcResult = null; this.readRpcCalls = {}; this.readRpcLog = []; this.failTable = null; this.failAfter = 0;
     this.maxRows = 1000; this.reportCountOffsetAfter = null; this.readsByTable = {}; this.rangeCallsByTable = {}; this.authId = "auth-rh"; this.authEmail = "rh@example.com";
     this.allowWrites = false; this.authError = null;
     this.tables = Object.fromEntries(["users","sectors","time_entries","monthly_timesheets","hour_balance_lots","hour_balance_transactions","leave_requests","occurrences","non_business_day_authorizations","audit_logs","organization_policies","time_entry_versions","organizations"].map(t => [t, []]));
@@ -46,6 +46,43 @@ function rowsFor(table) {
   });
   return [];
 }
+
+function reportSummary(args) {
+  const kind = args.p_kind;
+  const table = kind === "entries" ? "report_time_entries" : kind === "balances" ? "report_balance_transactions" : "report_audit_events";
+  const dateKey = kind === "entries" ? "work_date" : "event_date";
+  const personKey = kind === "history" ? "affected_user_id" : "person_id";
+  const rows = rowsFor(table).filter(row => {
+    if (row.organization_id !== args.p_organization_id || row[dateKey] < args.p_from || row[dateKey] > args.p_to) return false;
+    if (args.p_person_id && row[personKey] !== args.p_person_id) return false;
+    if (args.p_sector_id === "UNASSIGNED" && (row.sector_id !== null || (kind === "history" && row.affected_user_id === null))) return false;
+    if (args.p_sector_id && args.p_sector_id !== "UNASSIGNED" && row.sector_id !== args.p_sector_id) return false;
+    if (kind === "entries") {
+      if (args.p_category === "regular" && (row.is_retroactive || row.non_business_day_status !== "NOT_APPLICABLE")) return false;
+      if (args.p_category === "retroactive" && !row.is_retroactive) return false;
+      if (args.p_category === "non_business" && row.non_business_day_status === "NOT_APPLICABLE") return false;
+      if (args.p_category === "with_notes" && !row.has_notes) return false;
+    } else if (args.p_category && row[kind === "balances" ? "type" : "category"] !== args.p_category) return false;
+    if (kind === "history" && args.p_actor_id && row.actor_id !== args.p_actor_id) return false;
+    return true;
+  });
+  const timezone = boundary.tables.organizations.find(row => row.id === args.p_organization_id)?.timezone;
+  if (kind === "entries") return {
+    rowCount: rows.length, timezone,
+    workedMinutes: rows.reduce((total, row) => total + row.calculated_minutes, 0),
+    consideredMinutes: rows.reduce((total, row) => total + row.eligible_minutes, 0),
+  };
+  if (kind === "balances") return rows.reduce((summary, row) => {
+    const credit = row.type === "CREDIT" || (row.type === "COMPENSATION" && row.lot_type === "DEBIT");
+    const debit = ["DEBIT", "CONSUMPTION", "EXPIRATION"].includes(row.type) || (row.type === "COMPENSATION" && row.lot_type === "CREDIT");
+    if (credit) summary.creditMinutes += row.minutes;
+    if (debit) summary.debitMinutes += row.minutes;
+    if (row.type === "RESERVATION") summary.reservationMinutes += row.minutes;
+    if (row.type === "CONSUMPTION") summary.utilizationMinutes += row.minutes;
+    return summary;
+  }, { rowCount: rows.length, timezone, creditMinutes: 0, debitMinutes: 0, reservationMinutes: 0, utilizationMinutes: 0 });
+  return { rowCount: rows.length, timezone, events: rows.length, affectedPeople: new Set(rows.map(row => row.affected_user_id).filter(Boolean)).size };
+}
 class Query {
   constructor(table) { this.table=table; boundary.readsByTable[table] = (boundary.readsByTable[table] ?? 0) + 1; this.filters=[]; this.orders=[]; this.from=0; this.to=Infinity; this.exact=false; this.selected=""; this.applied=false; }
   select(columns,options) {this.selected=columns;this.exact=options?.count==="exact";return this;}
@@ -81,7 +118,13 @@ class Query {
   then(resolve,reject) {return Promise.resolve(this.result()).then(resolve,reject);}
 }
 export class SupabaseConfigurationError extends Error {}
-export function getSupabaseAdmin() {return {from:table=>new Query(table),rpc(name,args){boundary.rpcCalls++;boundary.rpcLog.push({name,args});return boundary.rpcResult??{data:null,error:{message:"Forbidden RPC during read"}};}};}
+export function getSupabaseAdmin() {return {from:table=>new Query(table),rpc(name,args){
+  if(name==="report_summary"){
+    boundary.readRpcCalls[name]=(boundary.readRpcCalls[name]??0)+1;boundary.readRpcLog.push({name,args});
+    return {data:reportSummary(args),error:null};
+  }
+  boundary.rpcCalls++;boundary.rpcLog.push({name,args});return boundary.rpcResult??{data:null,error:{message:"Forbidden RPC during read"}};
+}};}
 export async function createSupabaseServerClient() {
   return {auth:{
     getUser:async()=>({data:{user:{id:boundary.authId,email:boundary.authEmail}},error:null}),

@@ -80,3 +80,24 @@ test("persisted entry situations and monthly timesheet history receive natural l
   });
   assert.equal(language.relatedRecordLabel("MonthlyTimesheet", "2026-08-01", "Ana Silva"), "Fechamento de agosto de 2026 — Ana Silva");
 });
+
+test("every current and historical report entity has a natural related-record label", () => {
+  const cases = [
+    ["TimeEntry", "2026-08-18", "Ana Silva", "Lançamento de 18/08/2026 — Ana Silva"],
+    ["MonthlyTimesheet", "2026-08-01", "Ana Silva", "Fechamento de agosto de 2026 — Ana Silva"],
+    ["Timesheet", "2026-08-01", "Ana Silva", "Fechamento de agosto de 2026 — Ana Silva"],
+    ["HourBalanceLot", "2026-08-31", "Ana Silva", "Saldo do banco de horas de 31/08/2026 — Ana Silva"],
+    ["LeaveRequest", "2026-09-10", "Ana Silva", "Solicitação de folga de 10/09/2026 — Ana Silva"],
+    ["Occurrence", "2026-08-05", "Ana Silva", "Ocorrência de 05/08/2026 — Ana Silva"],
+    ["NonBusinessDayAuthorization", "2026-08-09", "Ana Silva", "Autorização de dia não útil de 09/08/2026 — Ana Silva"],
+    ["NonBusinessAuthorization", "2026-08-09", "Ana Silva", "Autorização de dia não útil de 09/08/2026 — Ana Silva"],
+    ["User", null, "Ana Silva", "Colaborador ou usuário — Ana Silva"],
+    ["Contractor", null, "Ana Silva", "Colaborador — Ana Silva"],
+    ["OrganizationPolicy", null, null, "Política da organização"],
+    ["Sector", null, null, "Setor"],
+  ];
+  for (const [entity, date, person, expected] of cases) {
+    assert.equal(language.relatedRecordLabel(entity, date, person), expected, entity);
+    assert.doesNotMatch(language.relatedRecordLabel(entity, date, person), /Registro relacionado/, entity);
+  }
+});

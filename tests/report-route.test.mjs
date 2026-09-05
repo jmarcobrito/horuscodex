@@ -19,6 +19,7 @@ test("RH receives the normalized response and private no-store cache", async () 
   assert.equal(response.headers.get("cache-control"), "private, no-store");
   const body = await response.json();
   assert.equal(body.kind, "entries");
+  assert.equal(body.timezone, "America/Sao_Paulo");
   assert.equal(body.filters.from, "2026-08-01");
   assert.equal(body.pagination.pageSize, 50);
 });

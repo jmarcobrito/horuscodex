@@ -33,15 +33,15 @@ const ENTRY_ROWS: FixtureRow[] = [
 ];
 
 const BALANCE_ROWS: FixtureRow[] = [
-  { id: "balance-preview-1", createdAt: "2026-08-28T18:00:00Z", personId: "person-1", personName: "Ana Exemplo", sectorName: "Produto", movement: "Crédito", direction: "credit", minutes: 67, description: "Saldo positivo do fechamento de julho", status: "Disponível", previewSectorId: "sector-product", previewCategory: "CREDIT" },
-  { id: "balance-preview-2", createdAt: "2026-08-27T18:30:00Z", personId: "person-2", personName: "Bruno Exemplo", sectorName: "Operações", movement: "Débito", direction: "debit", minutes: 42, description: "Ajuste conferido pelo RH", status: "Compensado", previewSectorId: "sector-operations", previewCategory: "DEBIT" },
-  { id: "balance-preview-3", createdAt: "2026-08-24T13:10:00Z", personId: "person-1", personName: "Ana Exemplo", sectorName: "Produto", movement: "Reserva", direction: "reservation", minutes: 120, description: "Folga aprovada para 31/08", status: "Reservado", previewSectorId: "sector-product", previewCategory: "RESERVATION" },
-  { id: "balance-preview-4", createdAt: "2026-08-21T10:15:00Z", personId: "person-3", personName: "Carla Exemplo", sectorName: "Sem setor definido", movement: "Utilização", direction: "debit", minutes: 90, description: "Folga utilizada em 21/08", status: "Utilizado", previewSectorId: null, previewCategory: "CONSUMPTION" },
+  { id: "balance-preview-1", createdAt: "2026-08-28T18:00:00Z", personId: "person-1", personName: "Ana Exemplo", sectorName: "Produto", movement: "Crédito", direction: "credit", directionLabel: "Crédito", minutes: 67, description: "Saldo positivo do fechamento de julho", status: "Disponível", previewSectorId: "sector-product", previewCategory: "CREDIT" },
+  { id: "balance-preview-2", createdAt: "2026-08-27T18:30:00Z", personId: "person-2", personName: "Bruno Exemplo", sectorName: "Operações", movement: "Débito", direction: "debit", directionLabel: "Débito", minutes: 42, description: "Ajuste conferido pelo RH", status: "Compensado", previewSectorId: "sector-operations", previewCategory: "DEBIT" },
+  { id: "balance-preview-3", createdAt: "2026-08-24T13:10:00Z", personId: "person-1", personName: "Ana Exemplo", sectorName: "Produto", movement: "Reserva", direction: "reservation", directionLabel: "Reserva", minutes: 120, description: "Folga aprovada para 31/08", status: "Reservado", previewSectorId: "sector-product", previewCategory: "RESERVATION" },
+  { id: "balance-preview-4", createdAt: "2026-08-21T10:15:00Z", personId: "person-3", personName: "Carla Exemplo", sectorName: "Sem setor definido", movement: "Utilização", direction: "debit", directionLabel: "Débito", minutes: 90, description: "Folga utilizada em 21/08", status: "Utilizado", previewSectorId: null, previewCategory: "CONSUMPTION" },
 ];
 
 const HISTORY_ROWS: FixtureRow[] = [
   { id: "history-preview-1", createdAt: "2026-08-28T15:24:00Z", actorId: "rh-1", actorName: "Marina Exemplo", action: "Alterou um lançamento de horas", affectedPersonId: "person-1", affectedPersonName: "Ana Exemplo", relatedRecord: "Lançamento de 27/08/2026 — Ana Exemplo", reason: "Correção conferida com a colaboradora", technical: { actionCode: "TIME_ENTRY_UPDATED", entityType: "TimeEntry", entityId: "entry-preview-1" }, previewSectorId: "sector-product", previewCategory: "entries" },
-  { id: "history-preview-2", createdAt: "2026-08-27T17:40:00Z", actorId: "dev-1", actorName: "Diego Exemplo", action: "Criou um setor", affectedPersonId: null, affectedPersonName: "Não identificado", relatedRecord: "Registro relacionado", reason: "Organização da equipe fictícia", technical: { actionCode: "SECTOR_CREATED", entityType: "Sector", entityId: "sector-operations" }, previewSectorId: null, previewCategory: "registration" },
+  { id: "history-preview-2", createdAt: "2026-08-27T17:40:00Z", actorId: "dev-1", actorName: "Diego Exemplo", action: "Criou um setor", affectedPersonId: null, affectedPersonName: "Não identificado", relatedRecord: "Setor", reason: "Organização da equipe fictícia", technical: { actionCode: "SECTOR_CREATED", entityType: "Sector", entityId: "sector-operations" }, previewSectorId: null, previewCategory: "registration" },
   { id: "history-preview-3", createdAt: "2026-08-26T13:12:00Z", actorId: "rh-1", actorName: "Marina Exemplo", action: "Aprovou uma folga", affectedPersonId: "person-2", affectedPersonName: "Bruno Exemplo", relatedRecord: "Solicitação de folga — Bruno Exemplo", reason: "Saldo disponível e cobertura confirmada", technical: { actionCode: "LEAVE_REQUEST_APPROVE", entityType: "LeaveRequest", entityId: "leave-preview-1" }, previewSectorId: "sector-operations", previewCategory: "approval" },
 ];
 
@@ -65,12 +65,13 @@ const COLUMNS: Record<ReportKind, ReportResponse["columns"]> = {
     { key: "workDate", label: "Data trabalhada" }, { key: "personName", label: "Colaborador" }, { key: "sectorName", label: "Setor" },
     { key: "startTime", label: "Entrada" }, { key: "endTime", label: "Saída" }, { key: "breakMinutes", label: "Intervalo" },
     { key: "workedMinutes", label: "Horas trabalhadas" }, { key: "consideredMinutes", label: "Horas consideradas" },
-    { key: "situation", label: "Situação" }, { key: "notes", label: "Observação" },
+    { key: "situation", label: "Situação do dia" }, { key: "notes", label: "Observação" },
   ],
   balances: [
     { key: "createdAt", label: "Data" }, { key: "personName", label: "Colaborador" }, { key: "sectorName", label: "Setor" },
-    { key: "movement", label: "Movimentação" }, { key: "minutes", label: "Horas" }, { key: "description", label: "Origem ou descrição" },
-    { key: "status", label: "Situação" },
+    { key: "movement", label: "Tipo de movimentação" }, { key: "directionLabel", label: "Crédito ou débito" },
+    { key: "minutes", label: "Quantidade de horas" }, { key: "description", label: "Origem ou descrição" },
+    { key: "status", label: "Situação relacionada" },
   ],
   history: [
     { key: "createdAt", label: "Data e hora" }, { key: "actorName", label: "Quem realizou" }, { key: "action", label: "O que aconteceu" },
@@ -130,17 +131,17 @@ function previewReport(url: URL, mode: ReportMode): ReportResponse {
   const pagination = { page: filters.page, pageSize: 50 as const, total: rows.length, pageCount: rows.length ? 1 : 0 };
   if (filters.kind === "entries") {
     const entryRows = rows.filter((row): row is Extract<FixtureRow, { workDate: string }> => "workDate" in row);
-    return { kind: "entries", filters, columns: COLUMNS.entries, rows: operationalRows(entryRows), summary: { workedMinutes: entryRows.reduce((total, row) => total + row.workedMinutes, 0), consideredMinutes: entryRows.reduce((total, row) => total + row.consideredMinutes, 0) }, options, pagination } as ReportResponse;
+    return { kind: "entries", timezone: "America/Sao_Paulo", filters, columns: COLUMNS.entries, rows: operationalRows(entryRows), summary: { workedMinutes: entryRows.reduce((total, row) => total + row.workedMinutes, 0), consideredMinutes: entryRows.reduce((total, row) => total + row.consideredMinutes, 0) }, options, pagination } as ReportResponse;
   }
   if (filters.kind === "balances") {
     const balanceRows = rows.filter((row): row is Extract<FixtureRow, { movement: string }> => "movement" in row);
     const sum = (direction: string) => balanceRows.reduce((total, row) => total + (row.direction === direction ? row.minutes : 0), 0);
     const utilizationMinutes = balanceRows.reduce((total, row) => total + (row.previewCategory === "CONSUMPTION" ? row.minutes : 0), 0);
-    return { kind: "balances", filters, columns: COLUMNS.balances, rows: operationalRows(balanceRows), summary: { creditMinutes: sum("credit"), debitMinutes: sum("debit"), reservationMinutes: sum("reservation"), utilizationMinutes }, options, pagination } as ReportResponse;
+    return { kind: "balances", timezone: "America/Sao_Paulo", filters, columns: COLUMNS.balances, rows: operationalRows(balanceRows), summary: { creditMinutes: sum("credit"), debitMinutes: sum("debit"), reservationMinutes: sum("reservation"), utilizationMinutes }, options, pagination } as ReportResponse;
   }
   const historyRows = rows.filter((row): row is Extract<FixtureRow, { actorId: string }> => "actorId" in row);
   const affected = new Set(historyRows.flatMap(row => row.affectedPersonId ? [row.affectedPersonId] : []));
-  return { kind: "history", filters, columns: COLUMNS.history, rows: operationalRows(historyRows), summary: { events: historyRows.length, affectedPeople: affected.size }, options, pagination } as ReportResponse;
+  return { kind: "history", timezone: "America/Sao_Paulo", filters, columns: COLUMNS.history, rows: operationalRows(historyRows), summary: { events: historyRows.length, affectedPeople: affected.size }, options, pagination } as ReportResponse;
 }
 
 function pendingUntilAbort(signal?: AbortSignal | null) {

@@ -13,12 +13,12 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR").format(new Date(year, month - 1, day));
 }
 
-function cellValue(row: ReportRow, key: string) {
+function cellValue(row: ReportRow, key: string, timezone: string) {
   const value = (row as unknown as Record<string, unknown>)[key];
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "number" && key.toLowerCase().includes("minutes")) return formatMinutes(value);
   if (typeof value === "string" && key === "workDate") return formatDate(value);
-  if (typeof value === "string" && key === "createdAt") return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+  if (typeof value === "string" && key === "createdAt") return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(value));
   return typeof value === "string" || typeof value === "number" ? String(value) : "—";
 }
 
@@ -55,7 +55,7 @@ export function ReportTable({ report, isDev, onPageChange }: { report: ReportRes
     <ReportSummary report={report} />
     {report.rows.length > 0 && <section className="panel ledger-panel" aria-label="Resultados do relatório">
       <div className="table-scroll"><table><thead><tr>{columns.map(column => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
-        <tbody>{report.rows.map(row => <tr key={row.id}>{columns.map(column => <td key={column.key}>{cellValue(row, column.key)}{isDev && report.kind === "history" && column.key === columns.at(-1)?.key && <TechnicalDetails row={row as HistoryReportRow} />}</td>)}</tr>)}</tbody>
+        <tbody>{report.rows.map(row => <tr key={row.id}>{columns.map(column => <td key={column.key}>{cellValue(row, column.key, report.timezone)}{isDev && report.kind === "history" && column.key === columns.at(-1)?.key && <TechnicalDetails row={row as HistoryReportRow} />}</td>)}</tr>)}</tbody>
       </table></div>
     </section>}
     <nav className="panel entries-toolbar report-pagination" aria-label="Paginação do relatório">

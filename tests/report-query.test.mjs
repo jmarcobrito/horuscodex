@@ -55,6 +55,9 @@ test("report returns 50 newest rows and exact paging metadata", async () => {
   const response = await getReportPage(rh, filters({ kind: "history", page: 2 }));
   assert.equal(response.rows.length, 50);
   assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 1105, pageCount: 23 });
+  assert.equal(response.timezone, "America/Sao_Paulo");
+  assert.equal(boundary.rangeCallsByTable.report_audit_events, 1);
+  assert.equal(boundary.readRpcCalls.report_summary, 1);
 });
 
 test("entry summary covers every filtered row beyond the current 50-row page", async () => {
@@ -64,6 +67,8 @@ test("entry summary covers every filtered row beyond the current 50-row page", a
   assert.equal(response.rows.length, 25);
   assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 75, pageCount: 2 });
   assert.deepEqual(response.summary, { workedMinutes: 4500, consideredMinutes: 4500 });
+  assert.equal(boundary.rangeCallsByTable.report_time_entries, 1);
+  assert.equal(boundary.readRpcCalls.report_summary, 1);
   assert.equal(boundary.writes, 0);
   assert.equal(boundary.rpcCalls, 0);
 });
@@ -87,6 +92,8 @@ test("balance summary covers credit, debit, reservation and utilization across a
   assert.equal(response.rows.length, 10);
   assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 60, pageCount: 2 });
   assert.deepEqual(response.summary, { creditMinutes: 150, debitMinutes: 900, reservationMinutes: 450, utilizationMinutes: 600 });
+  assert.equal(boundary.rangeCallsByTable.report_balance_transactions, 1);
+  assert.equal(boundary.readRpcCalls.report_summary, 1);
   assert.equal(boundary.writes, 0);
   assert.equal(boundary.rpcCalls, 0);
 });
@@ -99,6 +106,8 @@ test("history summary counts every filtered event and distinct affected person b
   assert.equal(response.rows.length, 26);
   assert.deepEqual(response.pagination, { page: 2, pageSize: 50, total: 76, pageCount: 2 });
   assert.deepEqual(response.summary, { events: 76, affectedPeople: 75 });
+  assert.equal(boundary.rangeCallsByTable.report_audit_events, 1);
+  assert.equal(boundary.readRpcCalls.report_summary, 1);
   assert.equal(boundary.writes, 0);
   assert.equal(boundary.rpcCalls, 0);
 });

@@ -95,7 +95,8 @@ insert into public.audit_logs (
   previous_value, new_value, reason, created_at
 ) values
   ('report-audit-old', 'report-org', 'report-actor-a', 'TIME_ENTRY_UPDATED', 'TimeEntry', 'report-entry-a', null, null, 'Resolução pela entidade', '2026-08-04 12:00:00+00'),
-  ('report-audit-json', 'report-org', 'report-actor-a', 'CONTRACTOR_SECTOR_CHANGED', 'User', 'report-person-a', null, '{"contractor_id":"report-person-b"}'::jsonb, 'Resolução pelo JSON', '2026-08-05 12:00:00+00');
+  ('report-audit-json', 'report-org', 'report-actor-a', 'CONTRACTOR_SECTOR_CHANGED', 'User', 'report-person-a', null, '{"contractor_id":"report-person-b"}'::jsonb, 'Resolução pelo JSON', '2026-08-05 12:00:00+00'),
+  ('report-audit-authorization', 'report-org', 'report-actor-a', 'NON_BUSINESS_AUTH_REQUESTED', 'NonBusinessDayAuthorization', 'report-authorization-a', null, null, 'Entidade persistida real', '2026-08-06 12:00:00+00');
 
 insert into public.audit_logs (
   id, organization_id, user_id, action, entity_type, entity_id, created_at

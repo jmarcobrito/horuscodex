@@ -2,7 +2,7 @@ import type {
   BalanceReportRow, BalanceReportSummary, EntryReportRow, EntryReportSummary, HistoryReportRow, HistoryReportSummary,
   ReportColumn, ReportFilters, ReportKind, ReportOption, ReportOptions, ReportResponse, ReportRow,
 } from "../app/reports/report-types";
-import { actionLabel, balanceLotStatusLabel, balanceMovementLabel, entrySituationLabel, relatedRecordLabel, reportCategoryLabel } from "../app/reports/report-language";
+import { actionLabel, balanceDirectionLabel, balanceLotStatusLabel, balanceMovementLabel, entrySituationLabel, relatedRecordLabel, reportCategoryLabel } from "../app/reports/report-language";
 import type { HorusActor } from "./actor";
 import { validIsoDate } from "./http";
 import { ReadLimitExceededError, readAllRows } from "./read-all";
@@ -29,10 +29,8 @@ export class ReportInputError extends Error {
 type EntryViewRow = { id:string; organization_id:string; person_id:string; person_name:string|null; sector_id:string|null; sector_name:string|null; work_date:string; start_time:string; end_time:string; break_minutes:number; calculated_minutes:number; eligible_minutes:number; non_business_day_status:string; notes:string|null; is_retroactive:boolean; has_notes:boolean };
 type BalanceViewRow = { id:string; organization_id:string; person_id:string; person_name:string|null; sector_id:string|null; sector_name:string|null; type:string; lot_type:string|null; minutes:number; description:string|null; lot_status:string|null; created_at:string; event_date:string; direction?:string|null; movement_direction?:string|null };
 type AuditViewRow = { id:string; organization_id:string; actor_id:string; actor_name:string|null; action:string; entity_type:string; entity_id:string; reason:string|null; affected_user_id:string|null; affected_user_name:string|null; sector_id:string|null; related_date:string|null; created_at:string; event_date:string; category:string };
-type EntrySummaryRow = Pick<EntryViewRow, "id" | "calculated_minutes" | "eligible_minutes">;
-type BalanceSummaryRow = Pick<BalanceViewRow, "id" | "type" | "lot_type" | "minutes">;
 type BalanceDirectionRow = Pick<BalanceViewRow, "type" | "lot_type" | "direction" | "movement_direction">;
-type HistorySummaryRow = Pick<AuditViewRow, "id" | "affected_user_id">;
+type ReportAggregate = { rowCount:number; timezone:string; workedMinutes?:number; consideredMinutes?:number; creditMinutes?:number; debitMinutes?:number; reservationMinutes?:number; utilizationMinutes?:number; events?:number; affectedPeople?:number };
 type UserOptionRow = { id:string; name:string; status:"ACTIVE"|"INACTIVE" };
 type SectorOptionRow = { id:string; name:string; status:"ACTIVE"|"INACTIVE" };
 type Page<T> = { data:T[]|null; count:number|null; error:unknown };
@@ -41,7 +39,11 @@ type ReportQuery<T> = {
   not(key:string, operator:string, value:unknown): ReportQuery<T>; gte(key:string, value:unknown): ReportQuery<T>; lte(key:string, value:unknown): ReportQuery<T>;
   order(key:string, options?:{ ascending?:boolean }): ReportQuery<T>; range(from:number, to:number): PromiseLike<Page<T>>;
 };
-type ReportAdmin = { from(table:string): { select(columns:string, options:{ count:"exact" }): ReportQuery<unknown> } };
+type RpcResult<T> = { data:T|null; error:unknown };
+type ReportAdmin = {
+  from(table:string): { select(columns:string, options:{ count:"exact" }): ReportQuery<unknown> };
+  rpc(name:string, args:Record<string, unknown>): PromiseLike<RpcResult<unknown>>;
+};
 
 function reportAdmin(): ReportAdmin { return getSupabaseAdmin() as unknown as ReportAdmin; }
 
@@ -173,7 +175,8 @@ function balanceDirection(row: BalanceDirectionRow): BalanceReportRow["direction
 }
 
 function mapBalance(row: BalanceViewRow): BalanceReportRow {
-  return { id: row.id, createdAt: row.created_at, personId: row.person_id, personName: row.person_name ?? "Não identificado", sectorName: row.sector_name ?? "Sem setor definido", movement: balanceMovementLabel(row.type), direction: balanceDirection(row), minutes: row.minutes, description: row.description ?? "", status: balanceLotStatusLabel(row.lot_status ?? "") };
+  const direction = balanceDirection(row);
+  return { id: row.id, createdAt: row.created_at, personId: row.person_id, personName: row.person_name ?? "Não identificado", sectorName: row.sector_name ?? "Sem setor definido", movement: balanceMovementLabel(row.type), direction, directionLabel: balanceDirectionLabel(direction), minutes: row.minutes, description: row.description ?? "", status: balanceLotStatusLabel(row.lot_status ?? "") };
 }
 
 function mapHistory(row: AuditViewRow): HistoryReportRow {
@@ -187,34 +190,22 @@ function mapRows(kind: ReportKind, rows: unknown[]): ReportRow[] {
 }
 
 function columns(kind: ReportKind): ReportColumn[] {
-  if (kind === "entries") return [{ key:"workDate",label:"Data" },{ key:"personName",label:"Colaborador" },{ key:"workedMinutes",label:"Minutos trabalhados" },{ key:"consideredMinutes",label:"Minutos considerados" }];
-  if (kind === "balances") return [{ key:"createdAt",label:"Data" },{ key:"personName",label:"Colaborador" },{ key:"movement",label:"Movimentação" },{ key:"minutes",label:"Minutos" }];
-  return [{ key:"createdAt",label:"Data" },{ key:"actorName",label:"Responsável" },{ key:"action",label:"Ação" },{ key:"reason",label:"Justificativa" },{ key:"technical",label:"Dados técnicos",technical:true }];
-}
-
-function entrySummary(rows: EntrySummaryRow[]): EntryReportSummary {
-  return {
-    workedMinutes: rows.reduce((total, row) => total + row.calculated_minutes, 0),
-    consideredMinutes: rows.reduce((total, row) => total + row.eligible_minutes, 0),
-  };
-}
-
-function balanceSummary(rows: BalanceSummaryRow[]): BalanceReportSummary {
-  return rows.reduce<BalanceReportSummary>((total, row) => {
-    const direction = balanceDirection(row);
-    if (direction === "credit") total.creditMinutes += row.minutes;
-    if (direction === "debit") total.debitMinutes += row.minutes;
-    if (direction === "reservation") total.reservationMinutes += row.minutes;
-    if (row.type === "CONSUMPTION") total.utilizationMinutes += row.minutes;
-    return total;
-  }, { creditMinutes: 0, debitMinutes: 0, reservationMinutes: 0, utilizationMinutes: 0 });
-}
-
-function historySummary(rows: HistorySummaryRow[]): HistoryReportSummary {
-  return {
-    events: rows.length,
-    affectedPeople: new Set(rows.flatMap(row => row.affected_user_id ? [row.affected_user_id] : [])).size,
-  };
+  if (kind === "entries") return [
+    { key:"workDate",label:"Data trabalhada" }, { key:"personName",label:"Colaborador" }, { key:"sectorName",label:"Setor" },
+    { key:"startTime",label:"Entrada" }, { key:"endTime",label:"Saída" }, { key:"breakMinutes",label:"Intervalo" },
+    { key:"workedMinutes",label:"Horas trabalhadas" }, { key:"consideredMinutes",label:"Horas consideradas" },
+    { key:"situation",label:"Situação do dia" }, { key:"notes",label:"Observação" },
+  ];
+  if (kind === "balances") return [
+    { key:"createdAt",label:"Data" }, { key:"personName",label:"Colaborador" }, { key:"sectorName",label:"Setor" },
+    { key:"movement",label:"Tipo de movimentação" }, { key:"directionLabel",label:"Crédito ou débito" },
+    { key:"minutes",label:"Quantidade de horas" }, { key:"description",label:"Origem ou descrição" }, { key:"status",label:"Situação relacionada" },
+  ];
+  return [
+    { key:"createdAt",label:"Data e hora" }, { key:"actorName",label:"Quem realizou" }, { key:"action",label:"O que aconteceu" },
+    { key:"affectedPersonName",label:"Pessoa afetada" }, { key:"relatedRecord",label:"Registro relacionado" },
+    { key:"reason",label:"Motivo" }, { key:"technical",label:"Dados técnicos",technical:true },
+  ];
 }
 
 function pagination(page: number, total: number) { return { page, pageSize: PAGE_SIZE, total, pageCount: Math.ceil(total / PAGE_SIZE) }; }
@@ -223,30 +214,47 @@ async function readPage(actor: HorusActor, filters: ReportFilters, from: number,
   return reportQuery(actor, filters).range(from, to) as Promise<Page<unknown>>;
 }
 
-async function readSummaryRows(actor: HorusActor, filters: ReportFilters) {
-  const selectedColumns = filters.kind === "entries"
-    ? "id,calculated_minutes,eligible_minutes"
+function finiteNumber(value: unknown) { return typeof value === "number" && Number.isFinite(value); }
+
+async function readSummary(actor: HorusActor, filters: ReportFilters): Promise<ReportAggregate> {
+  const result = await reportAdmin().rpc("report_summary", {
+    p_organization_id: actor.organizationId,
+    p_kind: filters.kind,
+    p_from: filters.from,
+    p_to: filters.to,
+    p_person_id: filters.personId,
+    p_sector_id: filters.sectorId,
+    p_category: filters.category,
+    p_actor_id: filters.kind === "history" ? filters.actorId : null,
+  });
+  if (result.error) throw result.error;
+  const aggregate = result.data as ReportAggregate | null;
+  const keys = filters.kind === "entries"
+    ? ["workedMinutes", "consideredMinutes"]
     : filters.kind === "balances"
-      ? "id,type,lot_type,minutes"
-      : "id,affected_user_id";
-  return readAllRows<{ id:string }>((from, to) => reportQuery(actor, filters, selectedColumns).range(from, to) as PromiseLike<Page<{ id:string }>>);
+      ? ["creditMinutes", "debitMinutes", "reservationMinutes", "utilizationMinutes"]
+      : ["events", "affectedPeople"];
+  if (!aggregate || !Number.isSafeInteger(aggregate.rowCount) || aggregate.rowCount < 0 || typeof aggregate.timezone !== "string" || !aggregate.timezone || !keys.every(key => finiteNumber(aggregate[key as keyof ReportAggregate]))) {
+    throw new Error("Incomplete report summary");
+  }
+  return aggregate;
 }
 
 export async function getReportPage(actor: HorusActor, filters: ReportFilters): Promise<ReportResponse> {
   assertFilters(filters);
   const options = await getReportOptions(actor, filters.kind);
   validateScopedFilters(filters, options);
-  const [result, summaryRows] = await Promise.all([
+  const [result, aggregate] = await Promise.all([
     readPage(actor, filters, (filters.page - 1) * PAGE_SIZE, filters.page * PAGE_SIZE - 1),
-    readSummaryRows(actor, filters),
+    readSummary(actor, filters),
   ]);
   if (result.error) throw result.error;
   if (!Array.isArray(result.data) || result.count === null || !Number.isSafeInteger(result.count) || result.count < 0) throw new Error("Incomplete history read");
-  if (summaryRows.length !== result.count) throw new Error("History changed during read");
-  const common = { filters, columns: columns(filters.kind), options, pagination: pagination(filters.page, result.count) };
-  if (filters.kind === "entries") return { ...common, kind: "entries", rows: mapRows("entries", result.data) as EntryReportRow[], summary: entrySummary(summaryRows as EntrySummaryRow[]) };
-  if (filters.kind === "balances") return { ...common, kind: "balances", rows: mapRows("balances", result.data) as BalanceReportRow[], summary: balanceSummary(summaryRows as BalanceSummaryRow[]) };
-  return { ...common, kind: "history", rows: mapRows("history", result.data) as HistoryReportRow[], summary: historySummary(summaryRows as HistorySummaryRow[]) };
+  if (aggregate.rowCount !== result.count) throw new Error("History changed during read");
+  const common = { timezone: aggregate.timezone, filters, columns: columns(filters.kind), options, pagination: pagination(filters.page, result.count) };
+  if (filters.kind === "entries") return { ...common, kind: "entries", rows: mapRows("entries", result.data) as EntryReportRow[], summary: { workedMinutes: aggregate.workedMinutes!, consideredMinutes: aggregate.consideredMinutes! } satisfies EntryReportSummary };
+  if (filters.kind === "balances") return { ...common, kind: "balances", rows: mapRows("balances", result.data) as BalanceReportRow[], summary: { creditMinutes: aggregate.creditMinutes!, debitMinutes: aggregate.debitMinutes!, reservationMinutes: aggregate.reservationMinutes!, utilizationMinutes: aggregate.utilizationMinutes! } satisfies BalanceReportSummary };
+  return { ...common, kind: "history", rows: mapRows("history", result.data) as HistoryReportRow[], summary: { events: aggregate.events!, affectedPeople: aggregate.affectedPeople! } satisfies HistoryReportSummary };
 }
 
 /** Private 500-row reader for exports. Counts and IDs must remain stable across every batch. */
