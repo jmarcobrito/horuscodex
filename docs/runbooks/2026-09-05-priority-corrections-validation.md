@@ -303,3 +303,30 @@ O PR deve permanecer em rascunho, com evidências e limites acima. Não há work
 [PR #5 — Corrige consultas, aprovações e histórico sem alterar o banco](https://github.com/jmarcobrito/horuscodex/pull/5), aberto em rascunho contra `main`. Commit inicial publicado `2308ffe6847a3f4f449079cda3c6fba454807b67`: 8 commits novos e 33 arquivos, com lista remota conferida contra o escopo local. Nenhum SQL ou dependência incluído. O commit posterior apenas registra este resultado e o andamento do plano.
 
 Consulta após a abertura: nenhum status de CI nem execução de workflow de PR para o commit; não são testes aprovados remotamente. A lista Vercel continuou contendo somente a produção anterior READY, e sinalizou esse deployment como `isRollbackCandidate: true`. Nenhum novo deploy desta branch observado. Não houve merge, auto-merge, deploy manual ou alteração no Supabase. Aprovação específica do release e identificação do ambiente de preview continuam pendentes.
+
+## Prévia remota — 05/09/2026, validação limitada ao ambiente disponível
+
+Usuário autorizou preparar e conferir a prévia, não publicar em produção. Skills de deployment/variáveis Vercel orientaram a inspeção do ambiente; Superpowers orientou registrar o resultado observado e suas limitações.
+
+### Ambiente identificado antes da publicação
+
+Na página autenticada de configuração Vercel, todas as nove variáveis do projeto estavam restritas a Production, inclusive SUPABASE_URL, as chaves do Supabase e a flag de fechamento. Aba Shared: “No shared variables linked”. Nenhum valor foi revelado, copiado ou alterado; nenhuma variável de produção foi levada para Preview. Portanto a prévia não tem backend Supabase configurado e não permite validar login/painel autenticado. Não confundir esse ambiente com um banco fictício remoto.
+
+A ferramenta de deploy não expôs os parâmetros necessários e rejeitou a chamada antes de criar qualquer deployment. A publicação foi feita pelo formulário oficial da Vercel: commit exato `ec88a4655ad6b77b8000257a0cb234316ee66e90`, branch de revisão, destino explicitamente Preview, botão “Create Preview Deployment”. Nenhum ajuste da configuração de bloqueio automático foi necessário.
+
+### Resultado
+
+- URL: https://horuscodex-fy9b63sr0-joao-marco-brito-s-projects.vercel.app/
+- Deployment: `dpl_7DAPeSkbK1LSVrz1nMK2WohvjGo8`.
+- Estado READY, sem erro de alias, associado ao PR #5 e ao SHA exato acima. Interface confirma Preview; metadados retornam `target: null` (não production).
+- Build Next/Turbopack concluído na Vercel; log informa build de 14 s e deployment concluído às 22:29:01 UTC (cerca de 25 s desde o início do build). Rotas geradas. Aviso preexistente: engines Node sem limite de versão principal; não alterado nesta etapa.
+- Navegador exibiu “Entre no Horus”, campos E-mail/Senha e botões de entrada. Nenhuma credencial digitada, nenhum login ou formulário enviado. Logs da própria prévia registraram GET / com status 200.
+- Uma consulta GET à API dashboard da prévia retornou **503, “Banco de dados não configurado.”**, com `private, no-store`. Ausência de backend explícita, não sucesso funcional. Logs limitados a este deployment mostram SupabaseConfigurationError por falta de SUPABASE_URL; não afirmar ausência de erros de execução.
+- A consulta da raiz pelo conector retornou 302; não usada como evidência de 200. A evidência de renderização veio do navegador e dos logs acima. Proteções de acesso da Vercel não foram modificadas e nenhum link de bypass foi criado.
+- Metadados da produção anterior reconferidos depois: `dpl_AQaQzaenYVgFKr3kVzT4qS3Hsy7u`, READY, commit `213607f`, ainda com alias oficial `horuscodex.vercel.app`. Nenhuma promoção ou merge realizado.
+
+### Limite e próximo portão
+
+Prévia publicada e compilação remota confirmada; **validação autenticada remota não realizada**, porque não existe backend de teste configurado. Os 209 testes e 39 casos PostgreSQL fictícios pertencem aos checkpoints anteriores e não foram executados contra esta URL. Nenhuma leitura ou escrita no Supabase real ocorreu nesta etapa. Banco de teste separado, se desejado, exige definição/autorização própria; não ampliar acesso ao banco real para preencher essa lacuna.
+
+Antes de produção, apresentar este limite e pedir aprovação específica. **Não promover este artefato Preview sem configuração de banco.** A publicação oficial, se autorizada, precisa de build Production do código aprovado com as variáveis Production já existentes, sem comandos Supabase, migrações ou mudanças de credenciais. Depois, somente conferência de leitura; nunca fechar/reabrir/editar agosto como teste. Reversão permanece restrita ao aplicativo e ao deployment anterior identificado. PR continua em rascunho até a decisão de liberação.
