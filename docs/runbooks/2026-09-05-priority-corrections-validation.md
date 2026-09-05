@@ -330,3 +330,32 @@ A ferramenta de deploy não expôs os parâmetros necessários e rejeitou a cham
 Prévia publicada e compilação remota confirmada; **validação autenticada remota não realizada**, porque não existe backend de teste configurado. Os 209 testes e 39 casos PostgreSQL fictícios pertencem aos checkpoints anteriores e não foram executados contra esta URL. Nenhuma leitura ou escrita no Supabase real ocorreu nesta etapa. Banco de teste separado, se desejado, exige definição/autorização própria; não ampliar acesso ao banco real para preencher essa lacuna.
 
 Antes de produção, apresentar este limite e pedir aprovação específica. **Não promover este artefato Preview sem configuração de banco.** A publicação oficial, se autorizada, precisa de build Production do código aprovado com as variáveis Production já existentes, sem comandos Supabase, migrações ou mudanças de credenciais. Depois, somente conferência de leitura; nunca fechar/reabrir/editar agosto como teste. Reversão permanece restrita ao aplicativo e ao deployment anterior identificado. PR continua em rascunho até a decisão de liberação.
+
+## Produção publicada — 05/09/2026
+
+O usuário respondeu “sim” à autorização específica para integrar o PR #5 e publicar somente o aplicativo com a configuração de produção existente, sem migrações nem alterações no banco. Este checkpoint substitui as pendências de liberação descritas nas etapas anteriores.
+
+### Verificação e publicação
+
+- Worktree limpo antes da liberação; 167 arquivos rastreados de código/configuração idênticos à cópia isolada `horus-workflow-check-P7uUHP`, cuja verificação completa já estava aprovada. Nova execução dos testes nessa cópia, com ambiente filtrado: **209 passaram, zero falhas/cancelados/ignorados; saída 0**. Não se repetiu o build local nesta última etapa; o novo build de produção abaixo é a evidência remota.
+- Diff sem SQL, migração, mudança de dependência ou política; `git diff --check` sem erros. Versão anterior reconfirmada antes do merge: `dpl_AQaQzaenYVgFKr3kVzT4qS3Hsy7u`, READY, commit `213607ffc7629518f53c86cdb7945d0114632115`.
+- PR #5 retirado do rascunho e integrado com verificação do head exato `a606dbce021a0b90b5886a14d9126e9344d38c40`. GitHub confirma merged em 22:34:49 UTC. Merge: `d0d56b6b22ab188960e026168d4025bddeed58f8`. Após atualizar somente a referência remota, árvore do merge idêntica à validada: `49e2d72b9d6bfa0a04b8fbd7c1ebd63e8090e754`; nenhum ajuste do checkout principal do usuário.
+- A integração Git iniciou **novo build Production**, sem promover o Preview. Deployment `dpl_8yF1qeUaDMMQcYSqJEDWKHuZff5r`, commit do merge acima, target production, READY, `aliasError: null`, com `horuscodex.vercel.app` entre os aliases.
+- Log remoto: build concluído em 15 s; publicação concluída em **22:35:20 UTC / 19:35:20 de Brasília**. Configuração, credenciais e variáveis existentes não foram alteradas.
+- Endereço oficial: https://horuscodex.vercel.app/ . Artefato anterior permanece como referência de reversão somente do aplicativo; nenhuma reversão executada.
+
+### Conferência real, exclusivamente de leitura
+
+Nova aba de verificação usou a sessão DEV já existente no navegador, sem digitar credenciais ou realizar novo login. Nenhum formulário de mutação enviado; nenhum cadastro, aprovação, edição, recálculo, fechamento ou reabertura de teste.
+
+- Painel DEV/RH renderizou dados e os rótulos corrigidos de disponibilidade, reserva, contexto mensal e datas de registro.
+- Aprovações carregou o escopo explícito de todas as datas, independente do Painel, e terminou sem erro visível.
+- Fechamento do mês carregou agosto com a orientação de seleção individual/equipe e confirmação posterior. Nenhuma pessoa foi selecionada; nenhum fechamento foi iniciado.
+- Lançamentos de agosto carregaram com acesso ao histórico diário. Um histórico foi aberto e terminou de carregar sem erro visível, depois fechado. Isso comprova disponibilidade dos registros consultados, **não uma conciliação integral de todo o histórico de agosto**.
+- Relatórios terminou de carregar com filtros por pessoa, setor e tipo, período e quatro opções de exportação. Nenhum arquivo real exportado. Retorno ao Painel ao encerrar a navegação.
+- GET sem sessão a `/api/dashboard` respondeu **401, “Sessão não autenticada.”**, `private, no-store`, em vez do 503 de configuração observado apenas no Preview.
+- Duas consultas agregadas de logs, limitadas a este deployment de produção desde 22:34 UTC, não retornaram ocorrências error/fatal na janela observada. Não significa ausência universal de falhas nem monitoramento contínuo.
+
+**Preservação:** nenhuma alteração direta no Supabase, schema, RLS, grants, funções SQL, credenciais ou dados dos colaboradores nesta publicação. As leituras reais acima não foram apresentadas como prova de comparação completa antes/depois do banco. Provas de preservação por comparação integral e testes de escrita continuam restritas às fixtures e ao PostgreSQL fictício dos checkpoints anteriores.
+
+**Escopo encerrado:** Entrega A/F01–F07 publicada. Redesenho visual completo do painel (Entrega B) e regras novas (Entrega C) permanecem separados. Superpowers orientou a verificação antes da conclusão; a skill Vercel de deployments orientou o novo build Production e a conferência da versão/alias. Nenhum subagente usado. Este registro pós-publicação é mantido localmente, sem novo push que dispare outra publicação.
