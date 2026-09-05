@@ -190,7 +190,7 @@ export function createPreviewRequest(delegate: PreviewRequest, state: PreviewSta
 function createRun(id: number, role: TestRole, scenario: TestScenario, reportMode: ReportMode) {
   const server = createWorkflowServer(role, scenario);
   const previewState = { reportMode };
-  return { id, role, server, request: createPreviewRequest(server.request, previewState) };
+  return { id, role, server, before: JSON.stringify(server.fullSnapshot()), request: createPreviewRequest(server.request, previewState) };
 }
 
 function Harness() {
@@ -206,7 +206,7 @@ function Harness() {
     <div className="fixture-banner"><strong>TESTE LOCAL — dados fictícios; sem Supabase</strong>
       <details><summary>Controles do ensaio</summary><div className="fixture-controls" key={run.id}>
         <label>Perfil de teste<select value={role} onChange={event => setRole(event.target.value as TestRole)}><option value="rh">RH</option><option value="pj">Colaborador</option><option value="dev">DEV</option></select></label>
-        <label>Cenário geral<select value={scenario} onChange={event => setScenario(event.target.value as TestScenario)}><option value="normal">Normal</option><option value="pending">Pendência</option><option value="empty">Mês sem lançamentos</option><option value="closed">Mês fechado</option><option value="unknown">Metadados indisponíveis</option><option value="range">Intervalo parcial inicial</option></select></label>
+<label>Cenário geral<select value={scenario} onChange={event => setScenario(event.target.value as TestScenario)}><option value="overview">Painel — seis situações</option><option value="many">Painel — 40 pessoas</option><option value="nobody">Consulta sem pessoas</option><option value="normal">Normal</option><option value="pending">Pendência</option><option value="empty">Mês sem lançamentos</option><option value="closed">Mês fechado</option><option value="unknown">Metadados indisponíveis</option><option value="range">Intervalo parcial inicial</option></select></label>
         <label>Estado dos relatórios<select value={reportMode} onChange={event => setReportMode(event.target.value as ReportMode)}><option value="normal">Com resultados</option><option value="empty">Sem resultados</option><option value="loading">Carregando contínuo</option><option value="error">Erro do servidor</option></select></label>
         <button type="button" className="fixture-primary" onClick={reset}>Aplicar controles e reiniciar</button>
         <button type="button" onClick={() => { server.configure({ failDashboard: true }); setReport("Próxima consulta falhará"); }}>Falhar próxima consulta</button>
@@ -217,6 +217,7 @@ function Harness() {
         <label><input type="checkbox" checked={realDisconnected} onChange={event => setRealDisconnected(event.target.checked)} />Fechamento desativado no servidor</label>
         <button type="button" onClick={() => setReport(JSON.stringify({ calls: server.calls, closingCalls: server.closingCalls }, null, 2))}>Mostrar chamadas fictícias</button>
         <button type="button" onClick={() => setReport(JSON.stringify(server.snapshot(), null, 2))}>Mostrar dias e versões fictícios</button>
+        <button type="button" onClick={() => setReport(JSON.stringify({ unchanged: run.before === JSON.stringify(server.fullSnapshot()), onlyReads: server.calls.every(call => call.method === "GET") && server.closingCalls.length === 0, reads: server.calls.filter(call => call.method === "GET").length, writes: server.calls.filter(call => call.method !== "GET").length, closings: server.closingCalls.length }, null, 2))}>Verificar preservação integral</button>
         <output aria-live="polite"><pre>{report}</pre></output>
       </div></details>
     </div>

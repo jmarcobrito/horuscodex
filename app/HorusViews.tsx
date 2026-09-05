@@ -51,25 +51,6 @@ function statusTone(status: string) {
   return "neutral";
 }
 
-export function Overview({ data, onNavigate }: { data: DashboardData; onNavigate: (section: Section) => void }) {
-  const display = dashboardDisplay(data);
-  const pending = data.metrics.pendingRequests + data.metrics.pendingOccurrences + data.metrics.pendingAuthorizations;
-  return <>
-    <section className="page-heading overview-heading"><div><span className="eyebrow">VISÃO CONSOLIDADA</span><h1>Painel</h1><p>{monthLabel(data.period)} · dados do período</p></div>{pending > 0 && <button className="secondary-button" onClick={() => onNavigate("requests")}>{pending} pendência(s)</button>}</section>
-    <section className="metric-grid">
-      <Metric label="COLABORADORES ATIVOS" value={String(data.metrics.activeContractors)} meta="Cadastros ativos" tone="violet" />
-      <Metric label="HORAS TRABALHADAS" value={formatMinutes(display.workedMinutes)} meta={display.fullMonth
-        ? "Carga mensal " + formatMinutes(data.metrics.requiredMinutes) + ((data.metrics.estimatedRequiredPersonMonths ?? 0) > 0 ? " · Inclui estimativa para meses sem registro mensal" : "")
-        : "Consideradas nos lançamentos: " + formatMinutes(display.entryEligibleMinutes)} tone="blue" />
-      <Metric label="DISPONÍVEL PARA USAR" value={formatMinutes(display.availableCreditMinutes)} meta={"Créditos válidos " + formatMinutes(display.validCreditMinutes) + " · Reservado para folgas " + formatMinutes(display.reservedCreditMinutes)} tone="green" />
-      <Metric label="DÉFICITS PENDENTES" value={formatMinutes(data.metrics.negativeBalanceMinutes)} meta="Débitos em aberto, separados dos créditos" tone="amber" />
-    </section>
-    <p className="bank-scope">Saldo atual do banco; não é uma posição histórica do mês selecionado.</p>
-    {!display.fullMonth && <MonthlyContext context={display.monthlyContext} estimatedMonths={data.metrics.estimatedRequiredPersonMonths ?? 0} />}
-    <section className="dashboard-grid"><div className="panel discipline-panel"><PanelHeading eyebrow="DISCIPLINA DE PREENCHIMENTO" title="Acompanhamento das pessoas" action="Ver todas as pessoas" onAction={() => onNavigate("team")} />{data.contractors.filter((person) => person.status === "ACTIVE").length ? <div className="table-scroll"><table><thead><tr><th>Colaborador</th><th>Última data trabalhada</th><th>Último envio</th><th>Dias entre trabalho e registro</th><th>Registrados após a data trabalhada</th><th>Dias com lançamento</th><th>Horas em relação à carga mensal</th></tr></thead><tbody>{data.contractors.filter((person) => person.status === "ACTIVE").map((person) => <tr key={person.id}><td><div className="person-cell"><span className="mini-avatar violet">{person.initials}</span><div><strong>{person.name}</strong><small>{person.email}</small></div></div></td><td>{person.lastEntryDate ? formatDate(person.lastEntryDate) : "Sem lançamentos"}</td><td>{submissionLabel(person.lastEntryAt, data.timezone)}</td><td><RegistrationDelay person={person} /></td><td>{person.retroactiveEntries}</td><td>{display.daysByPerson[person.id] ?? 0}</td><td>{display.fullMonth ? <><div className="fill-cell"><div className="mini-progress"><span style={{ width: person.fillPercentage + "%" }} /></div><b>{person.fillPercentage}%</b></div>{(person.estimatedRequiredMonths ?? 0) > 0 && <small>Inclui estimativa da carga</small>}</> : <small>Consulte um mês completo</small>}</td></tr>)}</tbody></table></div> : <Empty text="Nenhum colaborador ativo encontrado." />}</div>
-      <div className="panel balance-panel"><PanelHeading eyebrow="BANCO DE HORAS" title="Saldos mais antigos" action="Ver extrato" onAction={() => onNavigate("balance")} />{data.balanceLots.length ? <div className="lot-list">{data.balanceLots.slice(0, 5).map((lot) => <article className="lot-row" key={lot.id}><div className="lot-top"><div><strong>{lot.contractorName}</strong><span>{formatDate(lot.originDate)}</span></div><b className={lot.type === "CREDIT" ? "positive" : "negative"}>{formatMinutes((lot.type === "CREDIT" ? 1 : -1) * lot.remainingMinutes, true)}</b></div><div className="deadline-line"><small>{statusLabel(lot.status)}</small><time>{formatDate(lot.deadlineDate)}</time></div></article>)}</div> : <Empty text="Nenhum lote de saldo aberto." />}</div></section>
-  </>;
-}
 
 export function submissionLabel(instant: string | null, timezone = "America/Sao_Paulo") {
   if (instant === null) return "Sem envios válidos nesta consulta";
@@ -97,8 +78,6 @@ export function MonthlyContext({ context, estimatedMonths }: { context: ReturnTy
   </section>;
 }
 
-function Metric({ label, value, meta, tone }: { label: string; value: string; meta: string; tone: string }) { return <article className="metric-card"><div className={"metric-icon " + tone}>◇</div><span>{label}</span><strong>{value}</strong><p>{meta}</p></article>; }
-function PanelHeading({ eyebrow, title, action, onAction }: { eyebrow: string; title: string; action: string; onAction: () => void }) { return <div className="panel-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div><button onClick={onAction}>{action} <b>→</b></button></div>; }
 
 export function EntriesView({ role, data: originalData, onNew, onEdit, onHistory, readOnly = false, contractorId = null, onContractorChange, displayMode = "collaborator", onDisplayModeChange, workDate = "", onWorkDateChange, reviewScope, onClearReviewScope }: {
   role: Role; data: DashboardData; onNew: () => void; onEdit: (entry: DashboardEntry) => void;

@@ -83,7 +83,7 @@ export function normalizeOverviewFilters(data: DashboardData, filters: OverviewF
 export function buildOverviewModel(data: DashboardData, filters: OverviewFilters): OverviewModel;
 ```
 
-- [ ] Escrever primeiro a suíte com `runnerImport` e teste de população/inativos/imobilidade:
+- [x] Escrever primeiro a suíte com `runnerImport` e teste de população/inativos/imobilidade:
 
 ```js
 import assert from "node:assert/strict";
@@ -113,8 +113,8 @@ test("partial periods never infer monthly readiness", async () => {
 });
 ```
 
-- [ ] Rodar `node --test tests/overview-model.test.mjs`; registrar falha por módulo/contrato ainda ausente, não confundir falha de ambiente com teste vermelho funcional.
-- [ ] Implementar `resolveReviewIds` por interseção dos dois filtros em `data.contractors`, sem filtrar por ACTIVE. Núcleo:
+- [x] Rodar `node --test tests/overview-model.test.mjs`; registrar falha por módulo/contrato ainda ausente, não confundir falha de ambiente com teste vermelho funcional.
+- [x] Implementar `resolveReviewIds` por interseção dos dois filtros em `data.contractors`, sem filtrar por ACTIVE. Núcleo:
 
 ```ts
 const matchesSector = (person: DashboardContractor, sectorId: string | null) =>
@@ -125,11 +125,11 @@ const ids = new Set(data.contractors.filter(person =>
 ).map(person => person.id));
 ```
 
-- [ ] Implementar `scopeDashboard` como cópia de apresentação: filtrar contractors por id e entries/monthlyTimesheets/requests/occurrences/authorizations/balanceLots/balanceTransactions por contractorId. Conservar `monthlyTimesheets: undefined` se ausente. Recalcular métricas usadas pelas views a partir do subconjunto: horas dos lançamentos, carga/estimativas somadas dos contractors, pendências das listas filtradas, débitos dos lotes DEBIT e créditos conforme `dashboardDisplay`. Não reutilizar totais de pessoas removidas. Resumo mensal: horas elegíveis dos lançamentos mais abonos dos registros mensais filtrados; estado único ou MIXED segundo registros disponíveis. Quando metadados mensais estiverem ausentes, as views devem mostrar indisponibilidade para os números dependentes, nunca exibir um zero auxiliar como valor apurado. Não colocar essa cópia no workspace, no cache principal, em `rhDashboard` ou em chamadas de gravação.
-- [ ] Implementar normalização: setor inexistente limpa setor; pessoa inexistente/incompatível limpa pessoa; juntar avisos naturais em uma mensagem; período parcial limpa somente status. Não limpar por situação sem linhas. Para `buildOverviewModel`, calcular `buildClosingRows(data)` apenas se `asFullMonth(data.period)` existir, depois filtrar seus ids por pessoa/setor; no intervalo usar ativos ou inativos com registro relevante no período (lançamento, registro mensal, ocorrência sobreposta ou autorização). Ordenar por nome e id para empate.
-- [ ] Construir contagens antes do filtro status; rows depois. Banco ignora status da tabela. Dias contam datas distintas; workedMinutes soma calculatedMinutes dos lançamentos filtrados; não depende da existência da folha. Usar `dashboardDisplay(scopedData)` para banco e contexto de intervalo.
+- [x] Implementar `scopeDashboard` como cópia de apresentação: filtrar contractors por id e entries/monthlyTimesheets/requests/occurrences/authorizations/balanceLots/balanceTransactions por contractorId. Conservar `monthlyTimesheets: undefined` se ausente. Recalcular métricas usadas pelas views a partir do subconjunto: horas dos lançamentos, carga/estimativas somadas dos contractors, pendências das listas filtradas, débitos dos lotes DEBIT e créditos conforme `dashboardDisplay`. Não reutilizar totais de pessoas removidas. Resumo mensal: horas elegíveis dos lançamentos mais abonos dos registros mensais filtrados; estado único ou MIXED segundo registros disponíveis. Quando metadados mensais estiverem ausentes, as views devem mostrar indisponibilidade para os números dependentes, nunca exibir um zero auxiliar como valor apurado. Não colocar essa cópia no workspace, no cache principal, em `rhDashboard` ou em chamadas de gravação.
+- [x] Implementar normalização: setor inexistente limpa setor; pessoa inexistente/incompatível limpa pessoa; juntar avisos naturais em uma mensagem; período parcial limpa somente status. Não limpar por situação sem linhas. Para `buildOverviewModel`, calcular `buildClosingRows(data)` apenas se `asFullMonth(data.period)` existir, depois filtrar seus ids por pessoa/setor; no intervalo usar ativos ou inativos com registro relevante no período (lançamento, registro mensal, ocorrência sobreposta ou autorização). Ordenar por nome e id para empate.
+- [x] Construir contagens antes do filtro status; rows depois. Banco ignora status da tabela. Dias contam datas distintas; workedMinutes soma calculatedMinutes dos lançamentos filtrados; não depende da existência da folha. Usar `dashboardDisplay(scopedData)` para banco e contexto de intervalo.
 - [ ] Acrescentar casos: todos os seis estados por alteração individual da fixture; metadata undefined versus []; folha duplicada; duas entradas no mesmo dia; carga zero; sector null; combinação incompatível; banco reservado/expirado/débito de outra pessoa; filtro status sem efeito no banco; dados e versões imutáveis após cada projeção. Verificar soma das contagens e valores do subconjunto, não apenas snapshots.
-- [ ] Rodar `node --test tests/overview-model.test.mjs tests/dashboard-display.test.mjs tests/closing-review.test.mjs`; revisar diff e fazer commit somente dos dois arquivos novos.
+- [x] Rodar `node --test tests/overview-model.test.mjs tests/dashboard-display.test.mjs tests/closing-review.test.mjs`; revisar diff e fazer commit somente dos dois arquivos novos.
 
 ## Tarefa 2 — navegação contextual e horário confiável
 
@@ -152,7 +152,7 @@ export function overviewTarget(data: DashboardData, filters: OverviewFilters,
   intent: OverviewIntent): OverviewTarget;
 ```
 
-- [ ] Escrever teste e executar `node --test tests/overview-navigation.test.mjs` antes da função:
+- [x] Escrever teste e executar `node --test tests/overview-navigation.test.mjs` antes da função:
 
 ```js
 import assert from "node:assert/strict";
@@ -177,8 +177,8 @@ test("explicit person navigation carries the selected month", async () => {
 });
 ```
 
-- [ ] Implementar matriz sem I/O: closing → closing/status atual; pending → closing/PENDING; person → entries/collaborator/pessoa validada no escopo; daily → entries/day/primeiro dia do mês; balance → balance/mesmo período/pessoa e setor/sem status. Exceto balance, exigir `asFullMonth`, usando o mês normalizado em period. Pessoa ausente ou fora do escopo lança “Colaborador não disponível nesta consulta”. Não introduzir URL de API ou função de fechar neste módulo.
-- [ ] Adicionar `receivedAt?: string` somente à action success de workspace e `receivedAt: string | null` ao slot. Inicial/open/start/failure/invalidate deixam null. O reducer aceita horário só após validações atuais de requestId/período/approvalsScope. Recebido inválido vira null; não chamar relógio dentro do reducer. Código da atribuição depois dos guards:
+- [x] Implementar matriz sem I/O: closing → closing/status atual; pending → closing/PENDING; person → entries/collaborator/pessoa validada no escopo; daily → entries/day/primeiro dia do mês; balance → balance/mesmo período/pessoa e setor/sem status. Exceto balance, exigir `asFullMonth`, usando o mês normalizado em period. Pessoa ausente ou fora do escopo lança “Colaborador não disponível nesta consulta”. Não introduzir URL de API ou função de fechar neste módulo.
+- [x] Adicionar `receivedAt?: string` somente à action success de workspace e `receivedAt: string | null` ao slot. Inicial/open/start/failure/invalidate deixam null. O reducer aceita horário só após validações atuais de requestId/período/approvalsScope. Recebido inválido vira null; não chamar relógio dentro do reducer. Código da atribuição depois dos guards:
 
 ```ts
 const receivedAt = action.receivedAt && Number.isFinite(Date.parse(action.receivedAt))
@@ -187,8 +187,8 @@ return { ...state, [action.key]: { ...slot, data: action.data,
   loading: false, error: null, receivedAt } };
 ```
 
-- [ ] Acrescentar em `tests/workspace-state.test.mjs` dois starts no mesmo slot (requestId 10/11), success 10 com horário antigo e success 11 com horário novo; somente 11 pode definir data/receivedAt. Validar mismatch de período, falha e invalidate limpando horário; ação success antiga sem receivedAt continua compatível. Manter todos os testes existentes de independência das abas.
-- [ ] Cobrir pending, daily, balance, setor incompatível e imutabilidade em `overview-navigation.test.mjs`. Rodar `node --test tests/overview-navigation.test.mjs tests/workspace-state.test.mjs tests/period.test.mjs`. Revisar e commitar os quatro arquivos.
+- [x] Acrescentar em `tests/workspace-state.test.mjs` dois starts no mesmo slot (requestId 10/11), success 10 com horário antigo e success 11 com horário novo; somente 11 pode definir data/receivedAt. Validar mismatch de período, falha e invalidate limpando horário; ação success antiga sem receivedAt continua compatível. Manter todos os testes existentes de independência das abas.
+- [x] Cobrir pending, daily, balance, setor incompatível e imutabilidade em `overview-navigation.test.mjs`. Rodar `node --test tests/overview-navigation.test.mjs tests/workspace-state.test.mjs tests/period.test.mjs`. Revisar e commitar os quatro arquivos.
 
 ## Tarefa 3 — layout da opção 1 e seletor compacto
 
@@ -210,7 +210,7 @@ export function Overview(props: OverviewProps): React.ReactNode;
 ```
 
 - [ ] Inspecionar a imagem escolhida com view_image antes de editar; usar Product Design image-to-code na execução, respeitando o produto existente. Medir referência real em vez de assumir que o gerador entregou 1440x1024. Não gerar novos layouts. Fontes já existem; manter marca/menu. Se usar ícones novos, resolver arquivos oficiais licenciados de uma única família com correspondência ao alvo, salvar somente os usados e licença, sem pacote novo.
-- [ ] Escrever testes renderizados com `createElement`/`renderToStaticMarkup` e runnerImport. Props de teste:
+- [x] Escrever testes renderizados com `createElement`/`renderToStaticMarkup` e runnerImport. Props de teste:
 
 ```js
 const props = { data: makeWorkflowDashboard(),
@@ -227,7 +227,7 @@ assert.doesNotMatch(html, /type="checkbox"|ana@example.com/);
 ```
 
 Importar assert/test de node, React e runnerImport como nas suítes existentes. Acrescentar teste PeriodPicker default versus compact: default mantém formulário visível; compact inclui “Outro intervalo” e região recolhível identificada. Rodar os dois arquivos e observar falha antes da implementação.
-- [ ] Implementar variante compacta com `<details><summary>Outro intervalo</summary>` e RangePicker existente. Não aplicar formulário ao abrir/fechar; conservar busy, min/max e validação. Exemplo do novo ramo:
+- [x] Implementar variante compacta com `<details><summary>Outro intervalo</summary>` e RangePicker existente. Não aplicar formulário ao abrir/fechar; conservar busy, min/max e validação. Exemplo do novo ramo:
 
 ```tsx
 {allowRange && (variant === "compact"
@@ -240,11 +240,11 @@ Importar assert/test de node, React e runnerImport como nas suítes existentes. 
         value={value} busy={busy} onChange={onChange} /></>)}
 ```
 
-- [ ] Renderizar cabeçalho/Painel, PeriodPicker compact, SelectMenu pessoa/setor, atualização. Formatar receivedAt no fuso recebido; null mostra “Consulta carregada”. Controles em carregamento desabilitados, nenhum novo fetch no Overview. Reusar labels de períodos existentes.
-- [ ] Renderizar seis botões de contagem com `aria-pressed`, nome incluindo estado/quantidade e onFiltersChange. Clique na situação ativa retorna all. Mostrar “Limpar filtro de situação”; counts não mudam com status. Botão principal emite `{kind:"closing"}`; aviso de PENDING emite `{kind:"pending"}`. Nunca chamar callback de gravação.
-- [ ] Renderizar cinco colunas da referência, nomes/setores sem email, todos os registros filtrados. “Conferir” emite person, ação da seção emite daily. Por linha, `<details>` mantém carga/estimativa, último trabalho/envio e indicadores de registro existentes; reutilizar formatação/fuso, não reimplementar cálculo. Manter aviso global de estimativa quando `estimatedRequiredPersonMonths > 0`, inclusive se a fonte histórica não possui contagem individual, sem atribuir estimativa a pessoa errada.
-- [ ] Renderizar faixa do banco com dados do modelo e ação balance. Intervalo parcial: sem seis números mensais, ações mensais desabilitadas e explicação/atalho com foco no seletor, horas/dias conhecidos visíveis; contexto mensal separado reutiliza lógica existente, metadata undefined explícita como indisponível.
-- [ ] CSS limitado a `.overview-*` e `.period-panel.overview-period`: tabela sem coluna de email; 5 colunas desktop; superfície clara, divisores leves; contagens com seis posições no desktop e quebra em telas estreitas; controles e linhas adaptam sem overflow da página. Body 14–16 px; foco contrastante; sem depender só de cores. Exemplo estrutural, ajustado à medição da imagem:
+- [x] Renderizar cabeçalho/Painel, PeriodPicker compact, SelectMenu pessoa/setor, atualização. Formatar receivedAt no fuso recebido; null mostra “Consulta carregada”. Controles em carregamento desabilitados, nenhum novo fetch no Overview. Reusar labels de períodos existentes.
+- [x] Renderizar seis botões de contagem com `aria-pressed`, nome incluindo estado/quantidade e onFiltersChange. Clique na situação ativa retorna all. Mostrar “Limpar filtro de situação”; counts não mudam com status. Botão principal emite `{kind:"closing"}`; aviso de PENDING emite `{kind:"pending"}`. Nunca chamar callback de gravação.
+- [x] Renderizar cinco colunas da referência, nomes/setores sem email, todos os registros filtrados. “Conferir” emite person, ação da seção emite daily. Por linha, `<details>` mantém carga/estimativa, último trabalho/envio e indicadores de registro existentes; reutilizar formatação/fuso, não reimplementar cálculo. Manter aviso global de estimativa quando `estimatedRequiredPersonMonths > 0`, inclusive se a fonte histórica não possui contagem individual, sem atribuir estimativa a pessoa errada.
+- [x] Renderizar faixa do banco com dados do modelo e ação balance. Intervalo parcial: sem seis números mensais, ações mensais desabilitadas e explicação/atalho com foco no seletor, horas/dias conhecidos visíveis; contexto mensal separado reutiliza lógica existente, metadata undefined explícita como indisponível.
+- [x] CSS limitado a `.overview-*` e `.period-panel.overview-period`: tabela sem coluna de email; 5 colunas desktop; superfície clara, divisores leves; contagens com seis posições no desktop e quebra em telas estreitas; controles e linhas adaptam sem overflow da página. Body 14–16 px; foco contrastante; sem depender só de cores. Exemplo estrutural, ajustado à medição da imagem:
 
 ```css
 .overview-statuses { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
@@ -262,10 +262,10 @@ Importar assert/test de node, React e runnerImport como nas suítes existentes. 
 
 **Interfaces:** `ReviewScopeBanner({data,scope,onClear}: {data:DashboardData;scope:ReviewScope;onClear:()=>void})`; acrescentar props opcionais `reviewScope?: ReviewScope`, `onClearReviewScope?: () => void` a EntriesView/BalanceView/ClosingOverview; ClosingOverview também recebe `statusFilter?: ClosingStatus | "all"` e `scopeRevision?: number`.
 
-- [ ] Escrever testes estáticos de escopo antes das props: BalanceView com person-1 exclui lote/movimentação person-2 e recalcula débito; EntriesView diário inclui apenas pessoas do setor em registros e “sem lançamento”; ClosingOverview com scope person-1/status READY não renderiza person-2, nem checkbox de outra pessoa. Render helpers iguais aos usados na tarefa 3, importando as views e fixtures reais de testes. Rodar `node --test tests/overview-scope.test.mjs` para registrar o teste vermelho.
-- [ ] Implementar banner com pessoa/setor/mês e botão “Limpar filtros recebidos”. Sem informações identificáveis de quem não foi retornado pela API; filtro sem correspondência mostra vazio, não tudo. Após limpar, manter mês e devolver o escopo completo autorizado da tela.
-- [ ] EntriesView/BalanceView usam `scopeDashboard` somente na apresentação; objeto original continua com HorusApp. Quando monthlyTimesheets for undefined, resumo mensal/abonos dependentes exibem “Não disponível”, inclusive no escopo filtrado. Para pessoa inativa recebida explicitamente e presente no payload, mas fora de selectableContractors por só ter ocorrência/autorização, incluir essa pessoa na opção de consulta; não mudar sua elegibilidade de edição.
-- [ ] ClosingOverview calcula `allRows = buildClosingRows(data)` com dados originais, depois filtra por resolveReviewIds/status. Seleção guarda identidade do payload e chave de escopo:
+- [x] Escrever testes estáticos de escopo antes das props: BalanceView com person-1 exclui lote/movimentação person-2 e recalcula débito; EntriesView diário inclui apenas pessoas do setor em registros e “sem lançamento”; ClosingOverview com scope person-1/status READY não renderiza person-2, nem checkbox de outra pessoa. Render helpers iguais aos usados na tarefa 3, importando as views e fixtures reais de testes. Rodar `node --test tests/overview-scope.test.mjs` para registrar o teste vermelho.
+- [x] Implementar banner com pessoa/setor/mês e botão “Limpar filtros recebidos”. Sem informações identificáveis de quem não foi retornado pela API; filtro sem correspondência mostra vazio, não tudo. Após limpar, manter mês e devolver o escopo completo autorizado da tela.
+- [x] EntriesView/BalanceView usam `scopeDashboard` somente na apresentação; objeto original continua com HorusApp. Quando monthlyTimesheets for undefined, resumo mensal/abonos dependentes exibem “Não disponível”, inclusive no escopo filtrado. Para pessoa inativa recebida explicitamente e presente no payload, mas fora de selectableContractors por só ter ocorrência/autorização, incluir essa pessoa na opção de consulta; não mudar sua elegibilidade de edição.
+- [x] ClosingOverview calcula `allRows = buildClosingRows(data)` com dados originais, depois filtra por resolveReviewIds/status. Seleção guarda identidade do payload e chave de escopo:
 
 ```ts
 const scopeKey = JSON.stringify([reviewScope?.personId ?? null,
@@ -275,7 +275,7 @@ const current = selection.data === data && selection.scopeKey === scopeKey
 ```
 
 Atualizações de checkbox/ack/select-ready devem carregar scopeKey. “Selecionar prontos para revisar” usa somente rows visíveis READY. Antes de review, conferir `current.ids.every(id => visibleIds.has(id))`; falha bloqueia com mensagem “A seleção mudou. Confira as pessoas novamente.” Nunca filtrar silenciosamente um comando já montado. `makeClosingCommand(data.period, allRows, current.ids, current.acknowledged)` e confirmação transacional ficam intactos.
-- [ ] Repetir suites `node --test tests/overview-scope.test.mjs tests/closing-review.test.mjs tests/daily-entries.test.mjs tests/entries-flow.test.mjs tests/closing-client.test.mjs`. Acrescentar fixtures para NO_ENTRIES e UNKNOWN; não criar novos SQLs. Registrar interação de limpar seleção na tarefa 6, pois SSR não testa eventos. Revisar e commitar caminhos explícitos.
+- [x] Repetir suites `node --test tests/overview-scope.test.mjs tests/closing-review.test.mjs tests/daily-entries.test.mjs tests/entries-flow.test.mjs tests/closing-client.test.mjs`. Acrescentar fixtures para NO_ENTRIES e UNKNOWN; não criar novos SQLs. Registrar interação de limpar seleção na tarefa 6, pois SSR não testa eventos. Revisar e commitar caminhos explícitos.
 
 ## Tarefa 5 — ligar o Painel aos workspaces existentes
 
@@ -283,11 +283,11 @@ Atualizações de checkbox/ack/select-ready devem carregar scopeKey. “Selecion
 
 **Interfaces:** importar `Overview` diretamente de `app/Overview.tsx`; remover export do Overview antigo em HorusViews e atualizar todos os consumidores encontrados. Reusar `OverviewTarget` para contexto por workspace e `OverviewFilters` no Painel, sem introduzir contrato HTTP.
 
-- [ ] Procurar todos os consumidores com `rg -n 'Overview|RegistrationDelay|submissionLabel|MonthlyContext' app tests`; listar arquivos realmente encontrados. Não remover auxiliares usados por EntriesView. Atualizar testes de indicadores para a nova localização e props mantendo asserções semânticas de fuso/estimativa, não apagar testes para passar.
-- [ ] Acrescentar teste de contrato contra mutação e acesso usando renderização HorusApp com fixture e perfil PJ: Painel não aparece; DEV conserva seletor e modo somente leitura. Além do HTML, planejar no ensaio fictício a asserção dinâmica de chamadas (tarefa 6); não aceitar busca textual como prova única de zero escrita.
-- [ ] Guardar filtros por identidade RH/DEV-RH e contexto de destino por workspaceKey. Overview usa filtros normalizados de resposta aceita; aviso emitido uma única vez quando uma escolha realmente é removida. Não limpar filtros por resposta antiga. Recebimento de filtros de destino não modifica o Painel.
-- [ ] Passar `receivedAt: new Date().toISOString()` ao success somente após validações da resposta em loadWorkspace. Remover/limitar o efeito atual que limpa `entryContractorId` usando closure desatualizada: só pode afetar o workspace e a navegação ainda ativos. Resultados fora da identidade atual não alteram `rhDashboard`, filtros, pessoa ou foco.
-- [ ] Implementar navegação explícita, diferente de openSection comum. Sequência:
+- [x] Procurar todos os consumidores com `rg -n 'Overview|RegistrationDelay|submissionLabel|MonthlyContext' app tests`; listar arquivos realmente encontrados. Não remover auxiliares usados por EntriesView. Atualizar testes de indicadores para a nova localização e props mantendo asserções semânticas de fuso/estimativa, não apagar testes para passar.
+- [x] Acrescentar teste de contrato contra mutação e acesso usando renderização HorusApp com fixture e perfil PJ: Painel não aparece; DEV conserva seletor e modo somente leitura. Além do HTML, planejar no ensaio fictício a asserção dinâmica de chamadas (tarefa 6); não aceitar busca textual como prova única de zero escrita.
+- [x] Guardar filtros por identidade RH/DEV-RH e contexto de destino por workspaceKey. Overview usa filtros normalizados de resposta aceita; aviso emitido uma única vez quando uma escolha realmente é removida. Não limpar filtros por resposta antiga. Recebimento de filtros de destino não modifica o Painel.
+- [x] Passar `receivedAt: new Date().toISOString()` ao success somente após validações da resposta em loadWorkspace. Remover/limitar o efeito atual que limpa `entryContractorId` usando closure desatualizada: só pode afetar o workspace e a navegação ainda ativos. Resultados fora da identidade atual não alteram `rhDashboard`, filtros, pessoa ou foco.
+- [x] Implementar navegação explícita, diferente de openSection comum. Sequência:
 
 ```ts
 // overviewNavigationId é um useRef<number>(0).
@@ -303,15 +303,15 @@ if (token !== overviewNavigationId.current) return;
 
 Os comentários acima são sequência de integração, não funções novas: usar setters já existentes e adicionar estado `reviewContexts: Record<string, OverviewTarget>` e `scopeRevision` incremental por navegação contextual. Incrementar o token também em mudança normal de aba, mês ou identidade. `loadWorkspace` já dispara start que limpa conteúdo; não reaproveitar dados de mês diferente. Capturar falha sem reenvio automático; a tela mantém erro e “Tentar novamente”.
 - [ ] Garantir que consulta contextual sempre configure o mês alvo mesmo quando destino já existia em outro mês; menu comum continua usando openSection/firstVisitPeriod. Foco no título da área após sucesso atual (`tabIndex=-1`), não após resposta obsoleta. Ao limpar escopo, limpar pessoa recebida e seleção/ack no fechamento, mas conservar período. Não manter seleção em retorno contextual ao mesmo mês (scopeRevision novo).
-- [ ] Integrar Overview com seu seletor compacto. Retirar PeriodPicker externo apenas quando o novo Overview está visível; em erro/carregamento manter um seletor utilizável no shell, sem duplicação e sem perder a recuperação. Entries/closing/requests conservam seletores próprios; Relatórios não recebe novo seletor.
-- [ ] Passar reviewScope às três views somente em RH; nunca em DEV/PJ ou PJ comum. Para person, iniciar `entryContractorId` com a pessoa alvo; daily usa o escopo recebido e primeiro dia; balance usa escopo e período de movimentações. Fechamento usa statusFilter e scopeRevision, mas callbacks de comando e confirmação continuam os existentes.
+- [x] Integrar Overview com seu seletor compacto. Retirar PeriodPicker externo apenas quando o novo Overview está visível; em erro/carregamento manter um seletor utilizável no shell, sem duplicação e sem perder a recuperação. Entries/closing/requests conservam seletores próprios; Relatórios não recebe novo seletor.
+- [x] Passar reviewScope às três views somente em RH; nunca em DEV/PJ ou PJ comum. Para person, iniciar `entryContractorId` com a pessoa alvo; daily usa o escopo recebido e primeiro dia; balance usa escopo e período de movimentações. Fechamento usa statusFilter e scopeRevision, mas callbacks de comando e confirmação continuam os existentes.
 - [ ] Rodar `node --test tests/overview-*.test.mjs tests/workspace-state.test.mjs tests/developer-view-contract.test.mjs tests/required-estimates-view.test.mjs tests/registration-view.test.mjs tests/rendered-html.test.mjs tests/people-history-protection.test.mjs`. No Windows, se o wildcard não expandir, enumerar os arquivos com Get-ChildItem e passar os caminhos como array ao Node; não contar zero arquivos como sucesso. Revisar diff e commitar somente arquivos relacionados.
 
 ## Tarefa 6 — ensaio integrado, fidelidade e segurança
 
 **Files:** criar `docs/runbooks/2026-09-05-month-overview-validation.md`, `design-qa.md`; modificar apenas fixtures/controles necessários em `tests/browser/main.tsx`, `tests/helpers/workflow-server.ts`, `tests/workflow-server.test.mjs`. Fonte de verificação: scripts isolados existentes, sem mudar suas proteções.
 
-- [ ] Antes de qualquer build, revisar `git status`, `git diff --check` e arquivos novos; rastrear somente arquivos permitidos para o executor isolado incluí-los. Não abrir `.env` nem executar o app conectado ao banco real.
+- [x] Antes de qualquer build, revisar `git status`, `git diff --check` e arquivos novos; rastrear somente arquivos permitidos para o executor isolado incluí-los. Não abrir `.env` nem executar o app conectado ao banco real.
 - [ ] Preparar fixtures dedicadas aos seis estados, seleção de setor, pessoa sem setor, inativo com histórico, zero, metadata indisponível, muitos colaboradores e intervalo livre. Não alterar a semântica de fixtures antigas usadas por outros testes. Incluir contador de chamadas e comparação profunda de dados antes/depois no servidor fictício. Exemplo para o cenário de consultas:
 
 ```js
@@ -329,7 +329,7 @@ O helper já expõe `snapshot()` limitado a entries/versions e `calls` com `{met
 - [ ] Conferir com navegador: filtros combinados; mês/intervalo/retorno mensal; seis indicadores; detalhes recolhíveis; refresh/error/retry; agosto no Painel e setembro em Lançamentos antes do clique Conferir; destino passa a agosto/pessoa correta; voltar mantém Painel. Repetir com duas navegações/respostas fora de ordem, troca DEV/PJ durante consulta e pessoa ausente no retorno.
 - [ ] Conferir daily com setor: registros e sem-lançamento do mesmo grupo; data dentro do mês; limpar contexto. Banco: totais e registros do mesmo escopo; situação mensal da tabela não restringe saldo. Logs somente GET e snapshot integral idêntico nesses cenários.
 - [ ] Em fixtures separadas, selecionar pessoa no fechamento, trocar escopo e confirmar seleção vazia; selecionar prontos inclui apenas visíveis; sem registro/UNKNOWN não selecionáveis; NO_ENTRIES exige reconhecimento explícito. Fechar uma pessoa e equipe com revisão/confirmar existentes. Conferir resultados parcial/incerto sem repetição automática. Registrar os POST fictícios separadamente do ensaio de leitura.
-- [ ] Repetir PostgreSQL com executáveis já instalados: `node scripts/verify-closing-postgres.mjs --bin C:/Users/danyel/AppData/Local/Temp/horus-postgres-tests-bf4dfb1be39545bdb2635ed7a7d24bb1/pgsql/bin --candidate`. initdb, pg_ctl e psql foram localizados durante o planejamento; reconfirmar os três arquivos antes da execução. Se ausentes, parar só essa verificação e localizar a instalação registrada, sem instalar automaticamente. Nunca fornecer Supabase/PGDATA existente. O script deve criar cluster fictício novo e encerrá-lo; registrar os testes realmente executados.
+- [x] Repetir PostgreSQL com executáveis já instalados: `node scripts/verify-closing-postgres.mjs --bin C:/Users/danyel/AppData/Local/Temp/horus-postgres-tests-bf4dfb1be39545bdb2635ed7a7d24bb1/pgsql/bin --candidate`. initdb, pg_ctl e psql foram localizados durante o planejamento; reconfirmar os três arquivos antes da execução. Se ausentes, parar só essa verificação e localizar a instalação registrada, sem instalar automaticamente. Nunca fornecer Supabase/PGDATA existente. O script deve criar cluster fictício novo e encerrá-lo; registrar os testes realmente executados.
 - [ ] Ler skill Product Design design-qa, comparar alvo escolhido e captura do ensaio no mesmo viewport/estado. Avaliar desktop, 390px, zoom 200%, teclado/foco, rótulos, contraste e overflow. Não substituir QA por build ou screenshot solto. Registrar achados e corrigir P0/P1/P2 até `final result: passed`; se captura/comparação bloqueada, registrar `blocked` e não afirmar fidelidade aprovada. Limites P3 ficam explícitos.
 - [ ] Revisão final: caminhos fora do escopo não mudaram; função `makeClosingCommand`, API e SQL intactos; DEV/PJ sem expansão de acesso; contexto parcial não virou fechamento; datas/carga/estimativas e relatórios/exportações preservados. Repetir verificações afetadas após qualquer correção.
 - [ ] Preencher runbook com tabela cenário/resultado/evidência/limite, marcar somente tarefas concluídas neste plano e commitar documentação. Entregar preview local verificado. Não publicar automaticamente; apresentar resultado/diff e solicitar autorização de PR/release quando aplicável. Reversão futura é somente da versão do aplicativo.
@@ -340,4 +340,6 @@ Cobertura da especificação: filtros/população/banco → tarefa 1; destinos/p
 
 Contratos novos têm nomes/tipos definidos antes de uso; os nomes de callback das views existentes precisam ser preservados. Snippets são orientações de implementação futura e ainda não foram executados. Passos de código incluem núcleo concreto e testes; interfaces declaradas devem receber implementação na tarefa indicada. Plano não transforma os resultados antigos da Entrega A em aprovação do novo painel.
 
-Estado deste documento: plano escrito após aprovação da especificação; implementação e novos testes ainda não iniciados. Executar na própria sessão com `superpowers:executing-plans`, sem subagentes. Manter checkpoints por tarefa, sem ampliar acesso, escopo ou publicação.
+Estado atualizado em 05/09/2026: implementação local das tarefas 1–5 realizada, sem subagentes. Tarefa 6 bloqueada por falta de espaço no disco C: durante a preparação da cópia isolada. Não houve publicação nem acesso ao Supabase. Evidências e retomada em `../../runbooks/2026-09-05-month-overview-validation.md`.
+
+Checkpoint: 68 testes selecionados passaram, análise estática dos arquivos alterados e TypeScript local passaram, 39 testes PostgreSQL passaram em cluster fictício novo e encerrado. A suíte completa/builds isolados e o ensaio de navegador ainda não foram concluídos. `design-qa.md` registra `final result: blocked`; não considerar a interface aprovada visualmente. A cópia temporária incompleta desta execução foi removida; fontes, histórico Git e previews anteriores preservados.

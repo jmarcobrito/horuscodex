@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useMemo, useReducer, useRef, useState } from "react";
-import { entryEditBlockReason, saveThenRefresh, selectableContractors, type EntriesDisplayMode } from "./entries-model";
+import { entryEditBlockReason, saveThenRefresh, type EntriesDisplayMode } from "./entries-model";
+import { Overview } from "./Overview";
+import { defaultOverviewFilters, normalizeOverviewFilters, type OverviewFilters } from "./overview-model";
+import { overviewTarget, type OverviewIntent, type OverviewTarget } from "./overview-navigation";
 import { EntryHistory, type HistoryState, type HistoryVersion } from "./EntryHistory";
 import { Modal } from "./Modal";
 import { defaultApprovalFilters, type ApprovalFilters } from "./approvals-model";
@@ -19,7 +22,7 @@ import type { DashboardContractor, DashboardData, DashboardEntry, DashboardPerio
 import { SelectMenu } from "./SelectMenu";
 import { ReportsView } from "./reports/ReportsView";
 import {
-  BalanceView, EntriesView, formatDate, formatMinutes, Overview,
+  BalanceView, EntriesView, formatDate, formatMinutes,
   RequestsView, type Role, type Section, TeamView,
 } from "./HorusViews";
 
@@ -82,6 +85,15 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const approvalIdentity = role + ":" + (activeViewAs || "self");
   const approvalFilters = approvalSettings[approvalIdentity] ?? defaultApprovalFilters;
   const activeKey = workspaceKey(role, section, activeViewAs, approvalFilters.scope);
+  const overviewIdentity = accountRole + ":" + approvalIdentity;
+  const [overviewSettings, setOverviewSettings] = useState<Record<string, OverviewFilters>>({});
+  const overviewSettingsRef = useRef<Record<string, OverviewFilters>>({});
+  const overviewFilters = overviewSettings[overviewIdentity] ?? defaultOverviewFilters;
+  const [reviewContexts, setReviewContexts] = useState<Record<string, OverviewTarget & { revision: number }>>({});
+  const reviewContext = role === "rh" ? reviewContexts[activeKey] : undefined;
+  const overviewNavigationId = useRef(0);
+  const currentNavigation = useRef({ key: activeKey, identity: approvalIdentity, overviewIdentity, token: 0 });
+  const contentRef = useRef<HTMLDivElement>(null);
   const activeSlot = workspaces[activeKey];
   const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [] };
   const dashboardQuery = periodQuery(activeSlot?.period ?? initialDashboard.period);
@@ -107,10 +119,56 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   function closeModal() { historyRequestId.current += 1; setModal(null); setHistoryState(null); }
   function requestCloseModal() { if (!mutationInFlight.current) closeModal(); }
   function showNotice(message: string) { setNotice(message); window.setTimeout(() => setNotice(""), 5200); }
+  function markNavigation(key: string, identity = approvalIdentity) {
+    const token = ++overviewNavigationId.current;
+    currentNavigation.current = { key, identity, overviewIdentity: accountRole + ":" + identity, token };
+    return token;
+  }
+  function changeOverviewFilters(next: OverviewFilters) {
+    if (loading || !activeSlot?.data || role !== "rh") return;
+    const normalized = normalizeOverviewFilters(activeSlot.data, next);
+    overviewSettingsRef.current = { ...overviewSettingsRef.current, [overviewIdentity]: normalized.filters };
+    setOverviewSettings(overviewSettingsRef.current);
+    if (normalized.notice) showNotice(normalized.notice);
+  }
+  function clearReviewScope() {
+    markNavigation(activeKey);
+    setReviewContexts(current => { const next = { ...current }; delete next[activeKey]; return next; });
+    setEntryContractorId(null);
+  }
+  async function navigateOverview(intent: OverviewIntent) {
+    if (loading || mutationInFlight.current || role !== "rh" || !activeSlot?.data) return;
+    const target = overviewTarget(activeSlot.data, overviewFilters, intent);
+    const key = workspaceKey("rh", target.section);
+    const token = markNavigation(key);
+    setReviewContexts(current => ({ ...current, [key]: { ...target, revision: token } }));
+    closeModal(); setConfirmation(null); setRequestFocus(undefined); setSection(target.section); setSidebarOpen(false);
+    // Configure before loading so retry keeps the intended view. Stale successes never restore it.
+    if (target.section === "entries") { setEntryContractorId(target.scope.personId); setEntryDisplayMode(target.entriesMode); setEntryWorkDate(target.workDate); }
+    try {
+      const result = await loadWorkspace(key, target.period);
+      if (overviewNavigationId.current !== token || currentNavigation.current.key !== key || currentNavigation.current.identity !== "rh:self") return;
+      if (target.scope.personId && !result.contractors.some(person => person.id === target.scope.personId)) {
+        setNotice("A pessoa não está disponível nesta consulta. Os filtros recebidos foram mantidos para não mostrar outra pessoa.");
+      }
+      window.requestAnimationFrame(() => {
+        if (overviewNavigationId.current !== token || currentNavigation.current.key !== key) return;
+        const heading = contentRef.current?.querySelector<HTMLElement>("h1");
+        heading?.setAttribute("tabindex", "-1"); heading?.focus();
+      });
+    } catch { /* The destination owns its retryable consultation error. */ }
+  }
   function openSection(next: Section) {
     if (loading || mutationInFlight.current) return;
     const key = workspaceKey(role, next, activeViewAs, approvalFilters.scope);
+    markNavigation(key);
     const source = activeSlot?.period ?? null;
+    if (next === "overview" && workspaces[key]?.data) {
+      const normalized = normalizeOverviewFilters(workspaces[key].data, overviewSettingsRef.current[overviewIdentity] ?? defaultOverviewFilters);
+      overviewSettingsRef.current = { ...overviewSettingsRef.current, [overviewIdentity]: normalized.filters };
+      setOverviewSettings(overviewSettingsRef.current);
+      if (normalized.notice) showNotice(normalized.notice);
+    }
     const period = firstVisitPeriod(next, source, initialDashboard.period);
     dispatchWorkspace({ type: "open", key, period });
     closeModal(); setRequestFocus(undefined); setConfirmation(null); setSection(next); setSidebarOpen(false);
@@ -119,6 +177,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     if (next !== "admin" && targetPeriod && !workspaces[key]?.data && !workspaces[key]?.loading) void loadWorkspace(key, targetPeriod, activeViewAs).catch(() => {});
   }
   const loadWorkspace = useCallback(async (key: string, period: DashboardPeriod, viewAs = "") => {
+    const navigation = currentNavigation.current;
     const requestId = ++requestCounter.current;
     latestRequests.current.set(key, requestId);
     dispatchWorkspace({ type: "start", key, period, requestId });
@@ -133,12 +192,15 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
       if (!result.period || !samePeriod(period, result.period) || !Array.isArray(result.contractors) || !Array.isArray(result.entries)) throw Error("A resposta não corresponde ao período escolhido.");
       if ((result.approvalsScope ?? "period") !== expectedScope) throw Error("A resposta não corresponde ao filtro de datas escolhido.");
       if (viewAs && (result.contractors.some(person => person.id !== viewAs) || result.entries.some(entry => entry.contractorId !== viewAs))) throw Error("A resposta não corresponde ao colaborador escolhido.");
-      dispatchWorkspace({ type: "success", key, requestId, data: result });
-      if (latestRequests.current.get(key) === requestId) {
+      if (latestRequests.current.get(key) !== requestId) throw Error("Consulta substituída por uma mais recente.");
+      dispatchWorkspace({ type: "success", key, requestId, data: result, receivedAt: new Date().toISOString() });
+      if (navigation.token === currentNavigation.current.token && navigation.identity === currentNavigation.current.identity) {
         if (key.startsWith("rh:")) setRhDashboard(result);
-        if (key === "rh:self:entries" && entryContractorId && !selectableContractors(result).some(person => person.id === entryContractorId)) {
-          setEntryContractorId(null);
-          setNotice("O filtro de colaborador foi removido porque essa pessoa não está disponível neste mês.");
+        if (key === "rh:self:overview") {
+          const normalized = normalizeOverviewFilters(result, overviewSettingsRef.current[navigation.overviewIdentity] ?? defaultOverviewFilters);
+          overviewSettingsRef.current = { ...overviewSettingsRef.current, [navigation.overviewIdentity]: normalized.filters };
+          setOverviewSettings(overviewSettingsRef.current);
+          if (normalized.notice) setNotice(normalized.notice);
         }
       }
       return result;
@@ -146,9 +208,10 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
       dispatchWorkspace({ type: "failure", key, requestId, message: error instanceof Error ? error.message : "Não foi possível carregar este mês." });
       throw error;
     }
-  }, [request, entryContractorId]);
+  }, [request]);
   function changeApprovalFilters(next: ApprovalFilters) {
     if (loading || mutationInFlight.current) return;
+    markNavigation(workspaceKey(role, "requests", activeViewAs, next.scope));
     setApprovalSettings(current => ({ ...current, [approvalIdentity]: next }));
     setRequestFocus(undefined);
     if (next.scope !== approvalFilters.scope) {
@@ -160,6 +223,8 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   }
   function changePeriod(period: DashboardPeriod) {
     if (loading || mutationInFlight.current) return;
+    markNavigation(activeKey);
+    if (section === "entries" && !reviewContext) setEntryContractorId(null);
     closeModal(); setConfirmation(null);
     if (section === "requests") setRequestFocus(undefined);
     if (section === "entries" && role === "rh") setEntryWorkDate(period.from);
@@ -173,6 +238,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   }
   async function refreshDashboard() {
     if (!activeSlot?.period) return;
+    markNavigation(activeKey);
     try { await loadWorkspace(activeKey, activeSlot.period, activeViewAs); } catch { /* The workspace displays the retryable error. */ }
   }
   async function mutate(path: string, method: "POST" | "PATCH", body: unknown, success: string, dismissModal = true) {
@@ -260,6 +326,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   function switchToRh() {
     if (!isDev || loading || mutationInFlight.current) return;
     const key = workspaceKey("rh", "overview");
+    markNavigation(key, "rh:self");
     const period = workspaces[key] ? workspaces[key].period : activeSlot?.period ?? null;
     dispatchWorkspace({ type: "open", key, period });
     if (period && !workspaces[key]?.data && !workspaces[key]?.loading) void loadWorkspace(key, period).catch(() => {});
@@ -271,6 +338,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     if (!targetId) { showNotice("Cadastre um colaborador antes de abrir essa visualização."); return; }
     const source = activeSlot?.period;
     const key = workspaceKey("pj", "entries", targetId);
+    markNavigation(key, "pj:" + targetId);
     const period = workspaces[key] ? workspaces[key].period : source ? asFullMonth(source) : null;
     dispatchWorkspace({ type: "open", key, period });
     if (period && !workspaces[key]?.data && !workspaces[key]?.loading) void loadWorkspace(key, period, targetId).catch(() => {});
@@ -281,6 +349,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     if (loading || mutationInFlight.current || !activeSlot?.data) return;
     const period = asFullMonth(activeSlot.data.period);
     if (!period) return;
+    markNavigation(workspaceKey("rh", "requests"));
     closeModal(); setConfirmation(null);
     const token = historyRequestId.current;
     setApprovalSettings(current => ({ ...current, ["rh:self"]: { scope: "period", status: "all", kind: "all", personId: issue.contractorId } }));
@@ -392,7 +461,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     <button className="mobile-menu" onClick={() => setSidebarOpen((open) => !open)} aria-label="Abrir menu" aria-expanded={sidebarOpen} aria-controls="main-sidebar"><span /><span /></button>
     <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon">{item.icon}</span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count" aria-label={(dashboard.approvalsScope === "all" ? "Pendências de todas as datas: " : "Pendências deste período: ") + pendingCount} title={dashboard.approvalsScope === "all" ? "Pendências de todas as datas" : "Pendências deste período"}>{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
-    <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
+    <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div ref={contentRef} className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
       {section === "requests" && <section className="panel approval-filters" aria-label="Filtros de aprovações">
         <div className="form-grid">
           <label>Datas<SelectMenu ariaLabel="Datas das aprovações" value={approvalFilters.scope} disabled={loading} onChange={value => changeApprovalFilters({ ...approvalFilters, scope: value as ApprovalFilters["scope"] })} options={[{value:"all",label:"Todas as datas"},{value:"period",label:"Período escolhido"}]} /></label>
@@ -402,17 +471,17 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
         </div>
         <p>{approvalFilters.scope === "all" ? "Solicitações de todas as datas. Estes filtros não alteram o mês do Painel." : "Somente solicitações nas datas escolhidas abaixo. O mês do Painel não muda."}</p>
       </section>}
-      {(["overview", "entries", "closing"].includes(section) || (section === "requests" && approvalFilters.scope === "period")) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview" || section === "requests"} onChange={changePeriod} />}
+      {((section === "overview" && !activeSlot?.data) || ["entries", "closing"].includes(section) || (section === "requests" && approvalFilters.scope === "period")) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview" || section === "requests"} onChange={changePeriod} />}
       {section !== "admin" && section !== "reports" && !activeSlot?.data && <section className="panel workspace-status" role={activeSlot?.error ? "alert" : "status"}>
         <h1>{sectionNames[section]}</h1>
         <p>{activeSlot?.error ? "Não foi possível concluir a consulta. " + activeSlot.error : activeSlot?.period ? (section === "requests" && approvalFilters.scope === "all" ? "Carregando solicitações de todas as datas…" : "Carregando o período escolhido…") : "Escolha o mês para consultar esta tela."}</p>
         {activeSlot?.error && <button type="button" className="secondary-button" onClick={() => void refreshDashboard()}>Tentar novamente</button>}
       </section>}
-      {activeSlot?.data && section === "overview" && role === "rh" && <Overview data={dashboard} onNavigate={openSection} />}
-      {activeSlot?.data && section === "entries" && <EntriesView role={role} data={dashboard} contractorId={entryContractorId} onContractorChange={setEntryContractorId} displayMode={entryDisplayMode} onDisplayModeChange={setEntryDisplayMode} workDate={entryWorkDate} onWorkDateChange={setEntryWorkDate} readOnly={isDev && viewMode === "pj"} onNew={openNewEntry} onEdit={openEditEntry} onHistory={openHistory} />}
-      {activeSlot?.data && section === "balance" && <BalanceView data={dashboard} />}
+      {activeSlot?.data && section === "overview" && role === "rh" && <Overview data={dashboard} filters={overviewFilters} busy={loading || Boolean(activeSlot.loading)} receivedAt={activeSlot.receivedAt} onFiltersChange={changeOverviewFilters} onPeriodChange={changePeriod} onRefresh={() => void refreshDashboard()} onIntent={intent => void navigateOverview(intent)} />}
+      {activeSlot?.data && section === "entries" && <EntriesView reviewScope={reviewContext?.scope} onClearReviewScope={clearReviewScope} role={role} data={dashboard} contractorId={entryContractorId} onContractorChange={setEntryContractorId} displayMode={entryDisplayMode} onDisplayModeChange={setEntryDisplayMode} workDate={entryWorkDate} onWorkDateChange={setEntryWorkDate} readOnly={isDev && viewMode === "pj"} onNew={openNewEntry} onEdit={openEditEntry} onHistory={openHistory} />}
+      {activeSlot?.data && section === "balance" && <BalanceView data={dashboard} reviewScope={reviewContext?.scope} onClearReviewScope={clearReviewScope} />}
       {activeSlot?.data && section === "requests" && <RequestsView data={dashboard} role={role} filters={approvalFilters} requestFocus={requestFocus} onClearFocus={() => changeApprovalFilters({ ...approvalFilters, personId: "", status: "pending", kind: "all" })} readOnly={isDev && viewMode === "pj"} onNewOccurrence={() => { setOccurrenceForm({ contractorId: defaultContractorId(), type: "MEDICAL_CERTIFICATE", startDate: today, endDate: today, hours: "8", effect: "CREDITS_HOURS", description: "" }); setModal("occurrence"); }} onNewLeave={() => { setLeaveForm({ contractorId: defaultContractorId(), startDate: today, endDate: today, hours: "8", reason: "" }); setModal("leave"); }} onNewAuthorization={() => { setAuthorizationForm({ contractorId: requestFocus?.contractorId ?? defaultContractorId(), workDate: requestFocus?.workDate ?? today, hours: "8", reason: "" }); setModal("authorization"); }} onDecision={decide} />}
-      {activeSlot?.data && section === "closing" && role === "rh" && <ClosingOverview data={dashboard} closingEnabled={Boolean(submitClosing)} onReview={(command, rows) => { setClosingReview(structuredClone({ command, rows })); setModal("closing"); }} onIssue={issue => void openClosingIssue(issue)} />}
+      {activeSlot?.data && section === "closing" && role === "rh" && <ClosingOverview reviewScope={reviewContext?.scope} onClearReviewScope={clearReviewScope} statusFilter={reviewContext?.closingStatus} scopeRevision={reviewContext?.revision} data={dashboard} closingEnabled={Boolean(submitClosing)} onReview={(command, rows) => { setClosingReview(structuredClone({ command, rows })); setModal("closing"); }} onIssue={issue => void openClosingIssue(issue)} />}
       {activeSlot?.data && section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onEdit={openEditContractor} onStatus={changeContractorStatus} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
       {activeSlot?.period && section === "reports" && role === "rh" && <ReportsView period={activeSlot.period} onPeriodChange={changePeriod} request={request} isDev={isDev} />}
       {section === "admin" && role === "rh" && <AdministrationView isDev={isDev} sectors={sectors.map(sector => ({ ...sector, memberCount: rhDashboard.contractors.filter(person => person.sectorId === sector.id).length }))} adminData={adminData} policy={rhDashboard.policy} loading={loading} onCreateSector={createSector} onUpdateSector={updateSector} onPolicy={openPolicy} onRole={changeUserRole} onStatus={changeUserStatus} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}

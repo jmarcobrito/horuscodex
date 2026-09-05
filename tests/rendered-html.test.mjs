@@ -6,8 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { runnerImport } from "vite";
 import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
 
-const views = async () => (await runnerImport("./app/HorusViews.tsx", { configFile: false, envDir: false })).module;
-const renderView = (view, data, extra = {}) => renderToStaticMarkup(createElement(view, { data, onNavigate() {}, onNew() {}, onEdit() {}, onStatus() {}, onSetPassword() {}, ...extra }));
+const views = async () => ({ ...(await runnerImport("./app/HorusViews.tsx", { configFile: false, envDir: false })).module, ...(await runnerImport("./app/Overview.tsx", { configFile: false, envDir: false })).module });
+const renderView = (view, data, extra = {}) => renderToStaticMarkup(createElement(view, { data, filters:{personId:null,sectorId:null,status:"all"}, busy:false, receivedAt:null, onFiltersChange(){}, onPeriodChange(){}, onRefresh(){}, onIntent(){}, onNavigate() {}, onNew() {}, onEdit() {}, onStatus() {}, onSetPassword() {}, ...extra }));
 const plain = html => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
 
 test("partial-period dashboard separates empty daily totals from complete monthly credits", async () => {
@@ -74,7 +74,7 @@ test("bank and dashboard display free credit separately from reserved credit and
   assert.match(bank, /Déficits pendentes 01:00/);
   assert.match(bank, /Saldo atual do banco; não é uma posição histórica do mês selecionado/);
   const overview = plain(renderView(Overview, data));
-  assert.match(overview, /DISPONÍVEL PARA USAR 02:00/);
+  assert.match(overview, /Disponível para usar 02:00/);
   assert.match(overview, /Saldo atual do banco; não é uma posição histórica do mês selecionado/);
   assert.deepEqual(data, before);
 });
