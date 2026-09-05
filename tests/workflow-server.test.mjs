@@ -2,6 +2,49 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
+
+test("fixture history resolves names and timezone without changing stored versions", async () => {
+  const server=createWorkflowServer(); const before=server.snapshot();
+  const response=await server.request("/api/time-entries/entry-1/history"); const body=await response.json();
+  assert.equal(body.timezone,"America/Sao_Paulo");
+  assert.equal(body.versions[0].changed_by_name,"Ana Exemplo");
+  assert.equal(body.versions[0].previous_data.eligible_minutes,undefined);
+  assert.deepEqual(server.snapshot(),before);
+});
+
+test("fixture registration indicators are scoped to the consulted entries", async () => {
+  const server = createWorkflowServer();
+  const before = server.snapshot();
+  const data = await (await server.request("/api/dashboard?from=2026-08-10&to=2026-08-10")).json();
+  assert.equal(data.timezone,"America/Sao_Paulo");
+  assert.equal(data.contractors[0].lastEntryAt,null);
+  assert.equal(data.contractors[0].lastEntryDate,null);
+  assert.equal(data.contractors[0].averageDelayDays,null);
+  assert.equal(data.contractors[0].unavailableRegistrationDates,0);
+  assert.deepEqual(server.snapshot(),before);
+});
+test("fixture uses the same missing-month estimates and never invents inactive requirements", async () => {
+  const server = createWorkflowServer();
+  const before = server.snapshot();
+  const data = await (await server.request("/api/dashboard?from=2026-09-01&to=2026-10-31")).json();
+  assert.equal(data.contractors.find(p=>p.id==="person-1").requiredMinutes,960);
+  assert.equal(data.contractors.find(p=>p.id==="person-1").estimatedRequiredMonths,1);
+  assert.equal(data.contractors.find(p=>p.id==="person-2").requiredMinutes,0);
+  assert.equal(data.metrics.requiredMinutes,1920);
+  assert.equal(data.metrics.estimatedRequiredPersonMonths,3);
+  assert.deepEqual(server.snapshot(),before);
+});
+
+test("fixture all-date leave read includes August from September without touching daily history", async () => {
+  const server=createWorkflowServer("rh");
+  const before=server.snapshot();
+  await server.request("/api/leave-requests",{method:"POST",body:JSON.stringify({contractorId:"person-1",startDate:"2026-08-12",endDate:"2026-08-12",requestedMinutes:60,reason:"Fictício"})});
+  const all=await (await server.request("/api/dashboard?year=2026&month=9&approvalsScope=all")).json();
+  const period=await (await server.request("/api/dashboard?year=2026&month=9&approvalsScope=period")).json();
+  assert.equal(all.approvalsScope,"all"); assert.equal(all.requests.length,1);
+  assert.equal(period.requests.length,0);
+  assert.deepEqual(server.snapshot(),before);
+});
 test("isolated server never reaches external or unknown routes and scopes PJ data", async () => {
   const server = createWorkflowServer("pj");
   await assert.rejects(server.request("https://horuscodex.vercel.app/api/dashboard"), /externo/);
@@ -9,6 +52,31 @@ test("isolated server never reaches external or unknown routes and scopes PJ dat
   const data = await (await server.request("/api/dashboard?year=2026&month=8&viewAs=person-2")).json();
   assert.deepEqual(data.contractors.map(p => p.id), ["person-1"]);
   assert.ok(data.entries.every(e => e.contractorId === "person-1"));
+});
+test("fictitious leave submission is scoped and never changes daily history", async () => {
+  const server = createWorkflowServer("pj");
+  const before = server.snapshot();
+  const response = await server.request("/api/leave-requests", { method: "POST", body: JSON.stringify({
+    contractorId: "person-2", startDate: "2026-08-12", endDate: "2026-08-12",
+    requestedMinutes: 120, reason: "Ensaio fictício",
+  }) });
+  assert.equal(response.status, 201);
+  const data = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(data.requests[0].contractorId, "person-1");
+  assert.equal(data.requests[0].requestedMinutes, 120);
+  assert.equal(data.requests[0].status, "REQUESTED");
+  assert.deepEqual(server.snapshot(), before);
+});
+test("fictitious insufficient leave balance returns a conflict", async () => {
+  const server = createWorkflowServer();
+  const response = await server.request("/api/leave-requests", { method: "POST", body: JSON.stringify({
+    contractorId: "person-1", startDate: "2026-08-12", endDate: "2026-08-12",
+    requestedMinutes: 600, reason: "Ensaio fictício",
+  }) });
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /Saldo fictício insuficiente/);
+  const data = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(data.requests.length, 0);
 });
 test("consultation, history and fictitious closing preserve days and versions", async () => {
   const server = createWorkflowServer();

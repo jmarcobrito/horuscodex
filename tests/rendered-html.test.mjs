@@ -1,6 +1,83 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { runnerImport } from "vite";
+import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
+
+const views = async () => (await runnerImport("./app/HorusViews.tsx", { configFile: false, envDir: false })).module;
+const renderView = (view, data, extra = {}) => renderToStaticMarkup(createElement(view, { data, onNavigate() {}, onNew() {}, onEdit() {}, onStatus() {}, onSetPassword() {}, ...extra }));
+const plain = html => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+
+test("partial-period dashboard separates empty daily totals from complete monthly credits", async () => {
+  const { Overview } = await views();
+  const data = makeWorkflowDashboard();
+  data.period = { from: "2026-08-10", to: "2026-08-10", year: null, month: null };
+  data.entries = [];
+  data.metrics.workedMinutes = 0;
+  data.metrics.requiredMinutes = 600;
+  data.monthlyTimesheets = [{ ...data.monthlyTimesheets[0], status: "CLOSED", creditedMinutes: 480, consideredMinutes: 900 }];
+  data.timesheet = { ...data.timesheet, workedMinutes: 0, consideredMinutes: 480, projectedBalanceMinutes: -120 };
+  const html = renderView(Overview, data);
+  const text = plain(html);
+  assert.match(text, /HORAS TRABALHADAS 00:00/);
+  assert.match(text, /Consideradas nos lançamentos: 00:00/);
+  assert.match(text, /Contexto dos meses consultados/);
+  assert.match(text, /valores mensais completos, sem rateio/i);
+  assert.match(text, /Abonos dos meses 08:00/);
+  assert.match(text, /Projeção dos meses \+05:00/);
+  assert.doesNotMatch(text, /−02:00|100%|Preenchimento/);
+  assert.match(text, /Consulte um mês completo/);
+});
+
+test("unavailable monthly context is explicit rather than a zero or hybrid monthly result", async () => {
+  const { Overview } = await views();
+  const data = makeWorkflowDashboard();
+  data.period.to = "2026-08-15";
+  data.monthlyTimesheets = undefined;
+  const text = plain(renderView(Overview, data));
+  assert.match(text, /Contexto mensal indisponível/);
+  assert.doesNotMatch(text, /Abonos dos meses|Projeção dos meses/);
+});
+
+test("dashboard and people distinguish recorded days from the monthly hours ratio", async () => {
+  const { Overview, TeamView } = await views();
+  const data = makeWorkflowDashboard();
+  data.entries.push({ ...data.entries[0], id: "same-day" });
+  for (const view of [Overview, TeamView]) {
+    const html = renderView(view, data);
+    assert.match(plain(html), /Dias com lançamento/);
+    assert.match(plain(html), /Horas em relação à carga mensal/);
+    assert.match(plain(html), /100\s*%/);
+    data.period.to = "2026-08-15";
+    const partial = plain(renderView(view, data));
+    assert.match(partial, /Consulte um mês completo/);
+    assert.doesNotMatch(partial, /100\s*%/);
+    data.period.to = "2026-08-31";
+  }
+});
+
+test("bank and dashboard display free credit separately from reserved credit and deficit", async () => {
+  const { Overview, BalanceView } = await views();
+  const data = makeWorkflowDashboard();
+  data.balanceLots = [{ id: "credit", contractorId: "person-1", contractorName: "Pessoa fictícia",
+    type: "CREDIT", originalMinutes: 600, remainingMinutes: 600, reservedMinutes: 480,
+    originDate: "2026-08-31", deadlineDate: "2099-12-31", status: "RESERVED" }];
+  data.metrics.positiveBalanceMinutes = 600;
+  data.metrics.negativeBalanceMinutes = 60;
+  const before = structuredClone(data);
+  const bank = plain(renderView(BalanceView, data));
+  assert.match(bank, /Disponível para usar 02:00/);
+  assert.match(bank, /Créditos válidos 10:00/);
+  assert.match(bank, /Reservado para folgas 08:00/);
+  assert.match(bank, /Déficits pendentes 01:00/);
+  assert.match(bank, /Saldo atual do banco; não é uma posição histórica do mês selecionado/);
+  const overview = plain(renderView(Overview, data));
+  assert.match(overview, /DISPONÍVEL PARA USAR 02:00/);
+  assert.match(overview, /Saldo atual do banco; não é uma posição histórica do mês selecionado/);
+  assert.deepEqual(data, before);
+});
 
 test("ships protected Horus workflows backed by server data", async () => {
   const [app, page, actor, entries, dashboard, team, adminRoute, adminView, administrationView, sectorsPanel, selectMenu, signIn, google, signInScreen] = await Promise.all([

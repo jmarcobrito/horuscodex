@@ -70,15 +70,46 @@ test("collaborator cannot approve authorizations or occurrences", async () => {
   for (const route of [authorization, occurrence, leave]) assert.equal((await route.PATCH(request("PATCH", { id: "x", action: "APPROVE" }))).status, 403);
   assert.equal(boundary.calls.length, 0);
 });
-test("occurrence creation uses an atomic RPC with current default calculation effect", async () => {
+test("bank use is rejected before any occurrence mutation for every profile", async () => {
+  for (const role of ["RH", "DEV", "ADMIN", "PJ"]) {
+    for (const bankFields of [
+      { type: "BANK_LEAVE" },
+      { type: "BANK_LEAVE", calculationEffect: "DOES_NOT_CREDIT" },
+      { type: "OTHER", calculationEffect: "CONSUMES_BALANCE" },
+      { type: "MEDICAL_CERTIFICATE", calculationEffect: "CONSUMES_BALANCE" },
+      { type: ["BANK_LEAVE"] },
+      { type: "OTHER", calculationEffect: ["CONSUMES_BALANCE"] },
+    ]) {
+      boundary.reset(role);
+      const response = await occurrence.POST(request("POST", {
+        contractorId: "person-1", startDate: "2026-10-12", endDate: "2026-10-12",
+        minutes: 60, description: "Fictício", ...bankFields,
+      }));
+      assert.equal(response.status, 409, role + ": " + JSON.stringify(bankFields));
+      assert.match((await response.json()).error, /solicitação de folga/i);
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      assert.equal(boundary.calls.length, 0);
+      assert.equal(boundary.actorCalls, 1);
+    }
+  }
+});
+test("occurrence creation keeps the server-owned medical certificate effect", async () => {
   boundary.reset("PJ"); boundary.result.data.status = "REQUESTED";
-  const response = await occurrence.POST(request("POST", { contractorId: "other", type: "MEDICAL_CERTIFICATE", startDate: "2026-08-03", endDate: "2026-08-03", minutes: 60, calculationEffect: "CONSUMES_BALANCE", description: "Atestado" }));
+  const response = await occurrence.POST(request("POST", { contractorId: "other", type: "MEDICAL_CERTIFICATE", startDate: "2026-08-03", endDate: "2026-08-03", minutes: 60, description: "Atestado" }));
   assert.equal(response.status, 201); assert.deepEqual(await response.json(), boundary.result.data);
   assert.deepEqual(boundary.calls, [{ name: "create_occurrence", args: {
     p_organization_id: "test-org", p_actor_id: "test-actor", p_contractor_id: "test-actor",
     p_type: "MEDICAL_CERTIFICATE", p_start_date: "2026-08-03", p_end_date: "2026-08-03",
     p_minutes: 60, p_calculation_effect: "CREDITS_HOURS", p_description: "Atestado",
   } }]);
+});
+test("collaborator cannot override the medical certificate calculation effect", async () => {
+  boundary.reset("PJ");
+  const response = await occurrence.POST(request("POST", { type: "MEDICAL_CERTIFICATE",
+    startDate: "2026-10-12", endDate: "2026-10-12", minutes: 60,
+    calculationEffect: "DOES_NOT_CREDIT", description: "Fictício" }));
+  assert.equal(response.status, 201);
+  assert.equal(boundary.calls[0].args.p_calculation_effect, "CREDITS_HOURS");
 });
 test("collaborator cancellation and RH decision use one occurrence RPC", async () => {
   for (const [role, action] of [["PJ", "CANCEL"], ["RH", "APPROVE"], ["DEV", "REJECT"]]) {

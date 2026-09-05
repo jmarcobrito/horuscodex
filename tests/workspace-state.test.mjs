@@ -4,6 +4,26 @@ import { runnerImport } from "vite";
 import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
 const options = { configFile: false, envDir: false };
 
+test("approval scopes have separate slots and reject responses from another scope", async () => {
+  const {module:w} = await runnerImport("./app/workspace-state.ts", options);
+  const allKey=w.workspaceKey("rh","requests","","all"), periodKey=w.workspaceKey("rh","requests","","period");
+  assert.notEqual(allKey,periodKey);
+  assert.equal(w.workspaceKey("rh","entries","","all"),w.workspaceKey("rh","entries","","period"));
+  assert.notEqual(allKey,w.workspaceKey("pj","requests","person-1","all"));
+  const august=makeWorkflowDashboard(), september=makeWorkflowDashboard(2026,9);
+  let state=w.initialWorkspace(w.workspaceKey("rh","overview"),august);
+  state=w.workspaceReducer(state,{type:"start",key:allKey,period:august.period,requestId:1});
+  state=w.workspaceReducer(state,{type:"success",key:allKey,requestId:1,data:august});
+  assert.ok(state[allKey].error); assert.equal(state[allKey].data,null);
+  state=w.workspaceReducer(state,{type:"start",key:allKey,period:august.period,requestId:2});
+  state=w.workspaceReducer(state,{type:"start",key:periodKey,period:september.period,requestId:3});
+  state=w.workspaceReducer(state,{type:"success",key:periodKey,requestId:3,data:september});
+  state=w.workspaceReducer(state,{type:"success",key:allKey,requestId:2,data:{...august,approvalsScope:"all"}});
+  assert.equal(state[periodKey].data.period.month,9);
+  assert.equal(state[allKey].data.approvalsScope,"all");
+  assert.equal(state[w.workspaceKey("rh","overview")].period.month,8);
+});
+
 test("leaving an unselected monthly screen does not strand approvals without a picker", async () => {
   const { module: w } = await runnerImport("./app/workspace-state.ts", options);
   const initial = makeWorkflowDashboard().period;

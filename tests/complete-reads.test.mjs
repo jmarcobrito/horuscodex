@@ -3,15 +3,198 @@ import test, {beforeEach} from "node:test";
 import {fileURLToPath} from "node:url";
 import {runnerImport} from "vite";
 const fixture=fileURLToPath(new URL("./helpers/read-boundary.mjs",import.meta.url));
-const {module:{getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary,getAllReportRows}}=await runnerImport("./tests/helpers/read-harness.ts",{
+const {module:{dashboardRoute,getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary,getAllReportRows}}=await runnerImport("./tests/helpers/read-harness.ts",{
   configFile:false,envDir:false,resolve:{alias:["./supabase","./supabase-auth","../../../db/supabase","../../../../../db/supabase","../../../../db/supabase","../../../../db/supabase-auth"].map(find=>({find,replacement:fixture}))},
 });
 const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizationName:"Fictícia",name:"RH",email:"rh@example.com",role:"RH"};
 const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
+
+function historyFixture() {
+  boundary.tables.users.push({id:"test-dev",organization_id:"test-org",name:"DEV Exemplo",role:"DEV",status:"ACTIVE"});
+  boundary.tables.time_entry_versions = ["test-rh", "test-dev", "missing-author", "person-other-org"].map((author,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{notes:"Antiga"},new_data:{notes:"Nova"},changed_by:author,change_reason:"Ensaio",changed_at:"2026-08-04T01:00:00Z"}));
+}
+const consultHistory = (id="entry-person-0000") => historyRoute.GET(new Request("http://127.0.0.1/history"),{params:Promise.resolve({id})});
+
+test("history resolves only referenced organization authors and preserves every stored snapshot", async()=>{
+  historyFixture();
+  const before=structuredClone(boundary.tables);
+  const response=await consultHistory(); const body=await response.json();
+  assert.equal(response.status,200); assert.equal(body.timezone,"America/Sao_Paulo");
+  const versions=new Map(body.versions.map(v=>[v.changed_by,v]));
+  assert.equal(versions.get("test-rh").changed_by_name,"RH");
+  assert.equal(versions.get("test-dev").changed_by_name,"DEV Exemplo");
+  assert.equal(versions.get("missing-author").changed_by_name,null);
+  assert.equal(versions.get("person-other-org").changed_by_name,null);
+  assert.ok(boundary.authorReads.length>0);
+  assert.deepEqual([...new Set(boundary.authorReads.flatMap(read=>read.ids))].sort(),["missing-author","person-other-org","test-dev","test-rh"]);
+  assert.deepEqual(Object.keys(body).sort(),["timezone","versions"]);
+  for(const v of body.versions) { assert.equal(v.email,undefined); assert.equal(v.role,undefined); }
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history returns all authors and versions beyond the service cap", async()=>{
+  boundary.tables.time_entry_versions=boundary.tables.users.filter(u=>u.role==="PJ"&&u.organization_id==="test-org").map((u,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{},new_data:{},changed_by:u.id,change_reason:null,changed_at:"2026-08-04T01:00:00Z"}));
+  boundary.maxRows=50;
+  const before=structuredClone(boundary.tables);
+  const response=await consultHistory(); const body=await response.json();
+  assert.equal(response.status,200); assert.equal(body.versions.length,1105);
+  assert.ok(body.versions.every(v=>v.changed_by_name===v.changed_by));
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history fails visibly on incomplete author or version pages", async()=>{
+  for(const table of ["users","time_entry_versions"]) {
+    boundary.reset();
+    boundary.tables.time_entry_versions=boundary.tables.users.slice(0,110).map((u,n)=>({id:"v-"+n,time_entry_id:"entry-person-0000",version_number:n+1,previous_data:{},new_data:{},changed_by:u.id,change_reason:null,changed_at:"2026-08-04T01:00:00Z"}));
+    boundary.maxRows=50; boundary.failTable=table; boundary.failAfter=50;
+    const before=structuredClone(boundary.tables);
+    const response=await consultHistory();
+    assert.equal(response.status,502); assert.equal((await response.json()).versions,undefined);
+    assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+  }
+});
+
+test("history denies another person's entry before reading versions", async()=>{
+  historyFixture();
+  boundary.authId="auth-person-0001"; boundary.authEmail="person-0001@example.com";
+  assert.equal((await consultHistory()).status,404);
+  assert.equal(boundary.readsByTable.time_entry_versions,undefined);
+  assert.equal((await consultHistory("entry-person-0001")).status,200);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("history refuses missing or invalid organization timezone without rewriting data", async()=>{
+  for(const timezone of [null,"Not/A_Zone"]) {
+    boundary.reset(); historyFixture(); boundary.tables.organizations[0].timezone=timezone;
+    const before=structuredClone(boundary.tables);
+    assert.equal((await consultHistory()).status,502);
+    assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+  }
+});
+
+test("registration dates use the organization timezone without rewriting timestamps", async () => {
+  boundary.tables.time_entries[0].created_at = "2026-08-04T01:00:00Z";
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData(rh,{year:2026,month:8});
+  const person = data.contractors.find(p=>p.id==="person-0000");
+  assert.equal(person.averageDelayDays,0);
+  assert.equal(person.retroactiveEntries,0);
+  assert.equal(person.unavailableRegistrationDates,0);
+  assert.equal(data.timezone,"America/Sao_Paulo");
+  assert.equal(person.lastEntryAt,"2026-08-04T01:00:00Z");
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("latest submission is the greatest valid instant, not the latest work-date row", async () => {
+  const original = boundary.tables.time_entries[0];
+  boundary.tables.time_entries = [
+    {...original,id:"older-work",work_date:"2026-08-01",created_at:"2026-08-05T01:00:00Z"},
+    {...original,id:"latest-work",work_date:"2026-08-03",created_at:"2026-08-03T12:00:00Z"},
+    {...original,id:"bad-time",work_date:"2026-08-02",created_at:"invalid"},
+  ];
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData({...rh,id:original.contractor_id,role:"PJ"},{year:2026,month:8});
+  const person = data.contractors[0];
+  assert.equal(person.lastEntryDate,"2026-08-03");
+  assert.equal(person.lastEntryAt,"2026-08-05T01:00:00Z");
+  assert.equal(person.averageDelayDays,2); // Mean of 3 and 0, rounded; invalid excluded.
+  assert.equal(person.retroactiveEntries,1);
+  assert.equal(person.unavailableRegistrationDates,1);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("no valid registration date is unavailable, not a zero-delay average", async () => {
+  boundary.tables.time_entries[0].created_at = "invalid";
+  const data = await getDashboardData({...rh,id:"person-0000",role:"PJ"},{year:2026,month:8});
+  assert.equal(data.contractors[0].averageDelayDays,null);
+  assert.equal(data.contractors[0].lastEntryAt,null);
+  assert.equal(data.contractors[0].unavailableRegistrationDates,1);
+});
+
+test("missing organization timezone fails consultation instead of assuming a timezone", async () => {
+  delete boundary.tables.organizations[0].timezone;
+  await assert.rejects(()=>getDashboardData(rh,{year:2026,month:8}),/fuso/i);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("monthly requirements agree per person and team, estimate only missing active months, and preserve all source data", async () => {
+  boundary.tables.organization_policies[0].monthly_required_minutes = 120;
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData(rh,{from:"2026-08-01",to:"2026-09-30"});
+  const active = data.contractors.find(p=>p.id==="person-0000");
+  assert.equal(active.requiredMinutes,180);
+  assert.equal(active.estimatedRequiredMonths,1);
+  const inactive = data.contractors.find(p=>p.id==="person-1104");
+  assert.equal(inactive.requiredMinutes,60);
+  assert.equal(inactive.estimatedRequiredMonths,0);
+  assert.equal(data.metrics.requiredMinutes,1104*180+60);
+  assert.equal(data.metrics.requiredMinutes,data.contractors.reduce((n,p)=>n+p.requiredMinutes,0));
+  assert.equal(data.metrics.estimatedRequiredPersonMonths,1104);
+  assert.equal(data.timesheet.requiredMinutes,data.metrics.requiredMinutes);
+  assert.ok(data.monthlyTimesheets.every(m=>m.requiredMinutes===60));
+  const september = await getDashboardData(rh,{year:2026,month:9});
+  assert.equal(september.contractors.find(p=>p.id===inactive.id).requiredMinutes,0);
+  assert.equal(september.contractors.find(p=>p.id===active.id).requiredMinutes,120);
+  const pj = await getDashboardData({...rh,id:active.id,role:"PJ"},{from:"2026-08-01",to:"2026-09-30"});
+  assert.equal(pj.metrics.requiredMinutes,180);
+  assert.equal(pj.metrics.estimatedRequiredPersonMonths,1);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("duplicated monthly records fail closed without repair or double counting", async () => {
+  boundary.tables.monthly_timesheets.push({...boundary.tables.monthly_timesheets[0],id:"duplicate-month"});
+  const before = structuredClone(boundary.tables);
+  await assert.rejects(()=>getDashboardData(rh,{year:2026,month:8}),/registro mensal duplicado/i);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("approval scope applies to all three types without changing any source row", async () => {
+  const base = {organization_id:"test-org",contractor_id:"person-0000",start_date:"2026-08-31",end_date:"2026-09-02",status:"REQUESTED"};
+  boundary.tables.leave_requests = [{...base,id:"leave-cross",requested_minutes:60,reserved_minutes:0,reason:"Fictício",requested_at:"2026-08-01T12:00:00Z"}];
+  boundary.tables.occurrences = [{...base,id:"occ-cross",minutes:60,type:"OTHER",calculation_effect:"DOES_NOT_CREDIT",description:"Fictício",created_at:"2026-08-01T12:00:00Z"}];
+  const before = structuredClone(boundary.tables);
+  const all = await getDashboardData(rh,{year:2026,month:10,approvalsScope:"all"});
+  assert.equal(all.authorizations.length,1105);
+  assert.deepEqual(all.requests.map(x=>x.id),["leave-cross"]);
+  assert.deepEqual(all.occurrences.map(x=>x.id),["occ-cross"]);
+  assert.equal(all.approvalsScope,"all");
+  const september = await getDashboardData(rh,{year:2026,month:9});
+  assert.equal(september.approvalsScope,"period");
+  assert.equal(september.requests.length,1); assert.equal(september.occurrences.length,1);
+  assert.equal(september.authorizations.length,0);
+  const october = await getDashboardData(rh,{year:2026,month:10,approvalsScope:"period"});
+  assert.equal(october.requests.length+october.occurrences.length+october.authorizations.length,0);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("all-date approvals retain organization and collaborator isolation, including DEV simulation", async () => {
+  boundary.tables.non_business_day_authorizations.push({...boundary.tables.non_business_day_authorizations[0],id:"outside",organization_id:"outside-org"});
+  for (const actor of [{...rh,id:"person-0000",role:"PJ"},await resolveViewActor({...rh,role:"DEV"},"person-1104")]) {
+    const data = await getDashboardData(actor,{year:2026,month:10,approvalsScope:"all"});
+    assert.equal(data.authorizations.length,1);
+    assert.ok(data.authorizations.every(a=>a.contractorId===actor.id));
+  }
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("dashboard endpoint rejects invalid approval scope and returns the selected scope", async () => {
+  const invalid = await dashboardRoute.GET(new Request("http://localhost/api/dashboard?approvalsScope=invalid"));
+  assert.equal(invalid.status,400);
+  assert.equal(invalid.headers.get("cache-control"),"private, no-store");
+  const response = await dashboardRoute.GET(new Request("http://localhost/api/dashboard?year=2026&month=10&approvalsScope=all"));
+  assert.equal(response.status,200); assert.equal((await response.json()).authorizations.length,1105);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
 test("dashboard consultation performs no persistence",async()=>{
   await getDashboardData(rh,{year:2026,month:8});
   assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
+});
+
+test("approval counters include requests waiting for adjustment",async()=>{
+  boundary.tables.non_business_day_authorizations[0].status="NEEDS_ADJUSTMENT";
+  const data=await getDashboardData(rh,{year:2026,month:10,approvalsScope:"all"});
+  assert.equal(data.metrics.pendingAuthorizations,1105);
 });
 test("dashboard does not load the administrative audit ledger", async () => {
   boundary.tables.audit_logs = Array.from({ length: 5000 }, (_, index) => ({ id: "audit-" + index }));

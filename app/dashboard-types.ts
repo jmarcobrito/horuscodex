@@ -18,8 +18,10 @@ export type DashboardContractor = {
   workedMinutes: number;
   consideredMinutes: number;
   requiredMinutes: number;
+  estimatedRequiredMonths?: number;
   fillPercentage: number;
-  averageDelayDays: number;
+  averageDelayDays: number | null;
+  unavailableRegistrationDates?: number;
   retroactiveEntries: number;
   timesheetStatus: "OPEN" | "CLOSED" | "REOPENED" | "MIXED";
 };
@@ -120,13 +122,18 @@ export type DashboardMonthlyTimesheet = {
   closedAt: string | null; closedByName: string | null;
 };
 
+export type ApprovalsScope = "period" | "all";
+
 export type DashboardData = {
+  timezone?: string;
+  approvalsScope?: ApprovalsScope;
   monthlyTimesheets?: DashboardMonthlyTimesheet[];
   period: DashboardPeriod;
   metrics: {
     activeContractors: number;
     workedMinutes: number;
     requiredMinutes: number;
+    estimatedRequiredPersonMonths?: number;
     positiveBalanceMinutes: number;
     negativeBalanceMinutes: number;
     pendingRequests: number;

@@ -360,6 +360,10 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .closing-issues li { margin: 12px 0; line-height: 1.6; }
 .closing-issues button { display: block; background: none; border: none; color: #5144bd; padding: 6px 0; text-align: left; text-decoration: underline; }
 .closing-empty, .request-focus { padding: 20px; }
+.approval-filters { padding: 20px; margin-bottom: 24px; }
+.approval-filters .form-grid { margin-top: 0; }
+.approval-filters label { min-width: 0; }
+.approval-filters p { margin: 12px 0 0; color: var(--muted, #696d80); font-size: 12px; }
 .closing-confirmation { padding: 22px 26px 25px; line-height: 1.65; }
 .closing-confirmation li { margin: 12px 0; }
 .closing-confirmation ul { padding-left: 20px; }
@@ -469,4 +473,18 @@ button:disabled { cursor:not-allowed; opacity:.62; }
   .sector-list { padding:4px 14px; }
   .sector-list article { grid-template-columns:1fr; gap:10px; }
   .sector-list .team-actions { grid-column:auto; }
+}
+
+/* Keep monthly context distinct from the selected days, without changing the dashboard layout. */
+.bank-scope,.monthly-context>p { color:var(--muted); font-size:12px; line-height:1.5; margin:12px 0 18px; }
+.monthly-context .timesheet-summary { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.monthly-context .timesheet-summary>div { min-width:0; }
+.team-stats { gap:16px 12px; }
+.team-stats p+p { padding-left:0; border-left:0; }
+.team-stats small { display:block; margin-top:6px; font-size:10px; line-height:1.4; color:var(--muted); }
+.team-stats+.team-actions { margin-top:18px; }
+@media (max-width:600px) {
+  .monthly-context .timesheet-summary { grid-template-columns:1fr; }
+  .monthly-context .timesheet-summary>div { border-right:0; border-bottom:1px solid var(--soft-line); }
+  .monthly-context .timesheet-summary>div:last-child { border-bottom:0; }
 }

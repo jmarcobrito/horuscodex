@@ -2,7 +2,8 @@ import type { DashboardData, DashboardEntry } from "../../app/dashboard-types";
 import type { ClosingSubmit, ClosingResult } from "../../app/closing-model";
 import type { HistoryVersion } from "../../app/EntryHistory";
 import { monthPeriod } from "../../app/period";
-import { buildPeriodSummary } from "../../db/dashboard-summary";
+import { buildPeriodSummary, requiredForPerson } from "../../db/dashboard-summary";
+import { civilDate, registrationDelayDays } from "../../db/civil-date";
 import { makeWorkflowDashboard, makeHistoryVersion } from "../fixtures/monthly-workflow.mjs";
 import { makeAdminData } from "../fixtures/dashboard.mjs";
 import { createMockRequest } from "./mock-request.mjs";
@@ -34,10 +35,16 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     while (cursor <= end) { months.push(getMonth(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)); cursor.setUTCDate(1); cursor.setUTCMonth(cursor.getUTCMonth() + 1); }
     const data = structuredClone(months[0] ?? august);
     data.period = period;
+    data.timezone = "America/Sao_Paulo";
+    const approvalsScope = url.searchParams.get("approvalsScope") ?? "period";
+    if (approvalsScope !== "all" && approvalsScope !== "period") throw Error("Escopo fictício inválido");
+    data.approvalsScope = approvalsScope;
+    const approvalMonths = [...dashboards.values()];
     data.entries = structuredClone(months.flatMap(m => m.entries).filter(e => e.workDate >= period.from && e.workDate <= period.to));
     data.monthlyTimesheets = months.every(m => m.monthlyTimesheets) ? structuredClone(months.flatMap(m => m.monthlyTimesheets!)) : undefined;
-    data.authorizations = structuredClone(months.flatMap(m => m.authorizations).filter(a => a.workDate >= period.from && a.workDate <= period.to));
-    data.occurrences = structuredClone(months.flatMap(m => m.occurrences).filter(o => o.startDate <= period.to && o.endDate >= period.from));
+    data.authorizations = structuredClone(approvalMonths.flatMap(m => m.authorizations).filter(a => approvalsScope === "all" || (a.workDate >= period.from && a.workDate <= period.to)));
+    data.occurrences = structuredClone(approvalMonths.flatMap(m => m.occurrences).filter(o => approvalsScope === "all" || (o.startDate <= period.to && o.endDate >= period.from)));
+    data.requests = structuredClone(approvalMonths.flatMap(m => m.requests).filter(r => approvalsScope === "all" || (r.startDate <= period.to && r.endDate >= period.from)));
     const id = role === "pj" ? "person-1" : url.searchParams.get("viewAs");
     if (id) {
       data.contractors = data.contractors.filter(p => p.id === id);
@@ -45,19 +52,29 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       data.monthlyTimesheets = data.monthlyTimesheets?.filter(m => m.contractorId === id);
       data.occurrences = data.occurrences.filter(o => o.contractorId === id);
       data.authorizations = data.authorizations.filter(a => a.contractorId === id);
-      data.requests = []; data.balanceLots = []; data.balanceTransactions = [];
+      data.requests = data.requests.filter(r => r.contractorId === id); data.balanceLots = []; data.balanceTransactions = [];
     }
     for (const person of data.contractors) {
       const entries = data.entries.filter(e => e.contractorId === person.id);
       const sheets = data.monthlyTimesheets?.filter(m => m.contractorId === person.id) ?? [];
       person.workedMinutes = entries.reduce((n, e) => n + e.calculatedMinutes, 0);
       person.consideredMinutes = entries.reduce((n, e) => n + e.eligibleMinutes, 0) + sheets.reduce((n, m) => n + m.creditedMinutes, 0);
-      person.requiredMinutes = sheets.reduce((n, m) => n + m.requiredMinutes, 0) || 480 * months.length;
+      const requirement = requiredForPerson(sheets, person.status === "ACTIVE", 480, months.length);
+      person.requiredMinutes = requirement.requiredMinutes;
+      person.estimatedRequiredMonths = requirement.estimatedMonths;
+      person.fillPercentage = person.requiredMinutes ? Math.min(100, Math.round(person.consideredMinutes / person.requiredMinutes * 100)) : 0;
       person.timesheetStatus = sheets[0]?.status ?? "OPEN";
+      const delays = entries.map(e => registrationDelayDays(e.workDate, e.createdAt, data.timezone!));
+      const validDelays = delays.filter((value): value is number => value !== null);
+      person.averageDelayDays = validDelays.length ? Math.round(validDelays.reduce((n, value) => n + value, 0) / validDelays.length) : null;
+      person.unavailableRegistrationDates = delays.length - validDelays.length;
+      person.retroactiveEntries = validDelays.filter(value => value > 0).length;
+      person.lastEntryDate = entries.map(e => e.workDate).sort().at(-1) ?? null;
+      person.lastEntryAt = entries.filter(e => civilDate(e.createdAt, data.timezone!) !== null).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]?.createdAt ?? null;
     }
     const summary = buildPeriodSummary({ users: data.contractors, entries: data.entries, timesheets: data.monthlyTimesheets ?? [], requiredPerMonth: 480, monthCount: months.length });
     data.timesheet = { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: data.monthlyTimesheets?.every(m => m.status === "CLOSED") ? "CLOSED" : "OPEN" };
-    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, pendingAuthorizations: data.authorizations.filter(a => a.status === "REQUESTED").length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
+    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, estimatedRequiredPersonMonths: summary.estimatedRequiredPersonMonths, pendingRequests: data.requests.filter(r => r.status === "REQUESTED").length, pendingAuthorizations: data.authorizations.filter(a => (a.status === "REQUESTED" || a.status === "NEEDS_ADJUSTMENT")).length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
     return data;
   }
   const snapshot = () => structuredClone({ entries: [...dashboards.values()].flatMap(m => m.entries), versions });
@@ -65,10 +82,27 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     const mode = controls.historyMode;
     if (mode === "slow") await pause(2500);
     if (mode === "error") return Response.json({ error: "Falha fictícia no histórico" }, { status: 503 });
-    return Response.json({ versions: mode === "empty" ? [] : structuredClone(versions[id] ?? []) });
+    const names = new Map([...august.contractors.map(person => [person.id, person.name] as const), ["test-rh", "Marina Exemplo"] as const]);
+    return Response.json({ timezone: "America/Sao_Paulo", versions: mode === "empty" ? [] : structuredClone(versions[id] ?? []).map(version => ({ ...version, changed_by_name: names.get(version.changed_by) ?? null })) });
   };
   const raw = (entry: DashboardEntry) => ({ start_time: entry.startTime, end_time: entry.endTime, break_minutes: entry.breakMinutes, calculated_minutes: entry.calculatedMinutes, notes: entry.notes });
   const { request, calls } = createMockRequest({
+    // Transport fixture only: 8h is a deterministic UI error threshold, not a business policy.
+    "POST /api/leave-requests": (_url: URL, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      if (!Number.isInteger(body.requestedMinutes) || body.requestedMinutes <= 0) return Response.json({ error: "Quantidade fictícia inválida." }, { status: 400 });
+      if (body.requestedMinutes > 480) return Response.json({ error: "Saldo fictício insuficiente. Neste ensaio, use até 8 horas." }, { status: 409 });
+      const contractorId = role === "pj" ? "person-1" : body.contractorId;
+      const [year, month] = String(body.startDate).split("-").map(Number);
+      const data = getMonth(year, month);
+      const person = data.contractors.find(p => p.id === contractorId);
+      if (!person) return Response.json({ error: "Pessoa fora da fixture." }, { status: 404 });
+      const item = { id: "fixture-leave-" + (data.requests.length + 1), contractorId, contractorName: person.name,
+        startDate: body.startDate, endDate: body.endDate, requestedMinutes: body.requestedMinutes,
+        reservedMinutes: 0, status: "REQUESTED", reason: body.reason, requestedAt: "2026-09-05T12:00:00Z", decisionNotes: "" };
+      data.requests.push(item);
+      return Response.json({ id: item.id, status: item.status, message: "Solicitação fictícia enviada. Nenhum dado real foi alterado." }, { status: 201 });
+    },
     "POST /api/timesheets": async (_url: URL, init: RequestInit) => {
       if (role === "pj") return Response.json({ error: "Apenas o RH pode fechar o mês." }, { status: 403 });
       const body = JSON.parse(String(init.body));
