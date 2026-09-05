@@ -1,4 +1,4 @@
-import type { DashboardData, DashboardPeriod } from "./dashboard-types";
+import type { ApprovalsScope, DashboardData, DashboardPeriod } from "./dashboard-types";
 import type { Section } from "./HorusViews";
 import { asFullMonth, samePeriod } from "./period";
 
@@ -15,7 +15,8 @@ export type WorkspaceAction =
   | { type: "success"; key: string; requestId: number; data: DashboardData }
   | { type: "failure"; key: string; requestId: number; message: string }
   | { type: "invalidate" };
-export function workspaceKey(role: "rh" | "pj", section: Section, viewAsId = "") { return role + ":" + (viewAsId || "self") + ":" + section; }
+export function workspaceKey(role: "rh" | "pj", section: Section, viewAsId = "", approvalsScope: ApprovalsScope = "period") { return role + ":" + (viewAsId || "self") + ":" + section + (section === "requests" ? ":" + approvalsScope : ""); }
+export function workspaceApprovalsScope(key: string): ApprovalsScope { return key.endsWith(":requests:all") ? "all" : "period"; }
 function emptySlot(period: DashboardPeriod | null): WorkspaceSlot { return { period, data: null, requestId: -1, loading: false, error: null }; }
 export function initialWorkspace(key: string, data: DashboardData): WorkspaceState { return { [key]: { ...emptySlot(data.period), data } }; }
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
@@ -25,6 +26,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
   const slot = state[action.key];
   if (!slot || slot.requestId !== action.requestId) return state;
   if (action.type === "failure") return { ...state, [action.key]: { ...slot, data: null, loading: false, error: action.message } };
+  if ((action.data.approvalsScope ?? "period") !== workspaceApprovalsScope(action.key)) {
+    return { ...state, [action.key]: { ...slot, data: null, loading: false, error: "A resposta não corresponde ao filtro de datas escolhido. Tente novamente." } };
+  }
   if (!slot.period || !samePeriod(slot.period, action.data.period)) {
     return { ...state, [action.key]: { ...slot, data: null, loading: false, error: "A resposta não corresponde ao período escolhido. Tente novamente." } };
   }

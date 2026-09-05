@@ -120,7 +120,10 @@ export type DashboardMonthlyTimesheet = {
   closedAt: string | null; closedByName: string | null;
 };
 
+export type ApprovalsScope = "period" | "all";
+
 export type DashboardData = {
+  approvalsScope?: ApprovalsScope;
   monthlyTimesheets?: DashboardMonthlyTimesheet[];
   period: DashboardPeriod;
   metrics: {

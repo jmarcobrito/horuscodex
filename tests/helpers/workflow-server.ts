@@ -34,10 +34,15 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     while (cursor <= end) { months.push(getMonth(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)); cursor.setUTCDate(1); cursor.setUTCMonth(cursor.getUTCMonth() + 1); }
     const data = structuredClone(months[0] ?? august);
     data.period = period;
+    const approvalsScope = url.searchParams.get("approvalsScope") ?? "period";
+    if (approvalsScope !== "all" && approvalsScope !== "period") throw Error("Escopo fictício inválido");
+    data.approvalsScope = approvalsScope;
+    const approvalMonths = [...dashboards.values()];
     data.entries = structuredClone(months.flatMap(m => m.entries).filter(e => e.workDate >= period.from && e.workDate <= period.to));
     data.monthlyTimesheets = months.every(m => m.monthlyTimesheets) ? structuredClone(months.flatMap(m => m.monthlyTimesheets!)) : undefined;
-    data.authorizations = structuredClone(months.flatMap(m => m.authorizations).filter(a => a.workDate >= period.from && a.workDate <= period.to));
-    data.occurrences = structuredClone(months.flatMap(m => m.occurrences).filter(o => o.startDate <= period.to && o.endDate >= period.from));
+    data.authorizations = structuredClone(approvalMonths.flatMap(m => m.authorizations).filter(a => approvalsScope === "all" || (a.workDate >= period.from && a.workDate <= period.to)));
+    data.occurrences = structuredClone(approvalMonths.flatMap(m => m.occurrences).filter(o => approvalsScope === "all" || (o.startDate <= period.to && o.endDate >= period.from)));
+    data.requests = structuredClone(approvalMonths.flatMap(m => m.requests).filter(r => approvalsScope === "all" || (r.startDate <= period.to && r.endDate >= period.from)));
     const id = role === "pj" ? "person-1" : url.searchParams.get("viewAs");
     if (id) {
       data.contractors = data.contractors.filter(p => p.id === id);
@@ -57,7 +62,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     }
     const summary = buildPeriodSummary({ users: data.contractors, entries: data.entries, timesheets: data.monthlyTimesheets ?? [], requiredPerMonth: 480, monthCount: months.length });
     data.timesheet = { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: data.monthlyTimesheets?.every(m => m.status === "CLOSED") ? "CLOSED" : "OPEN" };
-    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, pendingAuthorizations: data.authorizations.filter(a => a.status === "REQUESTED").length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
+    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, pendingRequests: data.requests.filter(r => r.status === "REQUESTED").length, pendingAuthorizations: data.authorizations.filter(a => (a.status === "REQUESTED" || a.status === "NEEDS_ADJUSTMENT")).length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
     return data;
   }
   const snapshot = () => structuredClone({ entries: [...dashboards.values()].flatMap(m => m.entries), versions });

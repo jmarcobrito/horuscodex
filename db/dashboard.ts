@@ -1,6 +1,6 @@
 import type {
   DashboardAuthorization, DashboardBalanceLot, DashboardBalanceTransaction,
-  DashboardContractor, DashboardData, DashboardEntry, DashboardOccurrence, DashboardRequest,
+  ApprovalsScope, DashboardContractor, DashboardData, DashboardEntry, DashboardOccurrence, DashboardRequest,
 } from "../app/dashboard-types";
 import { projectMonthlyTimesheet, type MonthlyTimesheetRow } from "./monthly-timesheet-view";
 import type { HorusActor } from "./actor";
@@ -9,7 +9,7 @@ import { getSupabaseAdmin } from "./supabase";
 import { readAllRows } from "./read-all";
 import { deadlineStatus } from "./workflow-rules";
 
-type PeriodInput = { year?: number; month?: number; from?: string; to?: string };
+type PeriodInput = { year?: number; month?: number; from?: string; to?: string; approvalsScope?: ApprovalsScope };
 type UserRow = { id: string; name: string; email: string; status: "ACTIVE" | "INACTIVE"; sector_id: string | null; sectors: { name: string } | { name: string }[] | null };
 type EntryRow = { id: string; contractor_id: string; work_date: string; start_time: string; end_time: string; break_minutes: number; calculated_minutes: number; eligible_minutes: number; non_business_day_status: string; notes: string; created_at: string; updated_at: string };
 type LotRow = { id: string; contractor_id: string; type: "CREDIT" | "DEBIT"; original_minutes: number; remaining_minutes: number; reserved_minutes: number; origin_date: string; deadline_date: string; status: string };
@@ -50,8 +50,13 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   let lotsQuery = admin.from("hour_balance_lots").select("id,contractor_id,type,original_minutes,remaining_minutes,reserved_minutes,origin_date,deadline_date,status", { count: "exact" }).eq("organization_id", actor.organizationId).order("origin_date").order("id");
   let transactionsQuery = admin.from("hour_balance_transactions").select("id,contractor_id,lot_id,type,minutes,description,created_at", { count: "exact" }).eq("organization_id", actor.organizationId).order("created_at", { ascending: false }).order("id");
   let requestsQuery = admin.from("leave_requests").select("id,contractor_id,start_date,end_date,requested_minutes,reserved_minutes,status,reason,requested_at,decision_notes", { count: "exact" }).eq("organization_id", actor.organizationId).order("requested_at", { ascending: false }).order("id");
-  let occurrencesQuery = admin.from("occurrences").select("id,contractor_id,type,start_date,end_date,minutes,calculation_effect,status,description,created_at,decision_notes", { count: "exact" }).eq("organization_id", actor.organizationId).lte("start_date", period.to).gte("end_date", period.from).order("created_at", { ascending: false }).order("id");
-  let authorizationsQuery = admin.from("non_business_day_authorizations").select("id,contractor_id,work_date,estimated_minutes,approved_minutes,reason,status,requested_at,decision_notes", { count: "exact" }).eq("organization_id", actor.organizationId).gte("work_date", period.from).lte("work_date", period.to).order("requested_at", { ascending: false }).order("id");
+  let occurrencesQuery = admin.from("occurrences").select("id,contractor_id,type,start_date,end_date,minutes,calculation_effect,status,description,created_at,decision_notes", { count: "exact" }).eq("organization_id", actor.organizationId).order("created_at", { ascending: false }).order("id");
+  let authorizationsQuery = admin.from("non_business_day_authorizations").select("id,contractor_id,work_date,estimated_minutes,approved_minutes,reason,status,requested_at,decision_notes", { count: "exact" }).eq("organization_id", actor.organizationId).order("requested_at", { ascending: false }).order("id");
+  if (input.approvalsScope !== "all") {
+    requestsQuery = requestsQuery.lte("start_date", period.to).gte("end_date", period.from);
+    occurrencesQuery = occurrencesQuery.lte("start_date", period.to).gte("end_date", period.from);
+    authorizationsQuery = authorizationsQuery.gte("work_date", period.from).lte("work_date", period.to);
+  }
   if (actor.role === "PJ") {
     usersQuery = usersQuery.eq("id", actor.id); entriesQuery = entriesQuery.eq("contractor_id", actor.id); timesheetsQuery = timesheetsQuery.eq("contractor_id", actor.id);
     lotsQuery = lotsQuery.eq("contractor_id", actor.id); transactionsQuery = transactionsQuery.eq("contractor_id", actor.id); requestsQuery = requestsQuery.eq("contractor_id", actor.id);
@@ -111,9 +116,10 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   });
   const statuses = new Set(timesheets.map((row) => row.status));
   return {
+    approvalsScope: input.approvalsScope ?? "period",
     period,
     monthlyTimesheets: timesheets.map(row => projectMonthlyTimesheet(row, names)),
-    metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT" && lot.status !== "EXPIRED"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED").length },
+    metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT" && lot.status !== "EXPIRED"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED" || row.status === "NEEDS_ADJUSTMENT").length },
     timesheet: { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" },
     policy: { monthlyRequiredMinutes: requiredPerMonth, positiveBalanceAfterDeadlinePolicy: policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE", minimumLeaveNoticeDays: policyRow?.minimum_leave_notice_days ?? null, retroactiveBatchThreshold: policyRow?.retroactive_batch_threshold ?? 3 },
     contractors, entries: dashboardEntries, balanceLots, balanceTransactions, requests: dashboardRequests,

@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, a tarefa 1 foi implementada e validada localmente; tarefas 2–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1 e 2 foram implementadas e validadas localmente; tarefas 3–7 continuam pendentes. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -109,7 +109,7 @@ setModal("leave");
 
 **Interfaces:** adicionar `ApprovalsScope = "period" | "all"`; opção `approvalsScope?: ApprovalsScope` em `PeriodInput`; resposta `DashboardData.approvalsScope?: ApprovalsScope`, ausência interpretada como `period` para fixtures antigas. `GET /api/dashboard?...&approvalsScope=all` continua autenticado e somente leitura. Parâmetro ausente usa `period`, inválido retorna 400.
 
-- [ ] Em `complete-reads.test.mjs`, usar a fixture existente com autorizações em agosto; chamar setembro com `approvalsScope: "all"` e afirmar que elas aparecem. Repetir com `period` e afirmar que não aparecem. Inserir folgas/ocorrências fictícias com datas de agosto e setembro, incluindo uma ocorrência atravessando meses, e exigir o mesmo resultado por interseção. Antes/depois: `assert.deepEqual(boundary.tables, before)` e `assert.equal(boundary.writes, 0)` / `rpcCalls === 0`.
+- [x] Em `complete-reads.test.mjs`, usar a fixture existente com autorizações em agosto; chamar setembro com `approvalsScope: "all"` e afirmar que elas aparecem. Repetir com `period` e afirmar que não aparecem. Inserir folgas/ocorrências fictícias com datas de agosto e setembro, incluindo uma ocorrência atravessando meses, e exigir o mesmo resultado por interseção. Antes/depois: `assert.deepEqual(boundary.tables, before)` e `assert.equal(boundary.writes, 0)` / `rpcCalls === 0`.
 
 ```js
 test("all-date approval read includes older requests without writes", async () => {
@@ -123,8 +123,8 @@ test("all-date approval read includes older requests without writes", async () =
 });
 ```
 
-- [ ] Rodar `node --test tests/complete-reads.test.mjs`; observar falha do novo contrato. Testar separadamente PJ e DEV como PJ, incluindo registros de outra organização, que nunca podem ser retornados.
-- [ ] Construir as três consultas sem datas primeiro; quando `approvalsScope !== "all"`, acrescentar os filtros abaixo. Preservar `organization_id`, restrição PJ, ordenação estável e `readAllRows` em todos os caminhos:
+- [x] Rodar `node --test tests/complete-reads.test.mjs`; observar falha do novo contrato. Testar separadamente PJ e DEV como PJ, incluindo registros de outra organização, que nunca podem ser retornados.
+- [x] Construir as três consultas sem datas primeiro; quando `approvalsScope !== "all"`, acrescentar os filtros abaixo. Preservar `organization_id`, restrição PJ, ordenação estável e `readAllRows` em todos os caminhos:
 
 ```ts
 requestsQuery = requestsQuery.lte("start_date", period.to).gte("end_date", period.from);
@@ -132,9 +132,9 @@ occurrencesQuery = occurrencesQuery.lte("start_date", period.to).gte("end_date",
 authorizationsQuery = authorizationsQuery.gte("work_date", period.from).lte("work_date", period.to);
 ```
 
-- [ ] Na interface, começar a aba Aprovações em “Todas as datas” / “Pendências”. A situação Pendências inclui REQUESTED e NEEDS_ADJUSTMENT; exibir separadamente “Aguardando decisão do RH” e “Aguardando ajuste”. Acrescentar seletores de tipo e pessoa; o filtro pessoa nunca amplia o conjunto autorizado. Dar a estados vazios o texto “Nenhuma pendência com estes filtros”.
-- [ ] Reutilizar `PeriodPicker` somente no modo “Período escolhido”. Não alterar automaticamente o mês do Painel. O foco vindo do fechamento abre o mês/pessoa do problema e torna esse filtro visível; “Limpar foco” não muda o mês das outras abas.
-- [ ] Estender `workspaceKey(role, section, viewAsId = "", approvalsScope: ApprovalsScope = "period")`: só para `requests`, adicionar `":" + approvalsScope`. Manter os demais resultados atuais. `HorusApp` deve usar essa chave em abertura, requisição, atualização e invalidação; incluir o escopo na URL e rejeitar resposta cujo escopo seja diferente. Guardar a escolha por perfil/pessoa visualizada; não reaproveitar respostas de outra identidade.
+- [x] Na interface, começar a aba Aprovações em “Todas as datas” / “Pendências”. A situação Pendências inclui REQUESTED e NEEDS_ADJUSTMENT; exibir separadamente “Aguardando decisão do RH” e “Aguardando ajuste”. Acrescentar seletores de tipo e pessoa; o filtro pessoa nunca amplia o conjunto autorizado. Dar a estados vazios o texto “Nenhuma pendência com estes filtros”.
+- [x] Reutilizar `PeriodPicker` somente no modo “Período escolhido”. Não alterar automaticamente o mês do Painel. O foco vindo do fechamento abre o mês/pessoa do problema e torna esse filtro visível; “Limpar foco” não muda o mês das outras abas.
+- [x] Estender `workspaceKey(role, section, viewAsId = "", approvalsScope: ApprovalsScope = "period")`: só para `requests`, adicionar `":" + approvalsScope`. Manter os demais resultados atuais. `HorusApp` deve usar essa chave em abertura, requisição, atualização e invalidação; incluir o escopo na URL e rejeitar resposta cujo escopo seja diferente. Guardar a escolha por perfil/pessoa visualizada; não reaproveitar respostas de outra identidade.
 
 ```js
 assert.notEqual(w.workspaceKey("rh", "requests", "", "all"),
@@ -143,8 +143,8 @@ assert.equal(w.workspaceKey("rh", "entries", "", "all"),
   w.workspaceKey("rh", "entries", "", "period"));
 ```
 
-- [ ] No simulador `createWorkflowServer`, aplicar as mesmas regras de escopo às arrays de pedidos e devolver `approvalsScope`. Cobrir alternância rápida entre escopos e resposta atrasada: a resposta anterior não substitui a última seleção. Contador do menu não deve ser apresentado como global se vier do escopo mensal; nesta entrega, rotular “Pendências deste período” quando aplicável.
-- [ ] Rodar as três suítes, conferir comportamento no preview fictício e fazer commit da tarefa. Revalidar que solicitar/decidir ainda usa as rotas transacionais existentes e que nenhuma consulta grava.
+- [x] No simulador `createWorkflowServer`, aplicar as mesmas regras de escopo às arrays de pedidos e devolver `approvalsScope`. Cobrir alternância rápida entre escopos e resposta atrasada: a resposta anterior não substitui a última seleção. Contador do menu não deve ser apresentado como global se vier do escopo mensal; nesta entrega, rotular “Pendências deste período” quando aplicável.
+- [x] Rodar as três suítes, conferir comportamento no preview fictício e fazer commit da tarefa. Revalidar que solicitar/decidir ainda usa as rotas transacionais existentes e que nenhuma consulta grava.
 
 ### Tarefa 3 — completar a carga de cada pessoa/mês sem gravar folhas
 

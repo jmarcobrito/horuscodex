@@ -1,4 +1,5 @@
 export { getDashboardData } from "../../db/dashboard";
+export * as dashboardRoute from "../../app/api/dashboard/route";
 export { getOptionalActor, requireActor, resolveViewActor } from "../../db/actor";
 export * as entriesRoute from "../../app/api/time-entries/route";
 export * as historyRoute from "../../app/api/time-entries/[id]/history/route";

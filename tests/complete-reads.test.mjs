@@ -3,15 +3,59 @@ import test, {beforeEach} from "node:test";
 import {fileURLToPath} from "node:url";
 import {runnerImport} from "vite";
 const fixture=fileURLToPath(new URL("./helpers/read-boundary.mjs",import.meta.url));
-const {module:{getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary,getAllReportRows}}=await runnerImport("./tests/helpers/read-harness.ts",{
+const {module:{dashboardRoute,getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary,getAllReportRows}}=await runnerImport("./tests/helpers/read-harness.ts",{
   configFile:false,envDir:false,resolve:{alias:["./supabase","./supabase-auth","../../../db/supabase","../../../../../db/supabase","../../../../db/supabase","../../../../db/supabase-auth"].map(find=>({find,replacement:fixture}))},
 });
 const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizationName:"Fictícia",name:"RH",email:"rh@example.com",role:"RH"};
 const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
+
+test("approval scope applies to all three types without changing any source row", async () => {
+  const base = {organization_id:"test-org",contractor_id:"person-0000",start_date:"2026-08-31",end_date:"2026-09-02",status:"REQUESTED"};
+  boundary.tables.leave_requests = [{...base,id:"leave-cross",requested_minutes:60,reserved_minutes:0,reason:"Fictício",requested_at:"2026-08-01T12:00:00Z"}];
+  boundary.tables.occurrences = [{...base,id:"occ-cross",minutes:60,type:"OTHER",calculation_effect:"DOES_NOT_CREDIT",description:"Fictício",created_at:"2026-08-01T12:00:00Z"}];
+  const before = structuredClone(boundary.tables);
+  const all = await getDashboardData(rh,{year:2026,month:10,approvalsScope:"all"});
+  assert.equal(all.authorizations.length,1105);
+  assert.deepEqual(all.requests.map(x=>x.id),["leave-cross"]);
+  assert.deepEqual(all.occurrences.map(x=>x.id),["occ-cross"]);
+  assert.equal(all.approvalsScope,"all");
+  const september = await getDashboardData(rh,{year:2026,month:9});
+  assert.equal(september.approvalsScope,"period");
+  assert.equal(september.requests.length,1); assert.equal(september.occurrences.length,1);
+  assert.equal(september.authorizations.length,0);
+  const october = await getDashboardData(rh,{year:2026,month:10,approvalsScope:"period"});
+  assert.equal(october.requests.length+october.occurrences.length+october.authorizations.length,0);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("all-date approvals retain organization and collaborator isolation, including DEV simulation", async () => {
+  boundary.tables.non_business_day_authorizations.push({...boundary.tables.non_business_day_authorizations[0],id:"outside",organization_id:"outside-org"});
+  for (const actor of [{...rh,id:"person-0000",role:"PJ"},await resolveViewActor({...rh,role:"DEV"},"person-1104")]) {
+    const data = await getDashboardData(actor,{year:2026,month:10,approvalsScope:"all"});
+    assert.equal(data.authorizations.length,1);
+    assert.ok(data.authorizations.every(a=>a.contractorId===actor.id));
+  }
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("dashboard endpoint rejects invalid approval scope and returns the selected scope", async () => {
+  const invalid = await dashboardRoute.GET(new Request("http://localhost/api/dashboard?approvalsScope=invalid"));
+  assert.equal(invalid.status,400);
+  assert.equal(invalid.headers.get("cache-control"),"private, no-store");
+  const response = await dashboardRoute.GET(new Request("http://localhost/api/dashboard?year=2026&month=10&approvalsScope=all"));
+  assert.equal(response.status,200); assert.equal((await response.json()).authorizations.length,1105);
+  assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
 test("dashboard consultation performs no persistence",async()=>{
   await getDashboardData(rh,{year:2026,month:8});
   assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
+});
+
+test("approval counters include requests waiting for adjustment",async()=>{
+  boundary.tables.non_business_day_authorizations[0].status="NEEDS_ADJUSTMENT";
+  const data=await getDashboardData(rh,{year:2026,month:10,approvalsScope:"all"});
+  assert.equal(data.metrics.pendingAuthorizations,1105);
 });
 test("dashboard does not load the administrative audit ledger", async () => {
   boundary.tables.audit_logs = Array.from({ length: 5000 }, (_, index) => ({ id: "audit-" + index }));

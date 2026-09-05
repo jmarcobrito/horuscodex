@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
+
+test("fixture all-date leave read includes August from September without touching daily history", async () => {
+  const server=createWorkflowServer("rh");
+  const before=server.snapshot();
+  await server.request("/api/leave-requests",{method:"POST",body:JSON.stringify({contractorId:"person-1",startDate:"2026-08-12",endDate:"2026-08-12",requestedMinutes:60,reason:"Fictício"})});
+  const all=await (await server.request("/api/dashboard?year=2026&month=9&approvalsScope=all")).json();
+  const period=await (await server.request("/api/dashboard?year=2026&month=9&approvalsScope=period")).json();
+  assert.equal(all.approvalsScope,"all"); assert.equal(all.requests.length,1);
+  assert.equal(period.requests.length,0);
+  assert.deepEqual(server.snapshot(),before);
+});
 test("isolated server never reaches external or unknown routes and scopes PJ data", async () => {
   const server = createWorkflowServer("pj");
   await assert.rejects(server.request("https://horuscodex.vercel.app/api/dashboard"), /externo/);
