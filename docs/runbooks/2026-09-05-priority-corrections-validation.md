@@ -297,3 +297,9 @@ O usuário autorizou preparar o PR e a liberação controlada. Isso não autoriz
 - Produção identificada por metadados Vercel, sem abrir o dashboard real: deployment `dpl_AQaQzaenYVgFKr3kVzT4qS3Hsy7u`, READY, target production, commit `213607ffc7629518f53c86cdb7945d0114632115`, alias `horuscodex.vercel.app`, sem erro de alias. Esse artefato é a referência anterior para reversão somente do aplicativo; reversão não executada.
 
 O PR deve permanecer em rascunho, com evidências e limites acima. Não há workflow GitHub Actions neste repositório; não apresentar ausência de checks como aprovação remota. Preview externo ainda não foi criado nem seu isolamento comprovado. Manter worktree e histórico local para revisão. Supabase e os dados reais de agosto não foram acessados nesta preparação.
+
+### PR aberto e verificado
+
+[PR #5 — Corrige consultas, aprovações e histórico sem alterar o banco](https://github.com/jmarcobrito/horuscodex/pull/5), aberto em rascunho contra `main`. Commit inicial publicado `2308ffe6847a3f4f449079cda3c6fba454807b67`: 8 commits novos e 33 arquivos, com lista remota conferida contra o escopo local. Nenhum SQL ou dependência incluído. O commit posterior apenas registra este resultado e o andamento do plano.
+
+Consulta após a abertura: nenhum status de CI nem execução de workflow de PR para o commit; não são testes aprovados remotamente. A lista Vercel continuou contendo somente a produção anterior READY, e sinalizou esse deployment como `isRollbackCandidate: true`. Nenhum novo deploy desta branch observado. Não houve merge, auto-merge, deploy manual ou alteração no Supabase. Aprovação específica do release e identificação do ambiente de preview continuam pendentes.
