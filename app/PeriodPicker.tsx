@@ -9,13 +9,14 @@ export type PeriodPickerProps = {
   value: DashboardPeriod | null;
   busy: boolean;
   allowRange: boolean;
+  variant?: "default" | "compact";
   onChange: (period: DashboardPeriod) => void;
 };
-export function PeriodPicker({ value, busy, allowRange, onChange }: PeriodPickerProps) {
+export function PeriodPicker({ value, busy, allowRange, onChange, variant = "default" }: PeriodPickerProps) {
   const month = value ? asFullMonth(value) : null;
   const previous = month ? shiftMonth(month, -1) : null;
   const next = month ? shiftMonth(month, 1) : null;
-  return <section className="period-panel panel" aria-label="Selecionar período">
+  return <section className={"period-panel panel" + (variant === "compact" ? " overview-period" : "")} aria-label="Selecionar período">
     <div className="month-selector">
       <span className="period-section-label">MÊS DE CONSULTA</span>
       <div className="month-selector-controls">
@@ -25,7 +26,7 @@ export function PeriodPicker({ value, busy, allowRange, onChange }: PeriodPicker
       </div>
       <span className="period-caption" aria-live="polite">{value ? monthLabel(value) : "Escolha o mês"}</span>
     </div>
-    {allowRange && <><div className="period-divider" aria-hidden="true" /><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></>}
+    {allowRange && (variant === "compact" ? <details className="overview-range"><summary>Outro intervalo</summary><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></details> : <><div className="period-divider" aria-hidden="true" /><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></>)}
   </section>;
 }
 function RangePicker({ value, busy, onChange }: Omit<PeriodPickerProps, "allowRange">) {

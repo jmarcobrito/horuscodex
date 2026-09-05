@@ -69,19 +69,19 @@ export function Overview({ data, onNavigate }: { data: DashboardData; onNavigate
   </>;
 }
 
-function submissionLabel(instant: string | null, timezone = "America/Sao_Paulo") {
+export function submissionLabel(instant: string | null, timezone = "America/Sao_Paulo") {
   if (instant === null) return "Sem envios válidos nesta consulta";
   const date = new Date(instant);
   if (!Number.isFinite(date.getTime())) return "Data não disponível";
   return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, dateStyle: "short", timeStyle: "short" }).format(date);
 }
-function RegistrationDelay({ person }: { person: DashboardContractor }) {
+export function RegistrationDelay({ person }: { person: DashboardContractor }) {
   return <>{person.averageDelayDays === null ? "Não disponível" : person.averageDelayDays + " dia(s) em média"}
     {(person.unavailableRegistrationDates ?? 0) > 0 && <small>{person.unavailableRegistrationDates} registro(s) com data inválida; fora do cálculo.</small>}
   </>;
 }
 
-function MonthlyContext({ context, estimatedMonths }: { context: ReturnType<typeof dashboardDisplay>["monthlyContext"]; estimatedMonths: number }) {
+export function MonthlyContext({ context, estimatedMonths }: { context: ReturnType<typeof dashboardDisplay>["monthlyContext"]; estimatedMonths: number }) {
   return <section className="monthly-context" aria-label="Contexto dos meses consultados">
     <h2 className="summary-title">Contexto dos meses consultados</h2>
     <p>Valores mensais completos, sem rateio. Não representam apenas os dias selecionados.</p>
