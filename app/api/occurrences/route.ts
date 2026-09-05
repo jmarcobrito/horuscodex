@@ -24,6 +24,10 @@ export async function POST(request: Request) {
   }
   try {
     const actor = await requireActor();
+    if (String(body.type) === "BANK_LEAVE" || String(body.calculationEffect ?? "") === "CONSUMES_BALANCE") {
+      return Response.json({ error: "Para usar o banco de horas, abra uma solicitação de folga." },
+        { status: 409, headers: { "cache-control": "private, no-store" } });
+    }
     const contractorId = actor.role === "PJ" ? actor.id : cleanText(body.contractorId, 200);
     if (!contractorId) return Response.json({ error: "Selecione o colaborador." }, { status: 400 });
     const requestedEffect = String(body.calculationEffect ?? "");

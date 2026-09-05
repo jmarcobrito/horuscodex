@@ -10,6 +10,31 @@ test("isolated server never reaches external or unknown routes and scopes PJ dat
   assert.deepEqual(data.contractors.map(p => p.id), ["person-1"]);
   assert.ok(data.entries.every(e => e.contractorId === "person-1"));
 });
+test("fictitious leave submission is scoped and never changes daily history", async () => {
+  const server = createWorkflowServer("pj");
+  const before = server.snapshot();
+  const response = await server.request("/api/leave-requests", { method: "POST", body: JSON.stringify({
+    contractorId: "person-2", startDate: "2026-08-12", endDate: "2026-08-12",
+    requestedMinutes: 120, reason: "Ensaio fictício",
+  }) });
+  assert.equal(response.status, 201);
+  const data = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(data.requests[0].contractorId, "person-1");
+  assert.equal(data.requests[0].requestedMinutes, 120);
+  assert.equal(data.requests[0].status, "REQUESTED");
+  assert.deepEqual(server.snapshot(), before);
+});
+test("fictitious insufficient leave balance returns a conflict", async () => {
+  const server = createWorkflowServer();
+  const response = await server.request("/api/leave-requests", { method: "POST", body: JSON.stringify({
+    contractorId: "person-1", startDate: "2026-08-12", endDate: "2026-08-12",
+    requestedMinutes: 600, reason: "Ensaio fictício",
+  }) });
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /Saldo fictício insuficiente/);
+  const data = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(data.requests.length, 0);
+});
 test("consultation, history and fictitious closing preserve days and versions", async () => {
   const server = createWorkflowServer();
   const before = server.snapshot();

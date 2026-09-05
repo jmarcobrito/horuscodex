@@ -45,7 +45,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       data.monthlyTimesheets = data.monthlyTimesheets?.filter(m => m.contractorId === id);
       data.occurrences = data.occurrences.filter(o => o.contractorId === id);
       data.authorizations = data.authorizations.filter(a => a.contractorId === id);
-      data.requests = []; data.balanceLots = []; data.balanceTransactions = [];
+      data.requests = data.requests.filter(r => r.contractorId === id); data.balanceLots = []; data.balanceTransactions = [];
     }
     for (const person of data.contractors) {
       const entries = data.entries.filter(e => e.contractorId === person.id);
@@ -69,6 +69,22 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
   };
   const raw = (entry: DashboardEntry) => ({ start_time: entry.startTime, end_time: entry.endTime, break_minutes: entry.breakMinutes, calculated_minutes: entry.calculatedMinutes, notes: entry.notes });
   const { request, calls } = createMockRequest({
+    // Transport fixture only: 8h is a deterministic UI error threshold, not a business policy.
+    "POST /api/leave-requests": (_url: URL, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      if (!Number.isInteger(body.requestedMinutes) || body.requestedMinutes <= 0) return Response.json({ error: "Quantidade fictícia inválida." }, { status: 400 });
+      if (body.requestedMinutes > 480) return Response.json({ error: "Saldo fictício insuficiente. Neste ensaio, use até 8 horas." }, { status: 409 });
+      const contractorId = role === "pj" ? "person-1" : body.contractorId;
+      const [year, month] = String(body.startDate).split("-").map(Number);
+      const data = getMonth(year, month);
+      const person = data.contractors.find(p => p.id === contractorId);
+      if (!person) return Response.json({ error: "Pessoa fora da fixture." }, { status: 404 });
+      const item = { id: "fixture-leave-" + (data.requests.length + 1), contractorId, contractorName: person.name,
+        startDate: body.startDate, endDate: body.endDate, requestedMinutes: body.requestedMinutes,
+        reservedMinutes: 0, status: "REQUESTED", reason: body.reason, requestedAt: "2026-09-05T12:00:00Z", decisionNotes: "" };
+      data.requests.push(item);
+      return Response.json({ id: item.id, status: item.status, message: "Solicitação fictícia enviada. Nenhum dado real foi alterado." }, { status: 201 });
+    },
     "POST /api/timesheets": async (_url: URL, init: RequestInit) => {
       if (role === "pj") return Response.json({ error: "Apenas o RH pode fechar o mês." }, { status: 403 });
       const body = JSON.parse(String(init.body));
