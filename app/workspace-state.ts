@@ -7,17 +7,17 @@ export function firstVisitPeriod(section: Section, source: DashboardPeriod | nul
   return source ?? initial;
 }
 
-export type WorkspaceSlot = { period: DashboardPeriod | null; data: DashboardData | null; requestId: number; loading: boolean; error: string | null };
+export type WorkspaceSlot = { period: DashboardPeriod | null; data: DashboardData | null; requestId: number; loading: boolean; error: string | null; receivedAt: string | null };
 export type WorkspaceState = Record<string, WorkspaceSlot>;
 export type WorkspaceAction =
   | { type: "open"; key: string; period: DashboardPeriod | null }
   | { type: "start"; key: string; period: DashboardPeriod; requestId: number }
-  | { type: "success"; key: string; requestId: number; data: DashboardData }
+  | { type: "success"; key: string; requestId: number; data: DashboardData; receivedAt?: string }
   | { type: "failure"; key: string; requestId: number; message: string }
   | { type: "invalidate" };
 export function workspaceKey(role: "rh" | "pj", section: Section, viewAsId = "", approvalsScope: ApprovalsScope = "period") { return role + ":" + (viewAsId || "self") + ":" + section + (section === "requests" ? ":" + approvalsScope : ""); }
 export function workspaceApprovalsScope(key: string): ApprovalsScope { return key.endsWith(":requests:all") ? "all" : "period"; }
-function emptySlot(period: DashboardPeriod | null): WorkspaceSlot { return { period, data: null, requestId: -1, loading: false, error: null }; }
+function emptySlot(period: DashboardPeriod | null): WorkspaceSlot { return { period, data: null, requestId: -1, loading: false, error: null, receivedAt: null }; }
 export function initialWorkspace(key: string, data: DashboardData): WorkspaceState { return { [key]: { ...emptySlot(data.period), data } }; }
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   if (action.type === "invalidate") return Object.fromEntries(Object.entries(state).map(([key, slot]) => [key, emptySlot(slot.period)]));
@@ -25,12 +25,13 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
   if (action.type === "start") return { ...state, [action.key]: { ...emptySlot(action.period), requestId: action.requestId, loading: true } };
   const slot = state[action.key];
   if (!slot || slot.requestId !== action.requestId) return state;
-  if (action.type === "failure") return { ...state, [action.key]: { ...slot, data: null, loading: false, error: action.message } };
+  if (action.type === "failure") return { ...state, [action.key]: { ...slot, data: null, loading: false, error: action.message, receivedAt: null } };
   if ((action.data.approvalsScope ?? "period") !== workspaceApprovalsScope(action.key)) {
-    return { ...state, [action.key]: { ...slot, data: null, loading: false, error: "A resposta não corresponde ao filtro de datas escolhido. Tente novamente." } };
+    return { ...state, [action.key]: { ...slot, data: null, loading: false, receivedAt: null, error: "A resposta não corresponde ao filtro de datas escolhido. Tente novamente." } };
   }
   if (!slot.period || !samePeriod(slot.period, action.data.period)) {
-    return { ...state, [action.key]: { ...slot, data: null, loading: false, error: "A resposta não corresponde ao período escolhido. Tente novamente." } };
+    return { ...state, [action.key]: { ...slot, data: null, loading: false, receivedAt: null, error: "A resposta não corresponde ao período escolhido. Tente novamente." } };
   }
-  return { ...state, [action.key]: { ...slot, data: action.data, loading: false, error: null } };
+  const receivedAt = action.receivedAt && Number.isFinite(Date.parse(action.receivedAt)) ? action.receivedAt : null;
+  return { ...state, [action.key]: { ...slot, data: action.data, loading: false, error: null, receivedAt } };
 }

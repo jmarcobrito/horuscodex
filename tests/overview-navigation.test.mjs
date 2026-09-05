@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { runnerImport } from "vite";
+import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
+test("explicit navigation carries month and scope without mutating data or guessing a partial month", async () => {
+  const { module: n } = await runnerImport("./app/overview-navigation.ts", { configFile: false, envDir: false });
+  const data = makeWorkflowDashboard(), before = structuredClone(data);
+  const filters = { personId: null, sectorId: null, status: "READY" };
+  const person = n.overviewTarget(data, filters, { kind: "person", personId: "person-2" });
+  assert.equal(person.section, "entries");
+  assert.equal(person.entriesMode, "collaborator");
+  assert.equal(person.scope.personId, "person-2");
+  assert.deepEqual(person.period, data.period);
+  assert.equal(person.workDate, "2026-08-01");
+  assert.equal(n.overviewTarget(data, filters, { kind: "closing" }).closingStatus, "READY");
+  assert.equal(n.overviewTarget(data, filters, { kind: "pending" }).closingStatus, "PENDING");
+  assert.equal(n.overviewTarget(data, filters, { kind: "daily" }).entriesMode, "day");
+  assert.equal(n.overviewTarget(data, filters, { kind: "balance" }).closingStatus, "all");
+  assert.throws(() => n.overviewTarget(data, filters, { kind: "person", personId: "missing" }));
+  assert.throws(() => n.overviewTarget(data, { ...filters, sectorId: "missing" }, { kind: "person", personId: "person-1" }));
+  assert.deepEqual(data, before);
+  data.period.to = "2026-09-15";
+  for (const kind of ["closing", "pending", "daily", "person"]) assert.throws(() => n.overviewTarget(data, filters, { kind, personId: "person-1" }));
+  assert.equal(n.overviewTarget(data, filters, { kind: "balance" }).period.to, "2026-09-15");
+});
