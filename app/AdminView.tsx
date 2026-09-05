@@ -28,7 +28,7 @@ function actionLabel(action: string) {
 
 export function AdminView({ data, loading, onRole, onStatus, onPassword, onViewAs }: Props) {
   return <>
-    <section className="page-heading admin-heading"><div><span className="eyebrow">ACESSO EXCLUSIVO DEV</span><h1>Administração</h1><p>Gerencie perfil e acesso sem misturar a função da pessoa com a situação do cadastro.</p></div><span className="dev-protection-badge">DEV PROTEGIDO</span></section>
+    <section className="page-heading admin-heading"><div><span className="eyebrow">ACESSO EXCLUSIVO DEV</span><h2>Acessos</h2><p>Gerencie perfil e acesso sem misturar a função da pessoa com a situação do cadastro.</p></div><span className="dev-protection-badge">DEV PROTEGIDO</span></section>
     <section className="admin-summary">
       <article><span>Usuários</span><strong>{data?.users.length ?? "—"}</strong></article>
       <article><span>RH ativos</span><strong>{data?.users.filter((user) => user.role === "RH" && user.status === "ACTIVE").length ?? "—"}</strong></article>

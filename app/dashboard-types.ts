@@ -11,6 +11,8 @@ export type DashboardContractor = {
   email: string;
   initials: string;
   status: "ACTIVE" | "INACTIVE";
+  sectorId: string | null;
+  sectorName: string;
   lastEntryDate: string | null;
   lastEntryAt: string | null;
   workedMinutes: number;
@@ -104,16 +106,6 @@ export type DashboardAuthorization = {
   decisionNotes: string;
 };
 
-export type DashboardAudit = {
-  id: string;
-  userName: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-  reason: string;
-  createdAt: string;
-};
-
 export type DashboardPolicy = {
   monthlyRequiredMinutes: number;
   positiveBalanceAfterDeadlinePolicy: "ALLOW_AFTER_DEADLINE" | "BLOCK_AFTER_DEADLINE";
@@ -157,6 +149,5 @@ export type DashboardData = {
   requests: DashboardRequest[];
   occurrences: DashboardOccurrence[];
   authorizations: DashboardAuthorization[];
-  audits: DashboardAudit[];
 };
 

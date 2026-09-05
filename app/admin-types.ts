@@ -22,3 +22,18 @@ export type AdminData = {
   users: AdminUser[];
   audits: AdminAudit[];
 };
+
+export type AdminSector = {
+  id: string;
+  name: string;
+  status: "ACTIVE" | "INACTIVE";
+  memberCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SectorUpdate = {
+  name: string;
+  status: AdminSector["status"];
+  reason: string;
+};

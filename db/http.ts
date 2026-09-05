@@ -26,20 +26,40 @@ const databaseFailures: Record<string, { status: number; error: string }> = {
   "Reopen reason is required": { status: 409, error: "Informe uma justificativa para reabrir o mês." },
   "Request cannot be cancelled": { status: 409, error: "A solicitação não pode ser cancelada nesta situação." },
   "Request is not approved": { status: 409, error: "A solicitação ainda não foi aprovada." },
+  "Invalid sector values": { status: 400, error: "Dados do setor inválidos." },
+  "Invalid sector": { status: 400, error: "Setor inválido ou inativo." },
+  "Sector not found": { status: 404, error: "Setor não encontrado." },
+  "Contractor not found": { status: 404, error: "Colaborador não encontrado." },
 };
+
+export function privateJson(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("cache-control", "private, no-store");
+  return Response.json(body, { ...init, headers });
+}
+
+function privateResponse(response: Response) {
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "private, no-store");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 export function apiFailure(error: unknown, operation: string) {
   const actorResponse = actorErrorResponse(error);
-  if (actorResponse) return actorResponse;
+  if (actorResponse) return privateResponse(actorResponse);
   if (error instanceof SupabaseConfigurationError) {
-    return Response.json({ error: "Banco de dados não configurado." }, { status: 503 });
+    return privateJson({ error: "Banco de dados não configurado." }, { status: 503 });
   }
   // PostgREST returns plain objects, not necessarily Error instances.
   const message = error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : "";
+  const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "";
+  if (code === "23505" && /sectors_org_name_unique/.test(message)) {
+    return privateJson({ error: "Já existe um setor com este nome." }, { status: 409 });
+  }
   const known = Object.hasOwn(databaseFailures, message) ? databaseFailures[message] : undefined;
   // Do not expose/log row contents, SQL details or unrecognized database messages.
   console.error("[horus] " + operation + " failed", known ? message : "Unrecognized database error");
-  return Response.json({ error: known?.error ?? "Não foi possível concluir a operação." }, { status: known?.status ?? 502 });
+  return privateJson({ error: known?.error ?? "Não foi possível concluir a operação." }, { status: known?.status ?? 502 });
 }
 
 export function validIsoDate(value: unknown): value is string {

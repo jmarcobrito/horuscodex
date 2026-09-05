@@ -106,10 +106,10 @@ test("plain PostgREST errors retain useful safe Portuguese messages and HTTP sta
     ["Request is not pending", "P0001", 409, /solicitação/i],
   ]) {
     const response = apiFailure({ message, code }, "test");
-    assert.equal(response.status, status); assert.match((await response.json()).error, text);
+    assert.equal(response.status, status); assert.equal(response.headers.get("cache-control"), "private, no-store"); assert.match((await response.json()).error, text);
   }
   const response = apiFailure({ message: "secret-data-from-database", code: "XX000", details: "private" }, "test");
-  assert.equal(response.status, 502); assert.doesNotMatch(JSON.stringify(await response.json()), /secret|private/);
+  assert.equal(response.status, 502); assert.equal(response.headers.get("cache-control"), "private, no-store"); assert.doesNotMatch(JSON.stringify(await response.json()), /secret|private/);
 });
 test("closed RPC error becomes a conflict without retrying or issuing fallback writes", async () => {
   boundary.result.error = { message: "Timesheet is closed", code: "P0001" };

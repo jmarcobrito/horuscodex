@@ -53,3 +53,15 @@ test("an unselected screen stays unselected instead of guessing the current mont
   assert.equal(state["rh:self:closing"].data, null);
   assert.equal(state["rh:self:closing"].loading, false);
 });
+
+test("reports keep a period independent from the other RH workspaces", async () => {
+  const { module: w } = await runnerImport("./app/workspace-state.ts", options);
+  const august = makeWorkflowDashboard(2026, 8), september = makeWorkflowDashboard(2026, 9);
+  let state = w.initialWorkspace("rh:self:overview", august);
+  state = w.workspaceReducer(state, { type: "open", key: "rh:self:reports", period: september.period });
+  state = w.workspaceReducer(state, { type: "start", key: "rh:self:reports", period: september.period, requestId: 7 });
+  state = w.workspaceReducer(state, { type: "success", key: "rh:self:reports", requestId: 7, data: september });
+  assert.equal(state["rh:self:overview"].period.month, 8);
+  assert.equal(state["rh:self:reports"].period.month, 9);
+  assert.notEqual(w.workspaceKey("rh", "reports"), w.workspaceKey("rh", "overview"));
+});

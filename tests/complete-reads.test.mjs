@@ -3,14 +3,31 @@ import test, {beforeEach} from "node:test";
 import {fileURLToPath} from "node:url";
 import {runnerImport} from "vite";
 const fixture=fileURLToPath(new URL("./helpers/read-boundary.mjs",import.meta.url));
-const {module:{getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary}}=await runnerImport("./tests/helpers/read-harness.ts",{
+const {module:{getDashboardData,getOptionalActor,resolveViewActor,entriesRoute,historyRoute,signInRoute,reportsRoute,adminRoute,boundary,getAllReportRows}}=await runnerImport("./tests/helpers/read-harness.ts",{
   configFile:false,envDir:false,resolve:{alias:["./supabase","./supabase-auth","../../../db/supabase","../../../../../db/supabase","../../../../db/supabase","../../../../db/supabase-auth"].map(find=>({find,replacement:fixture}))},
 });
 const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizationName:"Fictícia",name:"RH",email:"rh@example.com",role:"RH"};
+const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
 test("dashboard consultation performs no persistence",async()=>{
   await getDashboardData(rh,{year:2026,month:8});
   assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
+});
+test("dashboard does not load the administrative audit ledger", async () => {
+  boundary.tables.audit_logs = Array.from({ length: 5000 }, (_, index) => ({ id: "audit-" + index }));
+  const data = await getDashboardData(rh, { year: 2026, month: 8 });
+  assert.equal("audits" in data, false);
+  assert.equal(boundary.readsByTable.audit_logs ?? 0, 0);
+});
+test("dashboard projects the organization-scoped current sector without changing time data",async()=>{
+  boundary.tables.sectors.push({id:"sector-engineering",organization_id:"test-org",name:"Engenharia",status:"ACTIVE"});
+  boundary.tables.users.find(user=>user.id==="person-0000").sector_id="sector-engineering";
+  const before=structuredClone(boundary.tables.time_entries);
+  const data=await getDashboardData(rh,{year:2026,month:8});
+  assert.deepEqual(data.contractors.find(person=>person.id==="person-0000")?.sectorId,"sector-engineering");
+  assert.deepEqual(data.contractors.find(person=>person.id==="person-0000")?.sectorName,"Engenharia");
+  assert.equal(data.contractors.find(person=>person.id==="person-0001")?.sectorName,"Sem setor definido");
+  assert.deepEqual(boundary.tables.time_entries,before);assert.equal(boundary.writes,0);
 });
 test("dashboard includes every row beyond service cap and retains inactive history",async()=>{
   const data=await getDashboardData(rh,{year:2026,month:8});
@@ -78,4 +95,14 @@ test("export and DEV user list include all records beyond the service cap",async
   boundary.tables.users.find(u=>u.id==="test-rh").role="DEV";
   const response=await adminRoute.GET();
   assert.equal(response.status,200);assert.equal((await response.json()).users.length,1106);
+});
+test("complete report reads reject a changed exact count instead of exporting a partial history",async()=>{
+  boundary.reportCountOffsetAfter=500;
+  await assert.rejects(()=>getAllReportRows(rh,reportFilters),/History changed during read/);
+  assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
+});
+test("complete report reads reject duplicate IDs instead of exporting an ambiguous history",async()=>{
+  boundary.tables.audit_logs.push({...boundary.tables.audit_logs[0]});
+  await assert.rejects(()=>getAllReportRows(rh,reportFilters),/History changed during read/);
+  assert.equal(boundary.writes,0);assert.equal(boundary.rpcCalls,0);
 });

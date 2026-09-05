@@ -1,5 +1,5 @@
 import { requireActor } from "../../../db/actor";
-import { apiFailure, cleanText, readJson } from "../../../db/http";
+import { apiFailure, cleanText, privateJson, readJson } from "../../../db/http";
 import { sameOriginFailure } from "../../../db/request-security";
 import { getSupabaseAdmin } from "../../../db/supabase";
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode cadastrar colaboradores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Usuário sem permissão para gerenciar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
     const existing = await admin.from("users").select("id").eq("email", email).maybeSingle();
     if (existing.error) throw existing.error;
@@ -94,7 +94,7 @@ export async function PATCH(request: Request) {
 
   try {
     const actor = await requireActor();
-    if (actor.role === "PJ") return Response.json({ error: "Apenas o RH pode alterar colaboradores." }, { status: 403 });
+    if (actor.role === "PJ") return Response.json({ error: "Usuário sem permissão para gerenciar colaboradores." }, { status: 403 });
     const admin = getSupabaseAdmin();
 
     if (body.action === "SET_PASSWORD") {
@@ -139,6 +139,18 @@ export async function PATCH(request: Request) {
       });
       if (audit.error) throw audit.error;
       return Response.json({ id: body.id, message: "Senha do colaborador atualizada." });
+    }
+
+    if (body.action === "SET_SECTOR") {
+      const sectorId = typeof body.sectorId === "string" && body.sectorId ? body.sectorId : null;
+      const reason = cleanText(body.reason);
+      if (reason.length < 5) return privateJson({ error: "Informe a justificativa da alteração." }, { status: 400 });
+      const changed = await admin.rpc("set_contractor_sector", {
+        p_organization_id: actor.organizationId, p_actor_id: actor.id,
+        p_contractor_id: body.id, p_sector_id: sectorId, p_reason: reason,
+      });
+      if (changed.error) throw changed.error;
+      return privateJson(changed.data);
     }
 
     if (!["ACTIVE", "INACTIVE"].includes(String(body.status))) {

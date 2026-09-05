@@ -7,23 +7,24 @@ import { Modal } from "./Modal";
 import { PeriodPicker } from "./PeriodPicker";
 import { asFullMonth, monthPeriod, periodQuery, samePeriod } from "./period";
 import { firstVisitPeriod, initialWorkspace, workspaceKey, workspaceReducer } from "./workspace-state";
-import { AdminView } from "./AdminView";
+import { AdministrationView } from "./AdministrationView";
 import { ClosingOverview } from "./ClosingOverview";
 import { ClosingConfirmation } from "./ClosingConfirmation";
 import type { ClosingCommand, ClosingIssue, ClosingRow, ClosingSubmit } from "./closing-model";
 import { createClosingSubmit, type WorkflowRequest } from "./closing-client";
 import { DeveloperViewBanner } from "./DeveloperViewBanner";
-import type { AdminData, AdminUser } from "./admin-types";
-import type { DashboardData, DashboardEntry, DashboardPeriod } from "./dashboard-types";
+import type { AdminData, AdminSector, AdminUser, SectorUpdate } from "./admin-types";
+import type { DashboardContractor, DashboardData, DashboardEntry, DashboardPeriod } from "./dashboard-types";
 import { SelectMenu } from "./SelectMenu";
+import { ReportsView } from "./reports/ReportsView";
 import {
-  BalanceView, EntriesView, formatDate, formatMinutes, Overview, ReportsView,
+  BalanceView, EntriesView, formatDate, formatMinutes, Overview,
   RequestsView, type Role, type Section, TeamView,
 } from "./HorusViews";
 
 type User = { name: string; email: string };
 type AccountRole = "dev" | Role;
-type ModalKind = "closing" | "entry" | "history" | "occurrence" | "leave" | "authorization" | "contractor" | "contractorPassword" | "policy" | null;
+type ModalKind = "closing" | "entry" | "history" | "occurrence" | "leave" | "authorization" | "contractor" | "contractorEdit" | "contractorPassword" | "policy" | null;
 type Confirmation = { title: string; description: string; confirmLabel: string; reasonRequired: boolean; danger?: boolean; onConfirm: (reason: string) => Promise<void> } | null;
 
 const rhNavItems: Array<{ id: Section; label: string; icon: string; devOnly?: boolean }> = [
@@ -33,7 +34,7 @@ const rhNavItems: Array<{ id: Section; label: string; icon: string; devOnly?: bo
   { id: "closing", label: "Fechamento do mês", icon: "◫" },
   { id: "team", label: "Pessoas", icon: "◎" },
   { id: "reports", label: "Relatórios", icon: "↗" },
-  { id: "admin", label: "Administração", icon: "⚙", devOnly: true },
+  { id: "admin", label: "Administração", icon: "⚙" },
 ];
 const collaboratorNavItems: Array<{ id: Section; label: string; icon: string }> = [
   { id: "entries", label: "Meu mês", icon: "▷" },
@@ -41,6 +42,10 @@ const collaboratorNavItems: Array<{ id: Section; label: string; icon: string }> 
   { id: "requests", label: "Solicitações", icon: "◇" },
 ];
 const sectionNames: Record<Section, string> = { overview: "Painel", entries: "Lançamentos", balance: "Banco de horas", requests: "Solicitações", closing: "Fechamento do mês", team: "Pessoas", reports: "Relatórios", admin: "Administração" };
+
+export function navigationItems(role: Role, isDev: boolean) {
+  return role === "rh" ? rhNavItems.filter(item => !item.devOnly || isDev) : collaboratorNavItems;
+}
 
 function minutesBetween(start: string, end: string, breakMinutes: number) {
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -69,10 +74,12 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const [refreshNotice, setRefreshNotice] = useState(false);
   const [rhDashboard, setRhDashboard] = useState(initialDashboard); const [viewedContractorId, setViewedContractorId] = useState("");
   const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const [sectors, setSectors] = useState<AdminSector[]>([]);
+  const [sectorsLoaded, setSectorsLoaded] = useState(false);
   const activeViewAs = isDev && viewMode === "pj" ? viewedContractorId : "";
   const activeKey = workspaceKey(role, section, activeViewAs);
   const activeSlot = workspaces[activeKey];
-  const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [], audits: [] };
+  const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [] };
   const dashboardQuery = periodQuery(activeSlot?.period ?? initialDashboard.period);
   const [loading, setLoading] = useState(false); const [notice, setNotice] = useState("");
   const [modal, setModal] = useState<ModalKind>(null); const [confirmation, setConfirmation] = useState<Confirmation>(null);
@@ -84,11 +91,12 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const [leaveForm, setLeaveForm] = useState({ contractorId: "", startDate: today, endDate: today, hours: "8", reason: "" });
   const [authorizationForm, setAuthorizationForm] = useState({ contractorId: "", workDate: today, hours: "8", reason: "" });
   const [contractorForm, setContractorForm] = useState({ name: "", email: "", password: "" });
+  const [contractorSectorForm, setContractorSectorForm] = useState({ id: "", name: "", email: "", currentSectorName: "", sectorId: "", reason: "" });
   const [contractorPasswordForm, setContractorPasswordForm] = useState({ id: "", name: "", password: "", scope: "team" as "team" | "admin" });
   const [policyForm, setPolicyForm] = useState({ monthlyHours: minutesToHours(initialDashboard.policy.monthlyRequiredMinutes), minimumNotice: String(initialDashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(initialDashboard.policy.retroactiveBatchThreshold), deadlinePolicy: initialDashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" });
   const calculated = useMemo(() => minutesBetween(entryForm.start, entryForm.end, Number(entryForm.breakMinutes)), [entryForm]);
   const initials = user.name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  const visibleNav = role === "rh" ? rhNavItems.filter((item) => !item.devOnly || isDev) : collaboratorNavItems;
+  const visibleNav = navigationItems(role, isDev);
   const pendingCount = activeSlot?.data ? dashboard.metrics.pendingRequests + dashboard.metrics.pendingOccurrences + dashboard.metrics.pendingAuthorizations : 0;
 
 
@@ -102,7 +110,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     const period = firstVisitPeriod(next, source, initialDashboard.period);
     dispatchWorkspace({ type: "open", key, period });
     closeModal(); setRequestFocus(undefined); setConfirmation(null); setSection(next); setSidebarOpen(false);
-    if (next === "admin" && isDev) void fetchAdmin();
+    if (next === "admin") void fetchAdministration();
     const targetPeriod = workspaces[key] ? workspaces[key].period : period;
     if (next !== "admin" && targetPeriod && !workspaces[key]?.data && !workspaces[key]?.loading) void loadWorkspace(key, targetPeriod, activeViewAs).catch(() => {});
   }
@@ -181,20 +189,52 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     } finally { mutationInFlight.current = false; setLoading(false); }
   }
 
-  async function fetchAdmin() {
+  async function loadSectors() {
+    const response = await request("/api/sectors", { cache: "no-store" });
+    const result = await response.json() as { sectors?: Array<{ id: string; name: string; status: "ACTIVE" | "INACTIVE"; created_at?: string; updated_at?: string }>; error?: string };
+    if (!response.ok || !Array.isArray(result.sectors)) throw new Error(result.error || "Não foi possível carregar os setores.");
+    setSectors(result.sectors.map(sector => ({
+      id: sector.id,
+      name: sector.name,
+      status: sector.status,
+      memberCount: 0,
+      createdAt: sector.created_at,
+      updatedAt: sector.updated_at,
+    })));
+    setSectorsLoaded(true);
+  }
+
+  async function loadAdmin() {
+    const response = await request("/api/admin/users", { cache: "no-store" });
+    const result = await response.json() as AdminData & { error?: string };
+    if (!response.ok) throw new Error(result.error || "Não foi possível carregar os acessos.");
+    setAdminData(result);
+  }
+
+  async function fetchAdministration() {
     setLoading(true);
-    try {
-      const response = await request("/api/admin/users", { cache: "no-store" });
-      const result = await response.json() as AdminData & { error?: string };
-      if (!response.ok) throw new Error(result.error || "Não foi possível carregar a Administração.");
-      setAdminData(result);
-    } catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível carregar a Administração."); }
+    try { await Promise.all([loadSectors(), isDev ? loadAdmin() : Promise.resolve()]); }
+    catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível carregar a Administração."); }
+    finally { setLoading(false); }
+  }
+
+  async function refreshSectors() {
+    setLoading(true);
+    try { await loadSectors(); return true; }
+    catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível carregar os setores."); return false; }
+    finally { setLoading(false); }
+  }
+
+  async function refreshAdmin() {
+    setLoading(true);
+    try { await loadAdmin(); }
+    catch (error) { showNotice(error instanceof Error ? error.message : "Não foi possível carregar os acessos."); }
     finally { setLoading(false); }
   }
 
   async function adminMutate(method: "PATCH", body: unknown, success: string, dismissModal = true) {
     const saved = await mutate("/api/admin/users", method, body, success, dismissModal);
-    if (saved) await fetchAdmin();
+    if (saved) await refreshAdmin();
     return saved;
   }
 
@@ -278,6 +318,40 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   async function submitPolicy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); await mutate("/api/policies", "PATCH", { monthlyRequiredMinutes: hoursToMinutes(policyForm.monthlyHours), minimumLeaveNoticeDays: policyForm.minimumNotice === "" ? null : Number(policyForm.minimumNotice), retroactiveBatchThreshold: Number(policyForm.batchThreshold), positiveBalanceAfterDeadlinePolicy: policyForm.deadlinePolicy, applyToOpenBalances: policyForm.applyToOpenBalances, reason: policyForm.reason }, "Políticas atualizadas e registradas na auditoria.");
   }
+  function openPolicy() {
+    const policy = rhDashboard.policy;
+    setPolicyForm({ monthlyHours: minutesToHours(policy.monthlyRequiredMinutes), minimumNotice: String(policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(policy.retroactiveBatchThreshold), deadlinePolicy: policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" });
+    setModal("policy");
+  }
+  async function createSector(name: string) {
+    const saved = await mutate("/api/sectors", "POST", { name }, "Setor criado.", false);
+    if (saved) await refreshSectors();
+    return saved;
+  }
+  async function updateSector(sector: AdminSector, update: SectorUpdate) {
+    const saved = await mutate("/api/sectors", "PATCH", { id: sector.id, ...update }, update.status === "ACTIVE" && sector.status === "INACTIVE" ? "Setor reativado." : update.status === "INACTIVE" && sector.status === "ACTIVE" ? "Setor inativado." : "Nome do setor atualizado.", false);
+    if (saved) await refreshSectors();
+    return saved;
+  }
+  function openEditContractor(person: DashboardContractor) {
+    setContractorSectorForm({ id: person.id, name: person.name, email: person.email, currentSectorName: person.sectorName, sectorId: person.sectorId ?? "", reason: "" });
+    setModal("contractorEdit");
+    if (!sectorsLoaded) void refreshSectors();
+  }
+  function submitContractorSector(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextSectorName = sectors.find(sector => sector.id === contractorSectorForm.sectorId)?.name ?? "Sem setor definido";
+    setConfirmation({
+      title: "Atualizar setor do colaborador",
+      description: `${contractorSectorForm.name} passará a ter o setor “${nextSectorName}”. Os registros históricos de ponto não serão alterados; os relatórios passam a associá-los ao setor atual do colaborador.`,
+      confirmLabel: "Atualizar setor",
+      reasonRequired: false,
+      onConfirm: async () => {
+        const ok = await mutate("/api/team", "PATCH", { id: contractorSectorForm.id, action: "SET_SECTOR", sectorId: contractorSectorForm.sectorId || null, reason: contractorSectorForm.reason }, "Setor do colaborador atualizado.", false);
+        if (ok) { setConfirmation(null); closeModal(); }
+      },
+    });
+  }
   async function decide(resource: "leave-requests" | "occurrences" | "non-business-authorizations", id: string, action: string) {
     const label = action === "APPROVE" ? "aprovar" : action === "REJECT" ? "rejeitar" : action === "UTILIZE" ? "confirmar a utilização" : action === "CANCEL" ? "cancelar" : "solicitar ajuste em";
     setConfirmation({ title: "Confirmar decisão", description: `Deseja ${label} este registro?`, confirmLabel: "Confirmar", reasonRequired: action === "REJECT" || action === "NEEDS_ADJUSTMENT", onConfirm: async (reason) => { const ok = await mutate(`/api/${resource}`, "PATCH", { id, action, notes: reason }, "Decisão registrada.", false); if (ok) setConfirmation(null); } });
@@ -299,8 +373,8 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon">{item.icon}</span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count">{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
     <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
-      {["overview", "entries", "closing", "reports"].includes(section) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview" || section === "reports"} onChange={changePeriod} />}
-      {section !== "admin" && !activeSlot?.data && <section className="panel workspace-status" role={activeSlot?.error ? "alert" : "status"}>
+      {["overview", "entries", "closing"].includes(section) && <PeriodPicker value={activeSlot?.period ?? null} busy={loading} allowRange={section === "overview"} onChange={changePeriod} />}
+      {section !== "admin" && section !== "reports" && !activeSlot?.data && <section className="panel workspace-status" role={activeSlot?.error ? "alert" : "status"}>
         <h1>{sectionNames[section]}</h1>
         <p>{activeSlot?.error ? "Não foi possível carregar este mês. " + activeSlot.error : activeSlot?.period ? "Carregando o período escolhido…" : "Escolha o mês para consultar esta tela."}</p>
         {activeSlot?.error && <button type="button" className="secondary-button" onClick={() => void refreshDashboard()}>Tentar novamente</button>}
@@ -310,9 +384,9 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
       {activeSlot?.data && section === "balance" && <BalanceView data={dashboard} />}
       {activeSlot?.data && section === "requests" && <RequestsView data={dashboard} role={role} requestFocus={requestFocus} onClearFocus={() => setRequestFocus(undefined)} readOnly={isDev && viewMode === "pj"} onNewOccurrence={() => { setOccurrenceForm({ contractorId: defaultContractorId(), type: "MEDICAL_CERTIFICATE", startDate: today, endDate: today, hours: "8", effect: "CREDITS_HOURS", description: "" }); setModal("occurrence"); }} onNewLeave={() => { setLeaveForm({ contractorId: defaultContractorId(), startDate: today, endDate: today, hours: "8", reason: "" }); setModal("leave"); }} onNewAuthorization={() => { setAuthorizationForm({ contractorId: requestFocus?.contractorId ?? defaultContractorId(), workDate: requestFocus?.workDate ?? today, hours: "8", reason: "" }); setModal("authorization"); }} onDecision={decide} />}
       {activeSlot?.data && section === "closing" && role === "rh" && <ClosingOverview data={dashboard} closingEnabled={Boolean(submitClosing)} onReview={(command, rows) => { setClosingReview(structuredClone({ command, rows })); setModal("closing"); }} onIssue={issue => void openClosingIssue(issue)} />}
-      {activeSlot?.data && section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onStatus={changeContractorStatus} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
-      {activeSlot?.data && section === "reports" && role === "rh" && <ReportsView data={dashboard} onPolicy={() => { setPolicyForm({ monthlyHours: minutesToHours(dashboard.policy.monthlyRequiredMinutes), minimumNotice: String(dashboard.policy.minimumLeaveNoticeDays ?? ""), batchThreshold: String(dashboard.policy.retroactiveBatchThreshold), deadlinePolicy: dashboard.policy.positiveBalanceAfterDeadlinePolicy, applyToOpenBalances: false, reason: "" }); setModal("policy"); }} />}
-      {section === "admin" && isDev && role === "rh" && <AdminView data={adminData} loading={loading} onRole={changeUserRole} onStatus={changeUserStatus} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}
+      {activeSlot?.data && section === "team" && role === "rh" && <TeamView data={dashboard} onNew={() => setModal("contractor")} onEdit={openEditContractor} onStatus={changeContractorStatus} onSetPassword={(id, name) => { setContractorPasswordForm({ id, name, password: "", scope: "team" }); setModal("contractorPassword"); }} />}
+      {activeSlot?.period && section === "reports" && role === "rh" && <ReportsView period={activeSlot.period} onPeriodChange={changePeriod} request={request} isDev={isDev} />}
+      {section === "admin" && role === "rh" && <AdministrationView isDev={isDev} sectors={sectors.map(sector => ({ ...sector, memberCount: rhDashboard.contractors.filter(person => person.sectorId === sector.id).length }))} adminData={adminData} policy={rhDashboard.policy} loading={loading} onCreateSector={createSector} onUpdateSector={updateSector} onPolicy={openPolicy} onRole={changeUserRole} onStatus={changeUserStatus} onViewAs={(target) => void switchToContractor(target.id)} onPassword={(target) => { setContractorPasswordForm({ id: target.id, name: target.name, password: "", scope: "admin" }); setModal("contractorPassword"); }} />}
     </div></main>
 
     {modal === "closing" && closingReview && <ClosingConfirmation command={closingReview.command} rows={closingReview.rows} submit={submitClosing} testMode={closingTestMode} onClose={requestCloseModal} onBusyChange={busy => { mutationInFlight.current = busy; setLoading(busy); }} onSettled={async () => { latestRequests.current.clear(); dispatchWorkspace({ type: "invalidate" }); await fetchDashboard(); }} />}
@@ -322,6 +396,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     {modal === "leave" && <Modal title="Solicitar folga" eyebrow="USO DE CRÉDITO" description="A aprovação reserva os créditos mais antigos pelo método FIFO." busy={loading} onClose={requestCloseModal}><form onSubmit={submitLeave}>{role === "rh" && <ContractorSelect value={leaveForm.contractorId} onChange={(contractorId) => setLeaveForm({ ...leaveForm, contractorId })} data={dashboard} />}<div className="form-grid"><label className="field">Data inicial<input type="date" value={leaveForm.startDate} onChange={(event) => setLeaveForm({ ...leaveForm, startDate: event.target.value })} required /></label><label className="field">Data final<input type="date" min={leaveForm.startDate} value={leaveForm.endDate} onChange={(event) => setLeaveForm({ ...leaveForm, endDate: event.target.value })} required /></label><label className="field">Quantidade de horas<input type="number" min="0.25" step="0.25" value={leaveForm.hours} onChange={(event) => setLeaveForm({ ...leaveForm, hours: event.target.value })} required /></label></div><label className="field full-field">Justificativa<textarea value={leaveForm.reason} onChange={(event) => setLeaveForm({ ...leaveForm, reason: event.target.value })} maxLength={2000} required /></label><ModalActions loading={loading} onCancel={requestCloseModal} label="Enviar solicitação" /></form></Modal>}
     {modal === "authorization" && <Modal title="Trabalho em dia não útil" eyebrow="AUTORIZAÇÃO PRÉVIA" description="Sem aprovação, o lançamento fica salvo, mas não entra no fechamento." busy={loading} onClose={requestCloseModal}><form onSubmit={submitAuthorization}>{role === "rh" && <ContractorSelect value={authorizationForm.contractorId} onChange={(contractorId) => setAuthorizationForm({ ...authorizationForm, contractorId })} data={dashboard} />}<div className="form-grid"><label className="field">Data<input type="date" value={authorizationForm.workDate} onChange={(event) => setAuthorizationForm({ ...authorizationForm, workDate: event.target.value })} required /></label><label className="field">Horas estimadas<input type="number" min="0.25" max="24" step="0.25" value={authorizationForm.hours} onChange={(event) => setAuthorizationForm({ ...authorizationForm, hours: event.target.value })} required /></label></div><label className="field full-field">Justificativa<textarea value={authorizationForm.reason} onChange={(event) => setAuthorizationForm({ ...authorizationForm, reason: event.target.value })} maxLength={2000} required /></label><ModalActions loading={loading} onCancel={requestCloseModal} label="Enviar solicitação" /></form></Modal>}
     {modal === "contractor" && <Modal title="Novo colaborador" eyebrow="CADASTRO" description="Defina uma senha inicial e compartilhe-a com o colaborador por um canal seguro." busy={loading} onClose={requestCloseModal}><form onSubmit={submitContractor}><label className="field full-field">Nome completo<input value={contractorForm.name} onChange={(event) => setContractorForm({ ...contractorForm, name: event.target.value })} maxLength={200} required /></label><label className="field full-field">E-mail<input type="email" value={contractorForm.email} onChange={(event) => setContractorForm({ ...contractorForm, email: event.target.value })} maxLength={320} required /></label><label className="field full-field">Senha inicial<input type="password" autoComplete="new-password" value={contractorForm.password} onChange={(event) => setContractorForm({ ...contractorForm, password: event.target.value })} minLength={8} maxLength={72} required /></label><div className="audit-note"><span>◈</span><p><strong>Sem envio de magic link</strong>O colaborador também poderá entrar com o Google, desde que use o mesmo e-mail cadastrado.</p></div><ModalActions loading={loading} onCancel={requestCloseModal} label="Cadastrar colaborador" /></form></Modal>}
+    {modal === "contractorEdit" && <Modal title="Editar colaborador" eyebrow="SETOR ATUAL" description={`${contractorSectorForm.name} · ${contractorSectorForm.email}`} busy={loading} onClose={requestCloseModal}><form onSubmit={submitContractorSector}><div className="audit-note"><span>◇</span><p><strong>Setor atual: {contractorSectorForm.currentSectorName}</strong>Somente setores ativos podem ser escolhidos para uma nova atribuição.</p></div><div className="field full-field"><span>Setor do colaborador</span><SelectMenu ariaLabel={`Setor de ${contractorSectorForm.name}`} value={contractorSectorForm.sectorId} disabled={loading} onChange={sectorId => setContractorSectorForm({ ...contractorSectorForm, sectorId })} options={[{ value: "", label: "Sem setor definido" }, ...sectors.filter(sector => sector.status === "ACTIVE").map(sector => ({ value: sector.id, label: sector.name }))]} /></div><label className="field full-field">Justificativa<textarea value={contractorSectorForm.reason} onChange={event => setContractorSectorForm({ ...contractorSectorForm, reason: event.target.value })} minLength={5} maxLength={2000} required /></label><div className="audit-note"><span>◈</span><p><strong>Histórico preservado</strong>Esta alteração não regrava lançamentos antigos. Os relatórios associam os registros ao setor atual do colaborador.</p></div><ModalActions loading={loading} onCancel={requestCloseModal} label="Revisar alteração" /></form></Modal>}
     {modal === "contractorPassword" && <Modal title="Definir senha" eyebrow="ACESSO DO USUÁRIO" description={`Crie uma nova senha para ${contractorPasswordForm.name}.`} busy={loading} onClose={requestCloseModal}><form onSubmit={submitContractorPassword}><label className="field full-field">Nova senha<input type="password" autoComplete="new-password" value={contractorPasswordForm.password} onChange={(event) => setContractorPasswordForm({ ...contractorPasswordForm, password: event.target.value })} minLength={8} maxLength={72} required autoFocus /></label><div className="audit-note"><span>◈</span><p><strong>Compartilhamento seguro</strong>A senha não será enviada por e-mail nem registrada na auditoria.</p></div><ModalActions loading={loading} onCancel={requestCloseModal} label="Salvar nova senha" /></form></Modal>}
     {modal === "policy" && <Modal title="Políticas da organização" eyebrow="REGRAS OPERACIONAIS" description="Alterações exigem justificativa e ficam na auditoria." busy={loading} onClose={requestCloseModal}><form onSubmit={submitPolicy}><div className="form-grid"><label className="field">Carga mensal em horas<input type="number" min="0" step="0.25" value={policyForm.monthlyHours} onChange={(event) => setPolicyForm({ ...policyForm, monthlyHours: event.target.value })} required /></label><label className="field">Aviso mínimo para folga (dias)<input type="number" min="0" value={policyForm.minimumNotice} onChange={(event) => setPolicyForm({ ...policyForm, minimumNotice: event.target.value })} /></label><label className="field">Limite do lote retroativo<input type="number" min="1" value={policyForm.batchThreshold} onChange={(event) => setPolicyForm({ ...policyForm, batchThreshold: event.target.value })} required /></label><div className="field"><span>Crédito após 90 dias</span><SelectMenu ariaLabel="Política de crédito após 90 dias" value={policyForm.deadlinePolicy} onChange={(deadlinePolicy) => setPolicyForm({ ...policyForm, deadlinePolicy: deadlinePolicy as typeof policyForm.deadlinePolicy })} options={[{ value: "ALLOW_AFTER_DEADLINE", label: "Continuar permitindo", description: "O crédito segue disponível" }, { value: "BLOCK_AFTER_DEADLINE", label: "Bloquear utilização", description: "O crédito vence após o prazo" }]} /></div></div><label className="check-field"><input type="checkbox" checked={policyForm.applyToOpenBalances} onChange={(event) => setPolicyForm({ ...policyForm, applyToOpenBalances: event.target.checked })} /><span>Aplicar a política de prazo também aos saldos antigos ainda abertos</span></label><label className="field full-field">Justificativa<textarea value={policyForm.reason} onChange={(event) => setPolicyForm({ ...policyForm, reason: event.target.value })} minLength={5} maxLength={2000} required /></label><ModalActions loading={loading} onCancel={requestCloseModal} label="Salvar políticas" /></form></Modal>}
     {confirmation && <ConfirmationModal confirmation={confirmation} loading={loading} onClose={() => setConfirmation(null)} />}

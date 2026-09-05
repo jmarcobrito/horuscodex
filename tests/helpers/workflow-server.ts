@@ -45,7 +45,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       data.monthlyTimesheets = data.monthlyTimesheets?.filter(m => m.contractorId === id);
       data.occurrences = data.occurrences.filter(o => o.contractorId === id);
       data.authorizations = data.authorizations.filter(a => a.contractorId === id);
-      data.requests = []; data.balanceLots = []; data.balanceTransactions = []; data.audits = [];
+      data.requests = []; data.balanceLots = []; data.balanceTransactions = [];
     }
     for (const person of data.contractors) {
       const entries = data.entries.filter(e => e.contractorId === person.id);

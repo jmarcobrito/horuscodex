@@ -30,6 +30,8 @@ test("rejects cross-origin and originless state changes", async () => {
 
   assert.equal(crossOrigin?.status, 403);
   assert.equal(originless?.status, 403);
+  assert.equal(crossOrigin?.headers.get("cache-control"), "private, no-store");
+  assert.equal(originless?.headers.get("cache-control"), "private, no-store");
   assert.deepEqual(await crossOrigin?.json(), { error: "Origem da solicitação não autorizada." });
 });
 
@@ -46,6 +48,8 @@ test("every state-changing route runs the origin guard first", async () => {
     ["./app/api/occurrences/route.ts", "POST"],
     ["./app/api/occurrences/route.ts", "PATCH"],
     ["./app/api/policies/route.ts", "PATCH"],
+    ["./app/api/sectors/route.ts", "POST"],
+    ["./app/api/sectors/route.ts", "PATCH"],
     ["./app/api/team/route.ts", "POST"],
     ["./app/api/team/route.ts", "PATCH"],
     ["./app/api/time-entries/route.ts", "POST"],
