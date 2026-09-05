@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
+test("fixture uses the same missing-month estimates and never invents inactive requirements", async () => {
+  const server = createWorkflowServer();
+  const before = server.snapshot();
+  const data = await (await server.request("/api/dashboard?from=2026-09-01&to=2026-10-31")).json();
+  assert.equal(data.contractors.find(p=>p.id==="person-1").requiredMinutes,960);
+  assert.equal(data.contractors.find(p=>p.id==="person-1").estimatedRequiredMonths,1);
+  assert.equal(data.contractors.find(p=>p.id==="person-2").requiredMinutes,0);
+  assert.equal(data.metrics.requiredMinutes,1920);
+  assert.equal(data.metrics.estimatedRequiredPersonMonths,3);
+  assert.deepEqual(server.snapshot(),before);
+});
 
 test("fixture all-date leave read includes August from September without touching daily history", async () => {
   const server=createWorkflowServer("rh");

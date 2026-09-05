@@ -10,6 +10,37 @@ const rh={id:"test-rh",authUserId:"auth-rh",organizationId:"test-org",organizati
 const reportFilters={kind:"history",from:"2026-08-01",to:"2026-09-30",page:1,pageSize:50,personId:null,sectorId:null,category:null,actorId:null};
 beforeEach(()=>boundary.reset());
 
+test("monthly requirements agree per person and team, estimate only missing active months, and preserve all source data", async () => {
+  boundary.tables.organization_policies[0].monthly_required_minutes = 120;
+  const before = structuredClone(boundary.tables);
+  const data = await getDashboardData(rh,{from:"2026-08-01",to:"2026-09-30"});
+  const active = data.contractors.find(p=>p.id==="person-0000");
+  assert.equal(active.requiredMinutes,180);
+  assert.equal(active.estimatedRequiredMonths,1);
+  const inactive = data.contractors.find(p=>p.id==="person-1104");
+  assert.equal(inactive.requiredMinutes,60);
+  assert.equal(inactive.estimatedRequiredMonths,0);
+  assert.equal(data.metrics.requiredMinutes,1104*180+60);
+  assert.equal(data.metrics.requiredMinutes,data.contractors.reduce((n,p)=>n+p.requiredMinutes,0));
+  assert.equal(data.metrics.estimatedRequiredPersonMonths,1104);
+  assert.equal(data.timesheet.requiredMinutes,data.metrics.requiredMinutes);
+  assert.ok(data.monthlyTimesheets.every(m=>m.requiredMinutes===60));
+  const september = await getDashboardData(rh,{year:2026,month:9});
+  assert.equal(september.contractors.find(p=>p.id===inactive.id).requiredMinutes,0);
+  assert.equal(september.contractors.find(p=>p.id===active.id).requiredMinutes,120);
+  const pj = await getDashboardData({...rh,id:active.id,role:"PJ"},{from:"2026-08-01",to:"2026-09-30"});
+  assert.equal(pj.metrics.requiredMinutes,180);
+  assert.equal(pj.metrics.estimatedRequiredPersonMonths,1);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
+test("duplicated monthly records fail closed without repair or double counting", async () => {
+  boundary.tables.monthly_timesheets.push({...boundary.tables.monthly_timesheets[0],id:"duplicate-month"});
+  const before = structuredClone(boundary.tables);
+  await assert.rejects(()=>getDashboardData(rh,{year:2026,month:8}),/registro mensal duplicado/i);
+  assert.deepEqual(boundary.tables,before); assert.equal(boundary.writes,0); assert.equal(boundary.rpcCalls,0);
+});
+
 test("approval scope applies to all three types without changing any source row", async () => {
   const base = {organization_id:"test-org",contractor_id:"person-0000",start_date:"2026-08-31",end_date:"2026-09-02",status:"REQUESTED"};
   boundary.tables.leave_requests = [{...base,id:"leave-cross",requested_minutes:60,reserved_minutes:0,reason:"Fictício",requested_at:"2026-08-01T12:00:00Z"}];

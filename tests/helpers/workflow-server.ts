@@ -2,7 +2,7 @@ import type { DashboardData, DashboardEntry } from "../../app/dashboard-types";
 import type { ClosingSubmit, ClosingResult } from "../../app/closing-model";
 import type { HistoryVersion } from "../../app/EntryHistory";
 import { monthPeriod } from "../../app/period";
-import { buildPeriodSummary } from "../../db/dashboard-summary";
+import { buildPeriodSummary, requiredForPerson } from "../../db/dashboard-summary";
 import { makeWorkflowDashboard, makeHistoryVersion } from "../fixtures/monthly-workflow.mjs";
 import { makeAdminData } from "../fixtures/dashboard.mjs";
 import { createMockRequest } from "./mock-request.mjs";
@@ -57,12 +57,15 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       const sheets = data.monthlyTimesheets?.filter(m => m.contractorId === person.id) ?? [];
       person.workedMinutes = entries.reduce((n, e) => n + e.calculatedMinutes, 0);
       person.consideredMinutes = entries.reduce((n, e) => n + e.eligibleMinutes, 0) + sheets.reduce((n, m) => n + m.creditedMinutes, 0);
-      person.requiredMinutes = sheets.reduce((n, m) => n + m.requiredMinutes, 0) || 480 * months.length;
+      const requirement = requiredForPerson(sheets, person.status === "ACTIVE", 480, months.length);
+      person.requiredMinutes = requirement.requiredMinutes;
+      person.estimatedRequiredMonths = requirement.estimatedMonths;
+      person.fillPercentage = person.requiredMinutes ? Math.min(100, Math.round(person.consideredMinutes / person.requiredMinutes * 100)) : 0;
       person.timesheetStatus = sheets[0]?.status ?? "OPEN";
     }
     const summary = buildPeriodSummary({ users: data.contractors, entries: data.entries, timesheets: data.monthlyTimesheets ?? [], requiredPerMonth: 480, monthCount: months.length });
     data.timesheet = { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: data.monthlyTimesheets?.every(m => m.status === "CLOSED") ? "CLOSED" : "OPEN" };
-    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, pendingRequests: data.requests.filter(r => r.status === "REQUESTED").length, pendingAuthorizations: data.authorizations.filter(a => (a.status === "REQUESTED" || a.status === "NEEDS_ADJUSTMENT")).length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
+    data.metrics = { ...data.metrics, activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, estimatedRequiredPersonMonths: summary.estimatedRequiredPersonMonths, pendingRequests: data.requests.filter(r => r.status === "REQUESTED").length, pendingAuthorizations: data.authorizations.filter(a => (a.status === "REQUESTED" || a.status === "NEEDS_ADJUSTMENT")).length, pendingOccurrences: data.occurrences.filter(o => o.status === "REQUESTED").length };
     return data;
   }
   const snapshot = () => structuredClone({ entries: [...dashboards.values()].flatMap(m => m.entries), versions });

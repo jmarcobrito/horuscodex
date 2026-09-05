@@ -4,7 +4,7 @@ import type {
 } from "../app/dashboard-types";
 import { projectMonthlyTimesheet, type MonthlyTimesheetRow } from "./monthly-timesheet-view";
 import type { HorusActor } from "./actor";
-import { buildPeriodSummary } from "./dashboard-summary";
+import { buildPeriodSummary, requiredForPerson } from "./dashboard-summary";
 import { getSupabaseAdmin } from "./supabase";
 import { readAllRows } from "./read-all";
 import { deadlineStatus } from "./workflow-rules";
@@ -81,6 +81,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const users = usersResult as UserRow[];
   const entries = entriesResult as EntryRow[]; const keys = monthKeys(period.from, period.to);
   const timesheets = (timesheetsResult as MonthlyTimesheetRow[]).filter((row) => keys.has(`${row.year}-${row.month}`));
+  const summaryTimesheets = timesheets.map(row => ({ contractorId: row.contractor_id, year: row.year, month: row.month, requiredMinutes: row.required_minutes, creditedMinutes: row.credited_minutes }));
   const policyRow = policyResult.data; const requiredPerMonth = policyRow?.monthly_required_minutes ?? 9_720;
   const deadlinePolicy = (policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE") === "ALLOW_AFTER_DEADLINE" ? "ALLOW_AFTER_DEADLINE" : "BLOCK_AFTER_DEADLINE";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: organizationResult.data?.timezone ?? "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -97,10 +98,10 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const contractors: DashboardContractor[] = users.map((user) => {
     const userEntries = entries.filter((entry) => entry.contractor_id === user.id); const userTimesheets = timesheets.filter((row) => row.contractor_id === user.id);
     const workedMinutes = sum(userEntries, (entry) => entry.calculated_minutes); const consideredMinutes = sum(userEntries, (entry) => entry.eligible_minutes) + sum(userTimesheets, (row) => row.credited_minutes);
-    const requiredMinutes = userTimesheets.length ? sum(userTimesheets, (row) => row.required_minutes) : requiredPerMonth * keys.size;
+    const { requiredMinutes, estimatedMonths } = requiredForPerson(summaryTimesheets.filter(row => row.contractorId === user.id), user.status === "ACTIVE", requiredPerMonth, keys.size);
     const delays = userEntries.map(delayDays); const statuses = new Set(userTimesheets.map((row) => row.status));
     const sector = Array.isArray(user.sectors) ? user.sectors[0] : user.sectors;
-    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, sectorId: user.sector_id ?? null, sectorName: sector?.name ?? "Sem setor definido", lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt: userEntries[0]?.created_at ?? null, workedMinutes, consideredMinutes, requiredMinutes, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: delays.length ? Math.round(sum(delays, (value) => value) / delays.length) : 0, retroactiveEntries: delays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
+    return { id: user.id, name: user.name, email: user.email, initials: initials(user.name), status: user.status, sectorId: user.sector_id ?? null, sectorName: sector?.name ?? "Sem setor definido", lastEntryDate: userEntries[0]?.work_date ?? null, lastEntryAt: userEntries[0]?.created_at ?? null, workedMinutes, consideredMinutes, requiredMinutes, estimatedRequiredMonths: estimatedMonths, fillPercentage: requiredMinutes ? Math.min(100, Math.round(consideredMinutes / requiredMinutes * 100)) : 0, averageDelayDays: delays.length ? Math.round(sum(delays, (value) => value) / delays.length) : 0, retroactiveEntries: delays.filter((value) => value > 0).length, timesheetStatus: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" };
   });
   const balanceLots: DashboardBalanceLot[] = lots.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, type: row.type, originalMinutes: row.original_minutes, remainingMinutes: row.remaining_minutes, reservedMinutes: row.reserved_minutes, originDate: row.origin_date, deadlineDate: row.deadline_date, status: row.status }));
   const balanceTransactions: DashboardBalanceTransaction[] = transactions.map((row) => ({ id: row.id, contractorId: row.contractor_id, contractorName: names.get(row.contractor_id) ?? actor.name, lotId: row.lot_id, type: row.type, minutes: row.minutes, description: row.description, createdAt: row.created_at }));
@@ -110,7 +111,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
   const summary = buildPeriodSummary({
     users: users.map((user) => ({ id: user.id, status: user.status })),
     entries: entries.map((entry) => ({ contractorId: entry.contractor_id, calculatedMinutes: entry.calculated_minutes, eligibleMinutes: entry.eligible_minutes })),
-    timesheets: timesheets.map((row) => ({ contractorId: row.contractor_id, requiredMinutes: row.required_minutes, creditedMinutes: row.credited_minutes })),
+    timesheets: summaryTimesheets,
     requiredPerMonth,
     monthCount: keys.size,
   });
@@ -119,7 +120,7 @@ export async function getDashboardData(actor: HorusActor, input: PeriodInput = {
     approvalsScope: input.approvalsScope ?? "period",
     period,
     monthlyTimesheets: timesheets.map(row => projectMonthlyTimesheet(row, names)),
-    metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT" && lot.status !== "EXPIRED"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED" || row.status === "NEEDS_ADJUSTMENT").length },
+    metrics: { activeContractors: summary.activeContractors, workedMinutes: summary.workedMinutes, requiredMinutes: summary.requiredMinutes, estimatedRequiredPersonMonths: summary.estimatedRequiredPersonMonths, positiveBalanceMinutes: sum(lots.filter((lot) => lot.type === "CREDIT" && lot.status !== "EXPIRED"), (lot) => lot.remaining_minutes), negativeBalanceMinutes: sum(lots.filter((lot) => lot.type === "DEBIT"), (lot) => lot.remaining_minutes), pendingRequests: requests.filter((row) => row.status === "REQUESTED").length, pendingOccurrences: occurrences.filter((row) => row.status === "REQUESTED").length, pendingAuthorizations: authorizations.filter((row) => row.status === "REQUESTED" || row.status === "NEEDS_ADJUSTMENT").length },
     timesheet: { workedMinutes: summary.workedMinutes, creditedMinutes: summary.creditedMinutes, consideredMinutes: summary.consideredMinutes, requiredMinutes: summary.requiredMinutes, projectedBalanceMinutes: summary.consideredMinutes - summary.requiredMinutes, status: statuses.size === 1 ? [...statuses][0] : statuses.size > 1 ? "MIXED" : "OPEN" },
     policy: { monthlyRequiredMinutes: requiredPerMonth, positiveBalanceAfterDeadlinePolicy: policyRow?.positive_balance_after_deadline_policy ?? "ALLOW_AFTER_DEADLINE", minimumLeaveNoticeDays: policyRow?.minimum_leave_notice_days ?? null, retroactiveBatchThreshold: policyRow?.retroactive_batch_threshold ?? 3 },
     contractors, entries: dashboardEntries, balanceLots, balanceTransactions, requests: dashboardRequests,

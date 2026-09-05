@@ -18,6 +18,7 @@ export type DashboardContractor = {
   workedMinutes: number;
   consideredMinutes: number;
   requiredMinutes: number;
+  estimatedRequiredMonths?: number;
   fillPercentage: number;
   averageDelayDays: number;
   retroactiveEntries: number;
@@ -130,6 +131,7 @@ export type DashboardData = {
     activeContractors: number;
     workedMinutes: number;
     requiredMinutes: number;
+    estimatedRequiredPersonMonths?: number;
     positiveBalanceMinutes: number;
     negativeBalanceMinutes: number;
     pendingRequests: number;

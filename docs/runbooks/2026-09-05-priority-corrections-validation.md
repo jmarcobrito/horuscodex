@@ -80,3 +80,41 @@ O log do simulador mostrou somente GET ao alternar datas/filtros. O único POST 
 Limites: Graphify não tem grafo nesta área; relações confirmadas no código e nos testes, sem criar grafo. Build completo isolado, PostgreSQL e revisão integrada continuam na tarefa 7. Nenhum deploy, push, PR ou acesso ao Supabase de produção nesta rodada. Não é uma nova verificação do conteúdo real de agosto.
 
 Próxima etapa: tarefa 3, carga mensal por pessoa e por mês, somente na leitura. Tarefas 3–7 e a reorganização visual completa do painel permanecem pendentes.
+
+## Checkpoint seguinte — tarefa 3 concluída localmente
+
+Base: `9c46e42`. Autorização: seguir para a carga mensal por pessoa/mês, nesta área local, sem subagentes nem operações remotas. Este checkpoint substitui a retomada anterior.
+
+Implementado:
+
+- O resumo e cada pessoa usam a mesma função pura de carga mensal. Cada mês com registro conserva sua carga gravada, inclusive zero; apenas meses sem registro de pessoas atualmente ativas recebem estimativa baseada na política consultada.
+- Pessoas inativas mantêm toda a carga histórica disponível, mas não recebem carga estimada para meses ausentes. Totais individuais e da equipe usam o mesmo critério.
+- A chave pessoa/ano/mês identifica duplicatas: a consulta falha explicitamente sem somar duas vezes e sem tentar reparar registros.
+- O mapeamento conserva ano e mês e recebe somente folhas do intervalo consultado. Novos metadados indicam quantos meses estimados existem por pessoa e no total.
+- Painel e Lançamentos informam “Inclui estimativa para meses sem registro mensal” quando pertinente. Em Lançamentos, o aviso acompanha a seleção individual; não aparece na conferência diária.
+- O servidor fictício reutiliza a mesma função, inclusive no percentual derivado. Nenhuma dependência ou regra de fechamento foi alterada.
+
+| Verificação da tarefa 3 | Resultado observado |
+|---|---|
+| Baseline | 29 testes passaram |
+| TDD do resumo | Caso de dois meses falhou com 60 em vez de 120 antes da correção |
+| TDD da integração | Pessoa ativa com carga histórica 60 e política 120 retornava 60 em vez de 180; duplicata não era rejeitada |
+| TDD da interface | Avisos ausentes no Painel e em Lançamentos antes da implementação |
+| TDD da fixture | Após corrigir a ordem de inicialização do teste, caso de dois meses falhou com 480 em vez de 960 |
+| Suítes específicas após correção | 38 testes passaram, zero falhas/ignorados |
+| Suíte completa final | 180 testes passaram, zero falhas/ignorados |
+| Lint e TypeScript | Código de saída 0 em ambos |
+| Preservação | Comparação integral das tabelas fictícias antes/depois; zero mutações e zero RPC nas consultas, inclusive na falha por duplicata |
+| Histórico | Cargas históricas diferentes e zero preservados; inativo continua incluído; consulta de setembro não estima carga para inativo sem registro |
+| Isolamento | Totais por equipe e pessoa concordam; consulta PJ retorna somente sua carga e estimativa |
+| Preview RH, setembro–outubro | 06:00 realizadas, meta 32:00, com aviso de estimativa |
+| Preview RH, agosto | Ana: meta 08:00 sem aviso; Carla: meta 08:00 com aviso; Bruno inativo: histórico 05:00 e meta 08:00 sem aviso |
+| Conferência diária | Sem meta mensal nem aviso de estimativa; fechamento mensal permanece separado |
+| Visual | Aviso visível na janela normal e em 390×844, após a transição responsiva; largura restaurada |
+| Navegação | Log do simulador mostrou somente dois GET de consulta, nenhum fechamento ou outro envio |
+
+Revisão local: consumidores de `buildPeriodSummary`/`requiredForPerson` conferidos; consultas SQL, autenticação, políticas, migrações, dependências e rotas de escrita inalteradas. Superpowers orientou execução, reprodução do erro antes da correção e verificação antes de concluir. Sem grafo Graphify nesta área; impacto conferido diretamente no código.
+
+Limites: nenhuma conexão ao Supabase de produção, leitura de credenciais, recálculo ou alteração em agosto. As provas de preservação usam dados fictícios, não uma nova auditoria do banco real. Nenhum push, PR ou deploy. Build completo isolado e PostgreSQL continuam na tarefa 7.
+
+Próxima etapa: tarefa 4 — distinguir informações do mês, dias com lançamento e saldo livre, evitando indicadores com significados misturados. Tarefas 4–7 e a reorganização visual completa permanecem pendentes.

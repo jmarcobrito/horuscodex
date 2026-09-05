@@ -152,7 +152,7 @@ assert.equal(w.workspaceKey("rh", "entries", "", "all"),
 
 **Interfaces:** `SummaryTimesheet` passa a exigir `year: number; month: number`. Acrescentar função `requiredForPerson(sheets: SummaryTimesheet[], active: boolean, requiredPerMonth: number, monthCount: number): { requiredMinutes: number; estimatedMonths: number }`. A função recebe somente folhas da pessoa dentro do período; consumidores devem filtrá-las previamente. O banco garante uma folha por pessoa/mês; detectar duplicatas em leitura e falhar, não somar duas vezes.
 
-- [ ] Adicionar teste com duas competências e uma folha; atualizar os testes antigos para informar year/month:
+- [x] Adicionar teste com duas competências e uma folha; atualizar os testes antigos para informar year/month:
 
 ```js
 test("requirement covers each missing active month", () => {
@@ -165,8 +165,8 @@ test("requirement covers each missing active month", () => {
 });
 ```
 
-- [ ] Rodar `node --test tests/dashboard-summary.test.mjs`; o caso novo deve falhar em 60 versus 120. Acrescentar casos: duas folhas com cargas históricas diferentes, pessoa inativa com uma folha, ativa sem folha, duplicata de competência.
-- [ ] Implementar a soma por pessoa com o núcleo abaixo; primeiro validar duplicatas pela chave `year + "-" + month`. Reusar a função nos totais e em cada `DashboardContractor`, eliminando o atual fallback por pessoa inteira:
+- [x] Rodar `node --test tests/dashboard-summary.test.mjs`; o caso novo deve falhar em 60 versus 120. Acrescentar casos: duas folhas com cargas históricas diferentes, pessoa inativa com uma folha, ativa sem folha, duplicata de competência.
+- [x] Implementar a soma por pessoa com o núcleo abaixo; primeiro validar duplicatas pela chave `year + "-" + month`. Reusar a função nos totais e em cada `DashboardContractor`, eliminando o atual fallback por pessoa inteira:
 
 ```ts
 const stored = sheets.reduce((n, row) => n + row.requiredMinutes, 0);
@@ -175,9 +175,9 @@ const estimatedMonths = active ? Math.max(0, monthCount - present) : 0;
 return { requiredMinutes: stored + estimatedMonths * requiredPerMonth, estimatedMonths };
 ```
 
-- [ ] Adicionar `estimatedRequiredMonths?: number` ao tipo de pessoa e `estimatedRequiredPersonMonths?: number` ao resumo retornado; somar a contagem estimada. Quando >0, a interface informa “Inclui estimativa para meses sem registro mensal”. Não chamar essa estimativa de carga histórica confirmada.
-- [ ] Atualizar todos os chamadores encontrados por `rg -n "buildPeriodSummary|requiredForPerson" app db tests`, incluindo o servidor fictício. Adicionar year/month ao mapeamento de folhas de `db/dashboard.ts`. Nenhuma chamada `ensure_*`/recalcular durante leitura.
-- [ ] Executar as suítes de resumo, leituras completas e servidor fictício. Confirmar pessoa inativa com histórico continua visível; conferir teste de zero gravações. Revisar e fazer commit desta tarefa.
+- [x] Adicionar `estimatedRequiredMonths?: number` ao tipo de pessoa e `estimatedRequiredPersonMonths?: number` ao resumo retornado; somar a contagem estimada. Quando >0, a interface informa “Inclui estimativa para meses sem registro mensal”. Não chamar essa estimativa de carga histórica confirmada.
+- [x] Atualizar todos os chamadores encontrados por `rg -n "buildPeriodSummary|requiredForPerson" app db tests`, incluindo o servidor fictício. Adicionar year/month ao mapeamento de folhas de `db/dashboard.ts`. Nenhuma chamada `ensure_*`/recalcular durante leitura.
+- [x] Executar as suítes de resumo, leituras completas e servidor fictício. Confirmar pessoa inativa com histórico continua visível; conferir teste de zero gravações. Revisar e fazer commit desta tarefa.
 
 ### Tarefa 4 — separar contexto mensal, dias e saldo livre
 
