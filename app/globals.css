@@ -488,3 +488,97 @@ button:disabled { cursor:not-allowed; opacity:.62; }
   .monthly-context .timesheet-summary>div { border-right:0; border-bottom:1px solid var(--soft-line); }
   .monthly-context .timesheet-summary>div:last-child { border-bottom:0; }
 }
+
+/* Monthly overview: presentation-only, scoped to the RH panel. */
+.review-scope-banner { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:18px; padding:16px 20px; border:1px solid #dcd5f6; border-radius:8px; background:#f8f6ff; font-size:14px; }
+.review-scope-banner p { margin:0; }
+.review-scope-banner span { display:block; margin-top:5px; color:#5f647c; }
+.review-scope-status { font-size:14px; color:#5c547d; }
+.overview-root { font-size:14px; color:#252941; }
+.overview-title { margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+.overview-title h1 { font-size:30px; font-weight:700; }
+.overview-title p { font-size:15px; }
+.overview-toolbar { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:20px; }
+.overview-toolbar>div { min-width:0; }
+.period-panel.overview-period { display:flex; gap:12px; padding:0; border:0; background:transparent; margin:0; overflow:visible; }
+.overview-period .period-section-label,.overview-period .period-caption { display:none; }
+.overview-period .month-selector-controls { grid-template-columns:36px minmax(140px,170px) 36px; gap:0; }
+.overview-period .month-selector-controls button { width:36px; height:44px; border-radius:6px; }
+.overview-period .month-selector-controls input { min-width:0; width:100%; height:44px; border-radius:0; font-size:14px; }
+.overview-range { position:relative; }
+.overview-range summary { padding:13px 12px; border:1px solid #dcdde7; border-radius:6px; background:#fff; cursor:pointer; font-size:13px; white-space:nowrap; }
+.overview-range .custom-period-selector { position:absolute; top:52px; left:0; z-index:15; padding:18px; width:390px; max-width:calc(100vw - 40px); border:1px solid var(--line); border-radius:8px; box-shadow:0 10px 30px #2024421a; background:#fff; }
+.overview-range .custom-period-selector .period-section-label { display:block; }
+.overview-range .period-inline { grid-template-columns:1fr 1fr; }
+.overview-range .period-inline button { grid-column:1/-1; }
+.overview-filters { display:flex; flex:1; gap:12px; min-width:300px!important; }
+.overview-filters .select-menu-trigger { flex:1; min-width:0; width:auto; min-height:44px; font-size:14px; }
+.overview-refresh { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-left:auto; }
+.overview-refresh span { font-size:12px; color:#5f647c; }
+.overview-action { border:1px solid #cdc6fa; border-radius:6px; padding:10px 16px; color:#5140c9; font-size:13px; font-weight:700; background:#fff; cursor:pointer; }
+.overview-action:hover:not(:disabled) { background:#f4f1ff; }
+.overview-root .primary-button { background:#6350df; color:#fff; box-shadow:none; }
+.overview-root .primary-button:hover:not(:disabled) { background:#5140c9; }
+.overview-action:disabled,.overview-status:disabled { opacity:.55; cursor:not-allowed; }
+.overview-root button:focus-visible,.overview-root summary:focus-visible,.overview-root input:focus-visible { outline:3px solid #6451de; outline-offset:3px; }
+.overview-closing,.overview-team { border:1px solid var(--line); border-radius:8px; background:#fff; margin-bottom:20px; }
+.overview-closing-heading { display:flex; flex-wrap:wrap; gap:28px; align-items:center; padding:24px; }
+.overview-root h2 { font-family:var(--font-sora); font-size:20px; font-weight:650; margin:0; letter-spacing:-.4px; }
+.overview-closing-heading p { margin:6px 0 10px; }
+.overview-closing-heading small { font-size:13px; color:#62677f; }
+.overview-statuses { margin:0 24px; padding:16px 0; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
+.overview-status { min-width:0; border:0; border-right:1px solid var(--line); background:#fff; padding:4px 12px; cursor:pointer; color:#252941; }
+.overview-status:last-child { border-right:0; }
+.overview-status span { display:block; min-height:20px; font-size:12px; line-height:1.4; }
+.overview-status strong { display:block; font-size:25px; }
+.overview-status-READY { color:#5140c9; }
+.overview-status-PENDING { color:#a54e00; }
+.overview-status[aria-pressed="true"] { background:#f0ecff; outline:2px solid #6451de; outline-offset:-2px; border-radius:6px; }
+.overview-clear { margin:0 24px 16px; }
+.overview-pending { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:#fff5e6; border-top:1px solid #f3ddba; padding:12px 24px; border-radius:0 0 8px 8px; }
+.overview-pending p { margin:0; color:#965000; }
+.overview-pending button { border:0; background:transparent; }
+.overview-month-help { padding:0 24px 24px; }
+.overview-team-heading { padding:16px 24px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.overview-table { width:100%; table-layout:fixed; border-collapse:collapse; }
+.overview-table th,.overview-table td { padding:10px 24px; font-size:14px; text-align:left; vertical-align:top; border-top:1px solid var(--line); white-space:normal; overflow-wrap:anywhere; }
+.overview-table th { color:#5e637a; font-size:12px; font-weight:500; background:#fcfcfe; }
+.overview-table th:first-child { width:29%; }
+.overview-table th:last-child { width:max(13%,112px); }
+.overview-table td>strong { font-size:14px; font-weight:650; }
+.overview-table td>small { display:block; margin-top:4px; color:#636880; font-size:12px; }
+.overview-table .overview-action { padding:7px 14px; }
+.overview-pill { display:inline-block; padding:6px 9px; border-radius:5px; background:#f3f3f7; font-size:11px; font-weight:650; }
+.overview-pill.overview-status-READY { background:#f0ecff; }
+.overview-pill.overview-status-PENDING { background:#fff2df; }
+.overview-details { margin-top:8px; font-size:12px; }
+.overview-details summary { color:#5c547d; cursor:pointer; }
+.overview-details dl { margin:10px 0 0; }
+.overview-details dt { margin-top:10px; color:#62677f; }
+.overview-details dd { margin:4px 0 0; }
+.overview-table-note { margin:0; padding:18px 24px; border-top:1px solid var(--line); color:#62677f; font-size:12px; }
+.overview-empty { padding:24px; text-align:center; color:#62677f; }
+.overview-bank { display:flex; flex-wrap:wrap; gap:24px; align-items:center; padding:22px 24px; border:1px solid var(--line); border-radius:8px; background:#f9f9fc; }
+.overview-bank h2 { font-size:14px; }
+.overview-bank h2 span { font-family:var(--font-manrope); font-weight:400; }
+.overview-bank dl { display:flex; flex:1; flex-wrap:wrap; gap:24px; margin:0; }
+.overview-bank dl>div { flex:1; min-width:85px; padding-right:20px; border-right:1px solid var(--line); }
+.overview-bank dt { font-size:11px; color:#565c74; }
+.overview-bank dd { margin:5px 0 0; font-size:20px; font-variant-numeric:tabular-nums; }
+.overview-bank p { margin:0; flex-basis:100%; font-size:12px; color:#5f647c; }
+.overview-estimate,.overview-interval-total { color:#62677f; font-size:13px; line-height:1.6; }
+@media(max-width:1100px) { .overview-statuses { grid-template-columns:repeat(3,minmax(0,1fr)); row-gap:20px; } .overview-status:nth-child(3) { border:0; } .overview-table th,.overview-table td { padding:12px; } }
+@media(max-width:650px) {
+  .overview-toolbar>div,.overview-filters { width:100%; min-width:0!important; }
+  .period-panel.overview-period { flex-wrap:wrap; }
+  .overview-range .custom-period-selector { left:0; right:auto; }
+  .overview-statuses { grid-template-columns:repeat(2,minmax(0,1fr)); margin:0 16px; }
+  .overview-status:nth-child(3) { border-right:1px solid var(--line); }
+  .overview-status:nth-child(even) { border-right:0; }
+  .overview-closing-heading,.overview-team-heading { padding:18px 16px; }
+  .overview-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .overview-table tr { display:block; padding:12px 16px; border-top:1px solid var(--line); }
+  .overview-table td { display:block; padding:6px 0; border:0; }
+  .overview-table td:not(:first-child)::before { content:attr(data-label) ": "; font-size:12px; color:#62677f; }
+  .overview-bank { padding:18px 16px; }
+}

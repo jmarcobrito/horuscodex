@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { runnerImport } from "vite";
+import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
+const props = data => ({ data, filters: { personId: null, sectorId: null, status: "all" }, busy: false, receivedAt: null, onFiltersChange() {}, onPeriodChange() {}, onRefresh() {}, onIntent() {} });
+test("monthly overview offers explicit review, six state filters, and current bank without selecting anybody", async () => {
+  const { module: { Overview } } = await runnerImport("./app/Overview.tsx", { configFile: false, envDir: false });
+  const data = makeWorkflowDashboard(), render = extra => renderToStaticMarkup(createElement(Overview, { ...props(data), ...extra }));
+  const html = render();
+  for (const label of ["Ir para fechamento", "Conferir por dia", "Situação indisponível", "Sem registro mensal", "Detalhes do mês", "Cadastro inativo", "Sem lançamentos não significa falta"]) assert.match(html, new RegExp(label));
+  assert.match(html, /Banco de horas.*posição atual/s);
+  assert.doesNotMatch(html, /type="checkbox"|@example.com/);
+  assert.equal((html.match(/aria-pressed="false"/g) ?? []).length, 6);
+  assert.match(render({ busy: true }), /disabled=""[^>]*>Ir para fechamento/);
+  assert.match(render({ filters: { ...props(data).filters, status: "CLOSED" } }), /Nenhuma pessoa corresponde/);
+  data.monthlyTimesheets = [];
+  assert.match(render(), /08:00/);
+  data.period.to = "2026-08-15";
+  data.monthlyTimesheets = undefined;
+  const partial = render();
+  assert.match(partial, /Escolha um mês completo/);
+  assert.match(partial, /Contexto mensal indisponível/);
+  assert.doesNotMatch(partial, /aria-pressed/);
+  assert.match(partial, /disabled=""[^>]*>Ir para fechamento/);
+  assert.doesNotMatch(partial, /Revise e confirme o fechamento na próxima tela/);
+});

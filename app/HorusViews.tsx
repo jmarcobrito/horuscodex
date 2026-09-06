@@ -7,6 +7,8 @@ import { SelectMenu } from "./SelectMenu";
 import { entryEditBlockReason, resolveEntryDate, selectDailyEntries, selectEntries, selectableContractors, shiftEntryDate, type EntriesDisplayMode } from "./entries-model";
 import { validPeriodDate } from "./period";
 import { dashboardDisplay } from "./dashboard-display";
+import { scopeDashboard, type ReviewScope } from "./overview-model";
+import { ReviewScopeBanner } from "./ReviewScopeBanner";
 import type { DashboardContractor, DashboardData, DashboardEntry } from "./dashboard-types";
 
 export type Role = "rh" | "pj";
@@ -49,39 +51,20 @@ function statusTone(status: string) {
   return "neutral";
 }
 
-export function Overview({ data, onNavigate }: { data: DashboardData; onNavigate: (section: Section) => void }) {
-  const display = dashboardDisplay(data);
-  const pending = data.metrics.pendingRequests + data.metrics.pendingOccurrences + data.metrics.pendingAuthorizations;
-  return <>
-    <section className="page-heading overview-heading"><div><span className="eyebrow">VISÃO CONSOLIDADA</span><h1>Painel</h1><p>{monthLabel(data.period)} · dados do período</p></div>{pending > 0 && <button className="secondary-button" onClick={() => onNavigate("requests")}>{pending} pendência(s)</button>}</section>
-    <section className="metric-grid">
-      <Metric label="COLABORADORES ATIVOS" value={String(data.metrics.activeContractors)} meta="Cadastros ativos" tone="violet" />
-      <Metric label="HORAS TRABALHADAS" value={formatMinutes(display.workedMinutes)} meta={display.fullMonth
-        ? "Carga mensal " + formatMinutes(data.metrics.requiredMinutes) + ((data.metrics.estimatedRequiredPersonMonths ?? 0) > 0 ? " · Inclui estimativa para meses sem registro mensal" : "")
-        : "Consideradas nos lançamentos: " + formatMinutes(display.entryEligibleMinutes)} tone="blue" />
-      <Metric label="DISPONÍVEL PARA USAR" value={formatMinutes(display.availableCreditMinutes)} meta={"Créditos válidos " + formatMinutes(display.validCreditMinutes) + " · Reservado para folgas " + formatMinutes(display.reservedCreditMinutes)} tone="green" />
-      <Metric label="DÉFICITS PENDENTES" value={formatMinutes(data.metrics.negativeBalanceMinutes)} meta="Débitos em aberto, separados dos créditos" tone="amber" />
-    </section>
-    <p className="bank-scope">Saldo atual do banco; não é uma posição histórica do mês selecionado.</p>
-    {!display.fullMonth && <MonthlyContext context={display.monthlyContext} estimatedMonths={data.metrics.estimatedRequiredPersonMonths ?? 0} />}
-    <section className="dashboard-grid"><div className="panel discipline-panel"><PanelHeading eyebrow="DISCIPLINA DE PREENCHIMENTO" title="Acompanhamento das pessoas" action="Ver todas as pessoas" onAction={() => onNavigate("team")} />{data.contractors.filter((person) => person.status === "ACTIVE").length ? <div className="table-scroll"><table><thead><tr><th>Colaborador</th><th>Última data trabalhada</th><th>Último envio</th><th>Dias entre trabalho e registro</th><th>Registrados após a data trabalhada</th><th>Dias com lançamento</th><th>Horas em relação à carga mensal</th></tr></thead><tbody>{data.contractors.filter((person) => person.status === "ACTIVE").map((person) => <tr key={person.id}><td><div className="person-cell"><span className="mini-avatar violet">{person.initials}</span><div><strong>{person.name}</strong><small>{person.email}</small></div></div></td><td>{person.lastEntryDate ? formatDate(person.lastEntryDate) : "Sem lançamentos"}</td><td>{submissionLabel(person.lastEntryAt, data.timezone)}</td><td><RegistrationDelay person={person} /></td><td>{person.retroactiveEntries}</td><td>{display.daysByPerson[person.id] ?? 0}</td><td>{display.fullMonth ? <><div className="fill-cell"><div className="mini-progress"><span style={{ width: person.fillPercentage + "%" }} /></div><b>{person.fillPercentage}%</b></div>{(person.estimatedRequiredMonths ?? 0) > 0 && <small>Inclui estimativa da carga</small>}</> : <small>Consulte um mês completo</small>}</td></tr>)}</tbody></table></div> : <Empty text="Nenhum colaborador ativo encontrado." />}</div>
-      <div className="panel balance-panel"><PanelHeading eyebrow="BANCO DE HORAS" title="Saldos mais antigos" action="Ver extrato" onAction={() => onNavigate("balance")} />{data.balanceLots.length ? <div className="lot-list">{data.balanceLots.slice(0, 5).map((lot) => <article className="lot-row" key={lot.id}><div className="lot-top"><div><strong>{lot.contractorName}</strong><span>{formatDate(lot.originDate)}</span></div><b className={lot.type === "CREDIT" ? "positive" : "negative"}>{formatMinutes((lot.type === "CREDIT" ? 1 : -1) * lot.remainingMinutes, true)}</b></div><div className="deadline-line"><small>{statusLabel(lot.status)}</small><time>{formatDate(lot.deadlineDate)}</time></div></article>)}</div> : <Empty text="Nenhum lote de saldo aberto." />}</div></section>
-  </>;
-}
 
-function submissionLabel(instant: string | null, timezone = "America/Sao_Paulo") {
+export function submissionLabel(instant: string | null, timezone = "America/Sao_Paulo") {
   if (instant === null) return "Sem envios válidos nesta consulta";
   const date = new Date(instant);
   if (!Number.isFinite(date.getTime())) return "Data não disponível";
   return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, dateStyle: "short", timeStyle: "short" }).format(date);
 }
-function RegistrationDelay({ person }: { person: DashboardContractor }) {
+export function RegistrationDelay({ person }: { person: DashboardContractor }) {
   return <>{person.averageDelayDays === null ? "Não disponível" : person.averageDelayDays + " dia(s) em média"}
     {(person.unavailableRegistrationDates ?? 0) > 0 && <small>{person.unavailableRegistrationDates} registro(s) com data inválida; fora do cálculo.</small>}
   </>;
 }
 
-function MonthlyContext({ context, estimatedMonths }: { context: ReturnType<typeof dashboardDisplay>["monthlyContext"]; estimatedMonths: number }) {
+export function MonthlyContext({ context, estimatedMonths }: { context: ReturnType<typeof dashboardDisplay>["monthlyContext"]; estimatedMonths: number }) {
   return <section className="monthly-context" aria-label="Contexto dos meses consultados">
     <h2 className="summary-title">Contexto dos meses consultados</h2>
     <p>Valores mensais completos, sem rateio. Não representam apenas os dias selecionados.</p>
@@ -95,17 +78,19 @@ function MonthlyContext({ context, estimatedMonths }: { context: ReturnType<type
   </section>;
 }
 
-function Metric({ label, value, meta, tone }: { label: string; value: string; meta: string; tone: string }) { return <article className="metric-card"><div className={"metric-icon " + tone}>◇</div><span>{label}</span><strong>{value}</strong><p>{meta}</p></article>; }
-function PanelHeading({ eyebrow, title, action, onAction }: { eyebrow: string; title: string; action: string; onAction: () => void }) { return <div className="panel-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div><button onClick={onAction}>{action} <b>→</b></button></div>; }
 
-export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = false, contractorId = null, onContractorChange, displayMode = "collaborator", onDisplayModeChange, workDate = "", onWorkDateChange }: {
+export function EntriesView({ role, data: originalData, onNew, onEdit, onHistory, readOnly = false, contractorId = null, onContractorChange, displayMode = "collaborator", onDisplayModeChange, workDate = "", onWorkDateChange, reviewScope, onClearReviewScope }: {
   role: Role; data: DashboardData; onNew: () => void; onEdit: (entry: DashboardEntry) => void;
   onHistory: (entry: DashboardEntry) => void; readOnly?: boolean;
   contractorId?: string | null; onContractorChange?: (id: string | null) => void;
   displayMode?: EntriesDisplayMode; onDisplayModeChange?: (mode: EntriesDisplayMode) => void;
   workDate?: string; onWorkDateChange?: (date: string) => void;
+  reviewScope?: ReviewScope; onClearReviewScope?: () => void;
 }) {
+  const data = role === "rh" && reviewScope ? scopeDashboard(originalData, reviewScope) : originalData;
   const available = selectableContractors(data);
+  const targeted = role === "rh" && reviewScope?.personId ? data.contractors.find(person => person.id === reviewScope.personId) : undefined;
+  if (targeted && !available.some(person => person.id === targeted.id)) available.push(targeted);
   const selectedId = role === "pj" ? data.contractors[0]?.id ?? null : available.some(person => person.id === contractorId) ? contractorId : null;
   const selection = selectEntries(data, selectedId);
   const estimatedMonths = selectedId ? data.contractors.find(person => person.id === selectedId)?.estimatedRequiredMonths ?? 0 : data.metrics.estimatedRequiredPersonMonths ?? 0;
@@ -113,10 +98,12 @@ export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = f
   const daily = role === "rh" && displayMode === "day";
   const date = resolveEntryDate(data.period, workDate);
   const day = daily ? selectDailyEntries(data, date) : null;
+  if (day && targeted && !day.entries.some(entry => entry.contractorId === targeted.id) && !day.withoutEntry.some(person => person.id === targeted.id)) day.withoutEntry.push(targeted);
   const previousDay = shiftEntryDate(data.period, date, -1);
   const nextDay = shiftEntryDate(data.period, date, 1);
   const visibleEntries = day?.entries ?? selection.entries;
   return <>
+    {role === "rh" && reviewScope && onClearReviewScope && <ReviewScopeBanner data={originalData} scope={reviewScope} onClear={onClearReviewScope} />}
     <section className="page-heading"><div><span className="eyebrow">PERÍODO SELECIONADO</span><h1>{role === "rh" ? "Lançamentos da equipe" : "Meu mês"}</h1><p>{monthLabel(data.period)}</p></div>{role === "pj" && !readOnly && <button className="primary-button" onClick={onNew}>+ Registrar horas</button>}</section>
     {role === "rh" && <fieldset className="entries-display"><legend>Visualizar lançamentos</legend>
       <label><input type="radio" name="entries-display" checked={!daily} onChange={() => onDisplayModeChange?.("collaborator")} />Por colaborador</label>
@@ -141,9 +128,9 @@ export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = f
     </> : <><h2 className="summary-title">{selection.title}</h2>
     <section className="timesheet-summary" aria-label={selection.title}>
       <div><span>Horas trabalhadas</span><strong>{formatMinutes(selection.summary.workedMinutes)}</strong></div>
-      <div><span>Horas abonadas</span><strong>{formatMinutes(selection.summary.creditedMinutes)}</strong></div>
-      <div><span>Total considerado</span><strong>{formatMinutes(selection.summary.consideredMinutes)}</strong><small>Meta: {formatMinutes(selection.summary.requiredMinutes)}</small>{estimatedMonths > 0 && <small>Inclui estimativa para meses sem registro mensal</small>}</div>
-      <div className="projected"><span>Saldo previsto</span><strong>{formatMinutes(selection.summary.projectedBalanceMinutes, true)}</strong><small>{!selectedId && role === "rh" ? "Consulte a situação por pessoa no fechamento" : monthlyKnown ? statusLabel(selection.summary.status) : "Situação mensal não informada"}</small></div>
+      <div><span>Horas abonadas</span><strong>{data.monthlyTimesheets === undefined ? "Não disponível" : formatMinutes(selection.summary.creditedMinutes)}</strong></div>
+      <div><span>Total considerado</span><strong>{data.monthlyTimesheets === undefined ? "Não disponível" : formatMinutes(selection.summary.consideredMinutes)}</strong><small>Meta: {formatMinutes(selection.summary.requiredMinutes)}</small>{estimatedMonths > 0 && <small>Inclui estimativa para meses sem registro mensal</small>}</div>
+      <div className="projected"><span>Saldo previsto</span><strong>{data.monthlyTimesheets === undefined ? "Não disponível" : formatMinutes(selection.summary.projectedBalanceMinutes, true)}</strong><small>{!selectedId && role === "rh" ? "Consulte a situação por pessoa no fechamento" : monthlyKnown ? statusLabel(selection.summary.status) : "Situação mensal não informada"}</small></div>
     </section></>}
     <section className={"panel entries-panel" + (daily ? " daily-entry-panel" : "")}>{visibleEntries.length ? <div className="entry-list">{visibleEntries.map(entry => {
       const blocked = entryEditBlockReason(data, entry, readOnly);
@@ -171,7 +158,10 @@ export function EntriesView({ role, data, onNew, onEdit, onHistory, readOnly = f
   </>;
 }
 
-export function BalanceView({ data }: { data: DashboardData }) {
+export function BalanceView({ data, reviewScope, onClearReviewScope }: { data: DashboardData; reviewScope?: ReviewScope; onClearReviewScope?: () => void }) {
+  return <>{reviewScope && onClearReviewScope && <ReviewScopeBanner data={data} scope={reviewScope} onClear={onClearReviewScope} />}<BalanceContent data={reviewScope ? scopeDashboard(data, reviewScope) : data} /></>;
+}
+function BalanceContent({ data }: { data: DashboardData }) {
   const display = dashboardDisplay(data);
   return <><section className="page-heading"><div><span className="eyebrow">EXTRATO AUDITÁVEL</span><h1>Banco de horas</h1><p>Saldo atual do banco; não é uma posição histórica do mês selecionado.</p></div></section><section className="balance-hero"><div><span>Disponível para usar</span><strong>{formatMinutes(display.availableCreditMinutes)}</strong></div><div className="balance-breakdown"><p><span>Créditos válidos</span><strong>{formatMinutes(display.validCreditMinutes)}</strong></p><p><span>Reservado para folgas</span><strong>{formatMinutes(display.reservedCreditMinutes)}</strong></p><p><span>Déficits pendentes</span><strong>{formatMinutes(data.metrics.negativeBalanceMinutes)}</strong></p></div><div className="fifo-card"><span>Ordem de utilização</span><strong>Créditos mais antigos primeiro</strong></div></section>
     <section className="panel ledger-panel"><div className="panel-heading static"><div><span>LOTES EM ABERTO</span><h2>Saldo por origem</h2></div></div>{data.balanceLots.length ? <div className="table-scroll"><table><thead><tr><th>Colaborador</th><th>Natureza</th><th>Origem</th><th>Saldo</th><th>Reservado</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>{data.balanceLots.map((lot) => <tr key={lot.id}><td><strong>{lot.contractorName}</strong></td><td>{lot.type === "CREDIT" ? "Crédito" : "Déficit"}</td><td>{formatDate(lot.originDate)}</td><td>{formatMinutes((lot.type === "CREDIT" ? 1 : -1) * lot.remainingMinutes, true)}</td><td>{formatMinutes(lot.reservedMinutes)}</td><td>{formatDate(lot.deadlineDate)}</td><td><span className={"status-pill " + statusTone(lot.status)}>{statusLabel(lot.status)}</span></td></tr>)}</tbody></table></div> : <Empty text="Nenhum saldo aberto." />}</section>

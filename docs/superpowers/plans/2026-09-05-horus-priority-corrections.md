@@ -28,7 +28,7 @@
 
 ## Estado e limites desta entrega
 
-Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Na documentação inicial, os testes ainda não haviam sido executados. Em 2026-09-05, as tarefas 1–6 e a validação local integrada da tarefa 7 foram concluídas. PR, preview externo e liberação de produção continuam pendentes de autorização específica. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Nenhuma publicação remota foi realizada.
+Plano escrito a partir do commit `54be4957d4e944f800935b0cafdf2c025a6cfeba`; verificar o diff na retomada. Em 2026-09-05, tarefas 1–7 concluídas, com autorização específica para cada liberação: PR #5 integrado e novo build Production do merge `d0d56b6` publicado no domínio oficial. Conferência autenticada em produção somente em leitura. Evidências e limites: `../../runbooks/2026-09-05-priority-corrections-validation.md`. Entregas B e C não fazem parte desta publicação.
 
 Não executar `db:push`, `db:types`, scripts SQL remotos, `supabase db reset` ou importações. Não carregar `.env` real em ensaios. Não usar dados pessoais nas fixtures. Não usar contagem de registros como única prova de preservação: comparar o conteúdo das tabelas fictícias antes/depois e assertar zero mutações nas consultas.
 
@@ -288,7 +288,7 @@ O sinalizador `--candidate` é necessário para testar no cluster novo as prote�
 - [x] Registrar no runbook uma tabela para cada cenário com resultado real, evidência e falhas. Não marcar “passou” antes de observar o resultado. Conferir teclado/foco e janela ampla/estreita nas áreas tocadas.
 - [x] Após autorização de execução e revisão local, preparar PR com: achados F01–F07 cobertos; arquivos; testes; ausência de migrações; prova de leitura sem gravação; limites; instrução de reversão da versão do aplicativo. Não incluir dados pessoais ou capturas reais no PR. PR #5 aberto em rascunho; deploy Git automático desabilitado somente na branch de revisão. Produção e banco inalterados nesta preparação.
 - [x] Preview publicado somente quando autorizado e identificado seu ambiente. Se usa banco de produção, limitar a navegação a leitura; nenhum cadastro, edição, aprovação ou fechamento de teste. Não copiar chaves privilegiadas para variáveis públicas. Prévia ec88a46 READY, sem variáveis de banco: entrada renderizada, API responde 503 de configuração. Validação autenticada remota indisponível; limite registrado no runbook. Não promover esse artefato sem configuração para produção.
-- [ ] Antes de produção, apresentar resultado do PR/preview e pedir aprovação específica do release. Confirmar versão anterior recuperável. Publicar somente o aplicativo, sem comandos Supabase; depois verificar leitura e navegação. Qualquer regressão bloqueia a entrega e exige reverter o aplicativo, não o banco.
+- [x] Antes de produção, apresentar resultado do PR/preview e pedir aprovação específica do release. Confirmar versão anterior recuperável. Publicar somente o aplicativo, sem comandos Supabase; depois verificar leitura e navegação. Qualquer regressão bloqueia a entrega e exige reverter o aplicativo, não o banco. Autorização recebida; PR #5 integrado com head exato aprovado; novo build Production READY, alias oficial conferido. Painel DEV/RH, Aprovações, agosto em Fechamento/Lançamentos, histórico diário e Relatórios carregaram em leitura. Nenhuma ação mensal, edição ou migração executada. Detalhes e limites no runbook.
 
 ## Revisão do plano
 

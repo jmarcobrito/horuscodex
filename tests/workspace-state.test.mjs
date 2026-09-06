@@ -4,6 +4,26 @@ import { runnerImport } from "vite";
 import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
 const options = { configFile: false, envDir: false };
 
+test("only the accepted response stamps the workspace; stale, invalid and failed reads never retain a timestamp", async () => {
+  const { module: w } = await runnerImport("./app/workspace-state.ts", options);
+  const data = makeWorkflowDashboard(), key = "rh:self:overview";
+  let state = w.initialWorkspace(key, data);
+  assert.equal(state[key].receivedAt, null);
+  for (const requestId of [10, 11]) state = w.workspaceReducer(state, { type: "start", key, period: data.period, requestId });
+  state = w.workspaceReducer(state, { type: "success", key, requestId: 10, data, receivedAt: "2026-09-05T10:00:00Z" });
+  assert.equal(state[key].receivedAt, null);
+  state = w.workspaceReducer(state, { type: "success", key, requestId: 11, data, receivedAt: "2026-09-05T11:00:00Z" });
+  assert.equal(state[key].receivedAt, "2026-09-05T11:00:00Z");
+  for (const action of [
+    { type: "failure", key, requestId: 11, message: "offline" },
+    { type: "success", key, requestId: 11, data: makeWorkflowDashboard(2026, 9), receivedAt: "2026-09-05T12:00:00Z" },
+    { type: "success", key, requestId: 11, data: { ...data, approvalsScope: "all" }, receivedAt: "2026-09-05T12:00:00Z" },
+    { type: "success", key, requestId: 11, data, receivedAt: "invalid" },
+    { type: "success", key, requestId: 11, data },
+    { type: "invalidate" },
+  ]) assert.equal(w.workspaceReducer(state, action)[key].receivedAt, null);
+});
+
 test("approval scopes have separate slots and reject responses from another scope", async () => {
   const {module:w} = await runnerImport("./app/workspace-state.ts", options);
   const allKey=w.workspaceKey("rh","requests","","all"), periodKey=w.workspaceKey("rh","requests","","period");

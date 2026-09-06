@@ -7,7 +7,7 @@ import { runnerImport } from "vite";
 import { makeDashboard } from "./fixtures/dashboard.mjs";
 
 test("Developer navigation uses clear role names", async () => {
-  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false });
+  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false, envDir: false });
   const html = renderToStaticMarkup(createElement(imported.module.HorusApp, {
     user: { name: "João Dev", email: "dev@example.com" },
     accountRole: "dev",
@@ -22,7 +22,7 @@ test("Developer navigation uses clear role names", async () => {
 });
 
 test("Developer simulation states that it is read-only", async () => {
-  const imported = await runnerImport("./app/DeveloperViewBanner.tsx", { configFile: false });
+  const imported = await runnerImport("./app/DeveloperViewBanner.tsx", { configFile: false, envDir: false });
   const html = renderToStaticMarkup(createElement(imported.module.DeveloperViewBanner, {
     collaboratorName: "Ana Exemplo",
     onBack() {},
@@ -34,13 +34,13 @@ test("Developer simulation states that it is read-only", async () => {
 });
 
 test("DEV sees reports in RH view but collaborator simulation does not", async () => {
-  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false });
+  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false, envDir: false });
   assert.ok(imported.module.navigationItems("rh", true).some(item => item.id === "reports"));
   assert.ok(!imported.module.navigationItems("pj", true).some(item => item.id === "reports"));
 });
 
 test("Administration stays in RH navigation and never enters collaborator simulation", async () => {
-  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false });
+  const imported = await runnerImport("./app/HorusApp.tsx", { configFile: false, envDir: false });
   assert.ok(imported.module.navigationItems("rh", false).some(item => item.id === "admin"), "RH and ADMIN share the administrative navigation");
   assert.ok(imported.module.navigationItems("rh", true).some(item => item.id === "admin"), "real DEV sees Administration in RH view");
   assert.ok(!imported.module.navigationItems("pj", false).some(item => item.id === "admin"), "PJ does not see Administration");

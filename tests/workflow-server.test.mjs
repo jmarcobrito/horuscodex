@@ -3,6 +3,20 @@ import test from "node:test";
 import { runnerImport } from "vite";
 const { module: { createWorkflowServer } } = await runnerImport("./tests/helpers/workflow-server.ts", { configFile: false, envDir: false });
 
+test("response-only absent person fixture preserves complete stored data and resets after one read", async () => {
+  const server = createWorkflowServer("rh", "overview"), before = server.fullSnapshot();
+  server.configure({ omitAnaOnce: true });
+  const response = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(response.contractors.some(person => person.id === "person-1"), false);
+  for (const key of ["entries", "monthlyTimesheets", "balanceLots", "balanceTransactions", "requests", "occurrences", "authorizations"]) {
+    assert.ok(response[key].every(item => item.contractorId !== "person-1"));
+  }
+  const next = await (await server.request("/api/dashboard?year=2026&month=8")).json();
+  assert.equal(next.contractors.some(person => person.id === "person-1"), true);
+  assert.deepEqual(server.fullSnapshot(), before);
+  assert.ok(server.calls.every(call => call.method === "GET"));
+});
+
 test("fixture history resolves names and timezone without changing stored versions", async () => {
   const server=createWorkflowServer(); const before=server.snapshot();
   const response=await server.request("/api/time-entries/entry-1/history"); const body=await response.json();
