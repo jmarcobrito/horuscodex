@@ -2,6 +2,16 @@
 
 Estado: **preparação local; PR novo e deploy não realizados**.
 
+## Atualização após autorização de Playwright — 06/09/2026
+
+Zoom real de 200% validado em perfil temporário separado, somente com o ensaio fictício. O teste revelou quebra do rótulo “Conferir”; corrigida com largura mínima de 112 px para a coluna de ação, sem mudar backend ou regras de fechamento. Teste executável `tests/browser/overview-action-layout.js` falhou antes e passou depois nas seis pessoas a 200%, 1487 px e 390 px.
+
+Depois da correção, as cinco etapas foram repetidas na cópia isolada com `buildSafeEnv`: Vinext, 226 testes (zero falhas, 10.314 ms), lint, Next e TypeScript, todas com saída 0. O lint inicialmente sinalizou a expressão de função exigida pelo Playwright CLI; adicionada justificativa restrita a essa linha do script de teste e repetido o lint global, sem erros ou avisos. Nenhuma regra do aplicativo ou configuração global de lint foi relaxada.
+
+`design-qa.md` agora está **passed**, com capturas pareadas, métricas de zoom e limites. Snapshot fictício integral preservado (5 leituras, zero gravações e fechamentos no checkpoint). Arquivos protegidos comparados novamente com `origin/main`: nenhuma diferença. Nenhum acesso ao Supabase, alteração de dependências do Horus ou deploy nesta rodada.
+
+Ao concluir, o zoom do perfil temporário foi restaurado a 100% e somente a sessão `horus-zoom-200` foi encerrada. Perfil pessoal, abas do usuário e preview 4178 preservados. A ferramenta Playwright foi obtida no cache de ferramentas; não foi adicionada ao pacote do Horus.
+
 ## Base conferida em 06/09/2026
 
 - GitHub `main`: `d0d56b6b22ab188960e026168d4025bddeed58f8`, consultado pela API do GitHub, igual à referência local `origin/main`.
@@ -35,8 +45,8 @@ Este texto está **apenas preparado localmente**. Não afirmar no PR que a valid
 
 ## Pendências para liberar
 
-1. Validar zoom real de 200%. Os atalhos anteriores não o aplicaram; viewport reduzido não substitui esse teste. Não transferir novamente a tarefa de ajuste manual ao usuário. Foi solicitada autorização para Playwright direto em navegador de teste isolado, exclusivamente no ensaio fictício.
-2. Registrar o resultado, resolver qualquer defeito encontrado e revisar os itens compostos restantes do plano. Só marcar QA como aprovado com evidência suficiente.
+1. Zoom real de 200% concluído; evidências e correção posterior registradas em `design-qa.md`.
+2. Consolidar os itens compostos restantes do plano na revisão final de release. A aprovação visual não substitui essa revisão.
 3. Atualizar a comparação contra `main` antes de publicar; se a base avançar, revisar a diferença nova e repetir as verificações afetadas.
 4. Criar o novo PR, verificar sua revisão e verificações do GitHub e seguir a autorização de release. A branch atual tem publicação automática desabilitada em `vercel.json`; enviar a branch não equivale a deploy.
 5. Confirmar a versão entregue pela Vercel. Qualquer verificação autenticada de produção precisa respeitar a restrição vigente de não acessar o Supabase; não testar gravações em dados reais.

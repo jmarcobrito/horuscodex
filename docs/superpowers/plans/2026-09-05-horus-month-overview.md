@@ -352,7 +352,8 @@ Checkpoint anterior: 68 testes selecionados e 39 testes PostgreSQL em cluster fi
 - [x] Conferir pessoa ausente, navegação contextual concorrente, troca entre setores com limpeza de seleção e reconhecimento, e detalhes pelo teclado.
 - [x] Repetir as cinco etapas na cópia isolada existente com ambiente filtrado após as correções: Vinext, 226 testes, lint global, Next, TypeScript; saída final 0. Não chamar essa sequência de nova execução do criador de cópia.
 - [x] Comparar referência e captura nítida no Chrome, com recortes de fechamento/tabela; conferir 390 px, reflow reduzido, contraste direcionado e console.
-- [ ] Confirmar zoom real de 200%. O atalho automatizado não mudou viewport/DPR; pedido de ajuste manual superado pela preferência do usuário por execução pelo agente. Solicitada autorização para Playwright direto em navegador de teste isolado. Reflow em 744 px não substitui esse teste.
-- [ ] Após esse teste, revisar os itens compostos restantes e liberar `design-qa.md`. Nenhuma publicação automática.
+- [x] Confirmar zoom real de 200%. Autorização para Playwright direto recebida; zoom nativo aplicado no perfil temporário. Janela inalterada, DPR 1→2, viewport 1469×962→734×481. Fluxos e preservação fictícia verificados. Rótulo quebrado da ação corrigido por largura mínima da coluna; regressão falhou antes e passou depois em zoom, desktop e celular.
+- [x] Liberar `design-qa.md` após comparação posterior à correção: `final result: passed`. Não significa aprovação automática de release.
+- [ ] Consolidar os itens compostos restantes com o runbook na revisão final do PR. Nenhuma publicação automática.
 
 Preservação: zero conexão ao Supabase; APIs, SQL, contratos transacionais, dependências e arquivos de ambiente intactos. Detalhes e limites da rodada no runbook, seção de 06/09/2026.

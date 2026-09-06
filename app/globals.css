@@ -544,7 +544,7 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .overview-table th,.overview-table td { padding:10px 24px; font-size:14px; text-align:left; vertical-align:top; border-top:1px solid var(--line); white-space:normal; overflow-wrap:anywhere; }
 .overview-table th { color:#5e637a; font-size:12px; font-weight:500; background:#fcfcfe; }
 .overview-table th:first-child { width:29%; }
-.overview-table th:last-child { width:13%; }
+.overview-table th:last-child { width:max(13%,112px); }
 .overview-table td>strong { font-size:14px; font-weight:650; }
 .overview-table td>small { display:block; margin-top:4px; color:#636880; font-size:12px; }
 .overview-table .overview-action { padding:7px 14px; }

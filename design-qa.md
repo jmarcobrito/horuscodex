@@ -1,8 +1,32 @@
 # Horus — QA visual do Painel mensal
 
-final result: blocked
+final result: passed
 
-## Resultado atual — 06/09/2026
+## Conclusão do zoom — 06/09/2026
+
+A pendência de zoom real foi resolvida nesta rodada, com autorização explícita do usuário para Playwright direto. Não houve acesso ao Supabase. As rodadas abaixo são histórico; o resultado vigente é o desta seção.
+
+- Perfil de Chrome separado, temporário, sem sessão pessoal; zoom configurado pelo seletor nativo `chrome://settings/appearance`, de 100% para 200%. Requisições de páginas externas bloqueadas, permitindo somente o ensaio 4178 e páginas internas do navegador.
+- Antes: janela externa 1487 × 1058, viewport 1469 × 962 CSS, DPR 1. Depois: mesma janela externa, viewport 734 × 481 CSS, DPR 2, `visualViewport.scale=1` e CSS `zoom=1`. O seletor nativo confirmou 200%. Não foi simulação por CSS, viewport ou escala de dispositivo.
+- [P2 encontrado e resolvido] A coluna de ação ocupava 13% da tabela fixa e dividia “Conferir” no meio em 734 CSS px. A largura agora é `max(13%,112px)`, restrita ao cabeçalho final de `.overview-table`. Nenhuma regra de negócio mudou.
+- Regressão executável em `tests/browser/overview-action-layout.js`: falhou antes com duas linhas no botão de Bruno; passou depois com uma linha e botão dentro da célula/tela, para as seis pessoas, em zoom 200%, desktop 1487 px e celular 390 px. É verificação de navegador separada da suíte de 226 testes.
+- Interações a 200%: intervalo 01–15/08, fechamento desabilitado no intervalo e retorno ao mês completo; filtro de situação e limpeza; setor Engenharia (duas pessoas) mais Bruno (uma); detalhes por Enter; menu aberto e navegação ao fechamento; seleção dos prontos e revisão cancelada sem confirmar; conferência diária recebendo pessoa/setor/mês e navegação de 03 para 04/08.
+- Preservação do percurso fictício: snapshot integral igual, `onlyReads=true`, 5 leituras, zero gravações e zero fechamentos no checkpoint final. O contador não representa o total acumulado de rodadas anteriores. Console da sessão: zero erros e zero avisos.
+
+### Evidência visual posterior
+
+Diretório: `C:/Users/danyel/Documents/Codex/2026-09-01/recordo-do-projeto-que-a-gente/output/playwright/zoom-200/`.
+
+- `zoom-200-range-native.png`, `zoom-200-closing-review.png`, `zoom-200-person-details.png` (antes da correção) e `zoom-200-action-fixed.png`: capturas nativas de 1469 × 962 pixels, viewport 734 × 481 CSS a 200%. O par antes/depois foi aberto no mesmo input, com foco no botão da tabela; posição de rolagem/detalhes difere, portanto não é uma comparação pixel a pixel.
+- A captura padrão do Playwright recortou a imagem ampliada. Os arquivos `zoom-200-initial.png`, `zoom-200-six-states.png` e `zoom-200-range-fullpixels.png` são diagnósticos, não evidência de recorte do aplicativo. As capturas nativas corrigem somente o método de captura, não a página.
+- Após restaurar 100% no perfil de teste: `desktop-final.png`, 1487 × 1058 pixels, viewport CSS idêntico e DPR 1. Aberta no mesmo input que a referência original `exec-0ec5299b-b81f-412d-a953-92f21925d726.png` indicada abaixo, também 1487 × 1058. Nenhum redimensionamento da referência foi necessário nesta comparação.
+- `mobile-final-stable.png`, 390 × 844 pixels/CSS, DPR 1; documento com largura 390, sem transbordamento. O arquivo `mobile-final.png` capturou a animação da sidebar ainda em curso e foi substituído como evidência pelo estado estável.
+- Tipografia, cores, marca e textos permanecem os da rodada anterior; títulos e ações legíveis. A largura mínima corrige o botão sem alterar os controles em desktop/celular. Revisão mensal e intervalo a 200% mantêm campos e botões alcançáveis.
+- Mantidas as diferenças intencionais já documentadas: barra superior preexistente, faixa de ensaio, seis pessoas, detalhes e aviso de estimativa tornam o conteúdo mais alto que o mock. Não remover histórico ou informações para reproduzir a altura ilustrativa. Ícones/marca preexistentes não foram substituídos.
+
+Nenhum P0/P1/P2 conhecido permanece nos estados examinados. QA visual deste Painel aprovado; isso não equivale a certificação completa de acessibilidade, validação do banco real ou confirmação de deploy. Revisão final de release/PR continua separada.
+
+## Rodada anterior — 06/09/2026
 
 As seções abaixo deste registro preservam a rodada anterior. Fontes e recorte do formulário foram corrigidos; o bloqueio atual é **a confirmação do zoom real de 200%**, não o build nem o carregamento das fontes.
 
