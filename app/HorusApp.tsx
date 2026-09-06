@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useMemo, useReducer, useRef, useState } from "r
 import { entryEditBlockReason, saveThenRefresh, type EntriesDisplayMode } from "./entries-model";
 import { Overview } from "./Overview";
 import { defaultOverviewFilters, normalizeOverviewFilters, type OverviewFilters } from "./overview-model";
-import { overviewTarget, type OverviewIntent, type OverviewTarget } from "./overview-navigation";
+import { overviewTarget, reviewContextNotice, type OverviewIntent, type OverviewTarget } from "./overview-navigation";
 import { EntryHistory, type HistoryState, type HistoryVersion } from "./EntryHistory";
 import { Modal } from "./Modal";
 import { defaultApprovalFilters, type ApprovalFilters } from "./approvals-model";
@@ -95,6 +95,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
   const currentNavigation = useRef({ key: activeKey, identity: approvalIdentity, overviewIdentity, token: 0 });
   const contentRef = useRef<HTMLDivElement>(null);
   const activeSlot = workspaces[activeKey];
+  const contextNotice = reviewContextNotice(activeSlot?.loading ? undefined : activeSlot?.data ?? undefined, reviewContext?.scope);
   const dashboard = activeSlot?.data ?? { ...initialDashboard, contractors: [], entries: [], monthlyTimesheets: undefined, requests: [], occurrences: [], authorizations: [], balanceLots: [], balanceTransactions: [] };
   const dashboardQuery = periodQuery(activeSlot?.period ?? initialDashboard.period);
   const [loading, setLoading] = useState(false); const [notice, setNotice] = useState("");
@@ -146,11 +147,8 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     // Configure before loading so retry keeps the intended view. Stale successes never restore it.
     if (target.section === "entries") { setEntryContractorId(target.scope.personId); setEntryDisplayMode(target.entriesMode); setEntryWorkDate(target.workDate); }
     try {
-      const result = await loadWorkspace(key, target.period);
+      await loadWorkspace(key, target.period);
       if (overviewNavigationId.current !== token || currentNavigation.current.key !== key || currentNavigation.current.identity !== "rh:self") return;
-      if (target.scope.personId && !result.contractors.some(person => person.id === target.scope.personId)) {
-        setNotice("A pessoa não está disponível nesta consulta. Os filtros recebidos foram mantidos para não mostrar outra pessoa.");
-      }
       window.requestAnimationFrame(() => {
         if (overviewNavigationId.current !== token || currentNavigation.current.key !== key) return;
         const heading = contentRef.current?.querySelector<HTMLElement>("h1");
@@ -462,6 +460,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
     <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon">{item.icon}</span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count" aria-label={(dashboard.approvalsScope === "all" ? "Pendências de todas as datas: " : "Pendências deste período: ") + pendingCount} title={dashboard.approvalsScope === "all" ? "Pendências de todas as datas" : "Pendências deste período"}>{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
     <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div ref={contentRef} className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
+      {contextNotice && <div className="toast" role="status" aria-live="polite">{contextNotice}</div>}
       {section === "requests" && <section className="panel approval-filters" aria-label="Filtros de aprovações">
         <div className="form-grid">
           <label>Datas<SelectMenu ariaLabel="Datas das aprovações" value={approvalFilters.scope} disabled={loading} onChange={value => changeApprovalFilters({ ...approvalFilters, scope: value as ApprovalFilters["scope"] })} options={[{value:"all",label:"Todas as datas"},{value:"period",label:"Período escolhido"}]} /></label>

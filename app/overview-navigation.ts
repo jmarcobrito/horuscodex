@@ -8,6 +8,11 @@ export type OverviewTarget = {
   section: "entries" | "closing" | "balance"; period: DashboardPeriod; scope: ReviewScope;
   closingStatus: ClosingStatus | "all"; entriesMode: "collaborator" | "day"; workDate: string;
 };
+export function reviewContextNotice(data: DashboardData | undefined, scope: ReviewScope | undefined): string {
+  return data && scope?.personId && !data.contractors.some(person => person.id === scope.personId)
+    ? "A pessoa não está disponível nesta consulta. Os filtros recebidos foram mantidos para não mostrar outra pessoa."
+    : "";
+}
 export function overviewTarget(data: DashboardData, filters: OverviewFilters, intent: OverviewIntent): OverviewTarget {
   const month = asFullMonth(data.period);
   if (intent.kind !== "balance" && !month) throw Error("Escolha um mês completo para conferir o fechamento");

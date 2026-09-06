@@ -343,3 +343,16 @@ Contratos novos têm nomes/tipos definidos antes de uso; os nomes de callback da
 Estado atualizado em 05/09/2026: implementação local das tarefas 1–5 realizada, sem subagentes. Limpeza autorizada recuperou cerca de 4,82 GB. Na cópia isolada nova passaram Vinext, 223 testes, lint global e, após repetir a etapa de fontes com rede autorizada, Next e TypeScript. Tarefa 6 permanece em andamento: matriz interativa parcialmente concluída e QA visual bloqueado por fontes/densidade da captura. Não houve publicação nem acesso ao Supabase. Evidências e retomada em `../../runbooks/2026-09-05-month-overview-validation.md`.
 
 Checkpoint anterior: 68 testes selecionados e 39 testes PostgreSQL em cluster fictício novo e encerrado. Retomada: 223 testes na suíte completa; navegador comprovou meses independentes, filtros, diário, preservação integral nas consultas, fechamento individual/coletivo em fixtures, retorno parcial/incerto e DEV somente leitura. Os itens compostos acima continuam desmarcados quando ainda têm cenários pendentes. `design-qa.md` registra `final result: blocked`; não considerar a interface aprovada visualmente. Fontes, histórico Git e previews anteriores preservados; código funcional desta retomada permanece `6278a00`.
+
+### Atualização de execução — 06/09/2026
+
+- [x] Corrigir mensagem parcial e aviso contextual antigo; este agora deriva da resposta e do escopo ativos.
+- [x] Reutilizar fontes compiladas no ensaio, sem dependências/configuração de produção novas.
+- [x] Corrigir formulário de intervalo recortado e deslocado no celular; repetir aplicação/retorno do intervalo.
+- [x] Conferir pessoa ausente, navegação contextual concorrente, troca entre setores com limpeza de seleção e reconhecimento, e detalhes pelo teclado.
+- [x] Repetir as cinco etapas na cópia isolada existente com ambiente filtrado após as correções: Vinext, 226 testes, lint global, Next, TypeScript; saída final 0. Não chamar essa sequência de nova execução do criador de cópia.
+- [x] Comparar referência e captura nítida no Chrome, com recortes de fechamento/tabela; conferir 390 px, reflow reduzido, contraste direcionado e console.
+- [ ] Confirmar zoom real de 200%. O atalho automatizado não mudou viewport/DPR; pedido de ajuste manual enviado ao usuário. Reflow em 744 px não substitui esse teste.
+- [ ] Após esse teste, revisar os itens compostos restantes e liberar `design-qa.md`. Nenhuma publicação automática.
+
+Preservação: zero conexão ao Supabase; APIs, SQL, contratos transacionais, dependências e arquivos de ambiente intactos. Detalhes e limites da rodada no runbook, seção de 06/09/2026.

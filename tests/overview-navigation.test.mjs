@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { runnerImport } from "vite";
 import { makeWorkflowDashboard } from "./fixtures/monthly-workflow.mjs";
+test("unavailable-person notice follows the current response and clears for a new or cleared scope", async () => {
+  const { module: { reviewContextNotice } } = await runnerImport("./app/overview-navigation.ts", { configFile: false, envDir: false });
+  const data = makeWorkflowDashboard();
+  assert.match(reviewContextNotice(data, { personId: "missing", sectorId: null }), /pessoa não está disponível/);
+  assert.equal(reviewContextNotice(data, { personId: "person-2", sectorId: null }), "");
+  assert.equal(reviewContextNotice(data, undefined), "");
+  assert.equal(reviewContextNotice(undefined, { personId: "missing", sectorId: null }), "");
+  const restored = { ...data, contractors: [...data.contractors, { ...data.contractors[0], id: "missing" }] };
+  assert.equal(reviewContextNotice(restored, { personId: "missing", sectorId: null }), "");
+});
 test("explicit navigation carries month and scope without mutating data or guessing a partial month", async () => {
   const { module: n } = await runnerImport("./app/overview-navigation.ts", { configFile: false, envDir: false });
   const data = makeWorkflowDashboard(), before = structuredClone(data);

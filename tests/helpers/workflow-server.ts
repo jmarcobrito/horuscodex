@@ -14,7 +14,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
   const dashboards = new Map<string, DashboardData>([["2026-8", makeWorkflowDashboard()], ["2026-9", makeWorkflowDashboard(2026, 9)]]);
   const versions: Record<string, HistoryVersion[]> = { "entry-1": [makeHistoryVersion()], "entry-2": [] };
   const closingCalls: unknown[] = [];
-  const controls = { failDashboard: false, delayAugust: false, historyMode: "normal" as "normal" | "empty" | "error" | "slow", closingMode: "normal" as "normal" | "partial" | "uncertain" | "slow", failRefreshAfterSave: false };
+  const controls = { failDashboard: false, omitAnaOnce: false, delayAugust: false, historyMode: "normal" as "normal" | "empty" | "error" | "slow", closingMode: "normal" as "normal" | "partial" | "uncertain" | "slow", failRefreshAfterSave: false };
   const august = dashboards.get("2026-8")!;
   if (scenario === "pending") august.entries[0].nonBusinessDayStatus = "PENDING_AUTHORIZATION";
   if (scenario === "closed") { august.monthlyTimesheets![0].status = "CLOSED"; august.contractors[0].timesheetStatus = "CLOSED"; }
@@ -41,7 +41,7 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
     if (!dashboards.has(key)) dashboards.set(key, makeWorkflowDashboard(year, month));
     return dashboards.get(key)!;
   }
-  function consult(url: URL) {
+  function consult(url: URL, omitAna = false) {
     const from = url.searchParams.get("from"), to = url.searchParams.get("to");
     const period = from && to ? { from, to, year: null, month: null } : monthPeriod(Number(url.searchParams.get("year")), Number(url.searchParams.get("month")));
     const months: DashboardData[] = [];
@@ -67,6 +67,17 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       data.occurrences = data.occurrences.filter(o => o.contractorId === id);
       data.authorizations = data.authorizations.filter(a => a.contractorId === id);
       data.requests = data.requests.filter(r => r.contractorId === id); data.balanceLots = []; data.balanceTransactions = [];
+    }
+    // Response-only omission: persisted fictional history remains intact.
+    if (omitAna) {
+      data.contractors = data.contractors.filter(p => p.id !== "person-1");
+      data.entries = data.entries.filter(e => e.contractorId !== "person-1");
+      data.monthlyTimesheets = data.monthlyTimesheets?.filter(m => m.contractorId !== "person-1");
+      data.occurrences = data.occurrences.filter(o => o.contractorId !== "person-1");
+      data.authorizations = data.authorizations.filter(a => a.contractorId !== "person-1");
+      data.requests = data.requests.filter(r => r.contractorId !== "person-1");
+      data.balanceLots = data.balanceLots.filter(l => l.contractorId !== "person-1");
+      data.balanceTransactions = data.balanceTransactions.filter(t => t.contractorId !== "person-1");
     }
     for (const person of data.contractors) {
       const entries = data.entries.filter(e => e.contractorId === person.id);
@@ -134,7 +145,8 @@ export function createWorkflowServer(role: TestRole = "rh", scenario: TestScenar
       return Response.json({ action: "CLOSE", result: { timesheetId: `ts_${body.contractorId}_${body.year}_${body.month}`, alreadyClosed: result.status === "already-closed" } });
     },
     "GET /api/dashboard": async (url: URL) => {
-      const data = consult(url);
+      const omitAna = controls.omitAnaOnce; controls.omitAnaOnce = false;
+      const data = consult(url, omitAna);
       const fail = controls.failDashboard; controls.failDashboard = false;
       if (controls.delayAugust && data.period.from.startsWith("2026-08")) await pause(2500);
       return fail ? Response.json({ error: "Falha fictícia na consulta" }, { status: 503 }) : Response.json(data);

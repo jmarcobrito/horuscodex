@@ -210,6 +210,7 @@ function Harness() {
         <label>Estado dos relatórios<select value={reportMode} onChange={event => setReportMode(event.target.value as ReportMode)}><option value="normal">Com resultados</option><option value="empty">Sem resultados</option><option value="loading">Carregando contínuo</option><option value="error">Erro do servidor</option></select></label>
         <button type="button" className="fixture-primary" onClick={reset}>Aplicar controles e reiniciar</button>
         <button type="button" onClick={() => { server.configure({ failDashboard: true }); setReport("Próxima consulta falhará"); }}>Falhar próxima consulta</button>
+        <button type="button" onClick={() => { server.configure({ omitAnaOnce: true }); setReport("Ana será omitida apenas da próxima resposta fictícia; histórico preservado."); }}>Omitir Ana na próxima consulta</button>
         <label><input type="checkbox" onChange={event => { server.configure({ delayAugust: event.target.checked }); }} />Atrasar agosto</label>
         <label><input type="checkbox" onChange={event => { server.configure({ failRefreshAfterSave: event.target.checked }); }} />Falhar consulta após salvar</label>
         <label>Histórico fictício<select onChange={event => { server.configure({ historyMode: event.target.value as typeof server.controls.historyMode }); }}><option value="normal">Versões</option><option value="empty">Vazio</option><option value="error">Erro</option><option value="slow">Lento</option></select></label>

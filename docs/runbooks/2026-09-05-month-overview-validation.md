@@ -105,4 +105,37 @@ O navegador foi devolvido ao tamanho padrão e a fixture restaurada para RH/seis
 
 ## Preservação prioritária
 
+### Retomada e correções — 06/09/2026
+
+Partida: checkpoint `7b2fb3c`, worktree limpo. Preservado o escopo de apresentação/ensaios; sem publicação.
+
+Correções: orientação contextual do intervalo parcial; aviso de pessoa ausente derivado da consulta atual; formulário de intervalo com recorte e posicionamento móvel corrigidos; pesos de títulos e espaçamento ajustados. Ensaio passou a reutilizar Manrope/Sora compiladas localmente e ganhou omissão de Ana apenas da próxima resposta, sem modificar o armazenamento fictício.
+
+#### Verificação final desta rodada
+
+Na cópia isolada existente `C:/Users/danyel/AppData/Local/Temp/horus-workflow-check-pFhQnz`, arquivos alterados sincronizados explicitamente. Executadas em sequência as mesmas cinco etapas de verificação, em processos filhos com `buildSafeEnv`: **Vinext, 226 testes (226 passaram; zero falhas), lint global, Next e TypeScript independente — saída final 0**. Não foi criada outra cópia de dependências e não foi alegada uma nova execução do comando que cria a cópia.
+
+Houve uma tentativa intermediária com duas falhas de renderização por ordem de inicialização de `activeSlot` introduzida nesta rodada. Corrigida antes da repetição integral final. Não considerar a tentativa intermediária aprovada. Os testes novos de fonte, omissão fictícia e aviso tiveram falha esperada antes da implementação e passaram depois.
+
+Nenhum teste PostgreSQL foi repetido: a evidência anterior de 39 testes permanece histórica, e código transacional/SQL não foi modificado.
+
+| Caso acrescentado/repetido | Resultado |
+| --- | --- |
+| Resposta sem Ana | Aviso explícito e nenhum registro de outra pessoa; próxima resposta restaura Ana; snapshot integral do servidor fictício inalterado |
+| Duas navegações contextuais | Ana com atraso seguida de Bruno; destino permaneceu em Bruno. Aviso antigo encontrado e corrigido; repetição sem aviso indevido |
+| Troca de mês durante consulta | Setembro permaneceu como mês ativo após consulta de agosto atrasada |
+| Preservação no percurso de leitura | Snapshot igual, somente leituras; checkpoint capturado com 4 GET, zero writes, zero closings. Não confundir com toda a soma de sessões ou com os fechamentos fictícios da rodada anterior |
+| Troca de escopo do fechamento | Engenharia: Bruno + Diego reconhecido = 2 selecionados; Arquitetura = 0; retorno Engenharia = 0 e Diego novamente bloqueado até reconhecimento |
+| Intervalo nativo | Campo final 15/08 aplicado; fechamento desabilitado e mensagem correta; retorno a agosto completo com ações disponíveis. Na automação IAB, fill isolado não disparava o evento: usado passo pelas setas do campo |
+| Detalhes por teclado | Enter expandiu e recolheu detalhes de Ana; datas, carga, percentual e indicadores de envio legíveis |
+| Celular | Recorte do formulário identificado e corrigido; confirmação visual no IAB e Chrome, 390 px, sem ultrapassar a lateral |
+| Reflow reduzido | 744 × 530 medidos: filtros/CTA reorganizados; não tratado como zoom real |
+| Console final Chrome | Nenhum erro/aviso na sessão nova de validação |
+
+O ensaio próprio de 4178 foi reiniciado com CSP inline persistente para o WebSocket dessa porta; previews anteriores 4176/4177 não foram encerrados. Fontes vêm de arquivos estáticos da compilação, sem servir Next real nem ler ambiente.
+
+**Pendência atual específica:** zoom real de 200%. Atalhos da automação não mudaram viewport/DPR. Usuário solicitado a ajustar no menu do Chrome; override de tamanho restaurado. A comparação pareada nítida e os recortes foram realizados no Chrome após distorções de captura do IAB. Ver `design-qa.md`. Não reiniciar o plano, refazer limpeza ou conectar banco para resolver esse teste.
+
+Próximo passo: concluir esse teste e a revisão dos itens compostos ainda abertos no plano; só então liberar QA e preparar autorização de PR/release. Não há deploy desta rodada.
+
 Nenhuma conexão, consulta, gravação ou alteração de configuração foi feita no Supabase nesta execução. Histórico de agosto não foi manipulado. Cópias de apresentação nunca substituem o payload original em gravações. O ensaio PostgreSQL usa somente clusters locais fictícios novos e encerra o servidor ao concluir. O ambiente de produção continua na versão previamente publicada.

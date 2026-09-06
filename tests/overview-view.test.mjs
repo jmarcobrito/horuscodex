@@ -24,4 +24,5 @@ test("monthly overview offers explicit review, six state filters, and current ba
   assert.match(partial, /Contexto mensal indisponível/);
   assert.doesNotMatch(partial, /aria-pressed/);
   assert.match(partial, /disabled=""[^>]*>Ir para fechamento/);
+  assert.doesNotMatch(partial, /Revise e confirme o fechamento na próxima tela/);
 });

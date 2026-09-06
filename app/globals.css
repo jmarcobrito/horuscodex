@@ -496,11 +496,11 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .review-scope-status { font-size:14px; color:#5c547d; }
 .overview-root { font-size:14px; color:#252941; }
 .overview-title { margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--line); }
-.overview-title h1 { font-size:30px; }
+.overview-title h1 { font-size:30px; font-weight:700; }
 .overview-title p { font-size:15px; }
 .overview-toolbar { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:20px; }
 .overview-toolbar>div { min-width:0; }
-.period-panel.overview-period { display:flex; gap:12px; padding:0; border:0; background:transparent; margin:0; }
+.period-panel.overview-period { display:flex; gap:12px; padding:0; border:0; background:transparent; margin:0; overflow:visible; }
 .overview-period .period-section-label,.overview-period .period-caption { display:none; }
 .overview-period .month-selector-controls { grid-template-columns:36px minmax(140px,170px) 36px; gap:0; }
 .overview-period .month-selector-controls button { width:36px; height:44px; border-radius:6px; }
@@ -523,13 +523,13 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .overview-root button:focus-visible,.overview-root summary:focus-visible,.overview-root input:focus-visible { outline:3px solid #6451de; outline-offset:3px; }
 .overview-closing,.overview-team { border:1px solid var(--line); border-radius:8px; background:#fff; margin-bottom:20px; }
 .overview-closing-heading { display:flex; flex-wrap:wrap; gap:28px; align-items:center; padding:24px; }
-.overview-root h2 { font-family:var(--font-sora); font-size:20px; margin:0; letter-spacing:-.4px; }
+.overview-root h2 { font-family:var(--font-sora); font-size:20px; font-weight:650; margin:0; letter-spacing:-.4px; }
 .overview-closing-heading p { margin:6px 0 10px; }
 .overview-closing-heading small { font-size:13px; color:#62677f; }
-.overview-statuses { margin:0 24px; padding:20px 0; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
+.overview-statuses { margin:0 24px; padding:16px 0; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
 .overview-status { min-width:0; border:0; border-right:1px solid var(--line); background:#fff; padding:4px 12px; cursor:pointer; color:#252941; }
 .overview-status:last-child { border-right:0; }
-.overview-status span { display:block; min-height:34px; font-size:12px; line-height:1.4; }
+.overview-status span { display:block; min-height:20px; font-size:12px; line-height:1.4; }
 .overview-status strong { display:block; font-size:25px; }
 .overview-status-READY { color:#5140c9; }
 .overview-status-PENDING { color:#a54e00; }
@@ -541,7 +541,7 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .overview-month-help { padding:0 24px 24px; }
 .overview-team-heading { padding:16px 24px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
 .overview-table { width:100%; table-layout:fixed; border-collapse:collapse; }
-.overview-table th,.overview-table td { padding:14px 24px; font-size:14px; text-align:left; vertical-align:top; border-top:1px solid var(--line); white-space:normal; overflow-wrap:anywhere; }
+.overview-table th,.overview-table td { padding:10px 24px; font-size:14px; text-align:left; vertical-align:top; border-top:1px solid var(--line); white-space:normal; overflow-wrap:anywhere; }
 .overview-table th { color:#5e637a; font-size:12px; font-weight:500; background:#fcfcfe; }
 .overview-table th:first-child { width:29%; }
 .overview-table th:last-child { width:13%; }
@@ -571,7 +571,7 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 @media(max-width:650px) {
   .overview-toolbar>div,.overview-filters { width:100%; min-width:0!important; }
   .period-panel.overview-period { flex-wrap:wrap; }
-  .overview-range .custom-period-selector { left:auto; right:0; }
+  .overview-range .custom-period-selector { left:0; right:auto; }
   .overview-statuses { grid-template-columns:repeat(2,minmax(0,1fr)); margin:0 16px; }
   .overview-status:nth-child(3) { border-right:1px solid var(--line); }
   .overview-status:nth-child(even) { border-right:0; }
