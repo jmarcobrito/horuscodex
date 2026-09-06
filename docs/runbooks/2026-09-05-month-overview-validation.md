@@ -134,8 +134,8 @@ Nenhum teste PostgreSQL foi repetido: a evidência anterior de 39 testes permane
 
 O ensaio próprio de 4178 foi reiniciado com CSP inline persistente para o WebSocket dessa porta; previews anteriores 4176/4177 não foram encerrados. Fontes vêm de arquivos estáticos da compilação, sem servir Next real nem ler ambiente.
 
-**Pendência atual específica:** zoom real de 200%. Atalhos da automação não mudaram viewport/DPR. Usuário solicitado a ajustar no menu do Chrome; override de tamanho restaurado. A comparação pareada nítida e os recortes foram realizados no Chrome após distorções de captura do IAB. Ver `design-qa.md`. Não reiniciar o plano, refazer limpeza ou conectar banco para resolver esse teste.
+**Pendência atual específica:** zoom real de 200%. Atalhos da automação não mudaram viewport/DPR. A solicitação anterior de ajuste manual foi superada pela preferência do usuário por execução pelo agente; autorização para Playwright direto em navegador de teste isolado foi solicitada. Override de tamanho restaurado. A comparação pareada nítida e os recortes foram realizados no Chrome após distorções de captura do IAB. Ver `design-qa.md`. Não reiniciar o plano, refazer limpeza ou conectar banco para resolver esse teste.
 
-Próximo passo: concluir esse teste e a revisão dos itens compostos ainda abertos no plano; só então liberar QA e preparar autorização de PR/release. Não há deploy desta rodada.
+Próximo passo: concluir esse teste e a revisão dos itens compostos ainda abertos no plano; só então liberar QA e seguir o PR/release. Preparação local registrada em `2026-09-06-month-overview-release.md`: base atual do GitHub confirmada, caminhos protegidos sem diferenças e nova repetição dos 226 testes, lint, Vinext, Next e TypeScript com saída 0. Não há deploy desta rodada.
 
 Nenhuma conexão, consulta, gravação ou alteração de configuração foi feita no Supabase nesta execução. Histórico de agosto não foi manipulado. Cópias de apresentação nunca substituem o payload original em gravações. O ensaio PostgreSQL usa somente clusters locais fictícios novos e encerra o servidor ao concluir. O ambiente de produção continua na versão previamente publicada.

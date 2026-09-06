@@ -37,9 +37,9 @@ Diretório de artefatos: `C:/Users/danyel/Documents/Codex/2026-09-01/recordo-do-
 
 ### Pendência de liberação
 
-Zoom de 200% não aplicado pelos atalhos automatizados em IAB nem Chrome (viewport/DPR não mudaram). Foi solicitada ajuda do usuário para ajustar o zoom no menu do Chrome. Tamanhos temporários dos navegadores foram restaurados; abas do ensaio preservadas.
+Zoom de 200% não aplicado pelos atalhos automatizados em IAB nem Chrome (viewport/DPR não mudaram). A solicitação anterior de ajuste manual foi superada: o usuário prefere que o agente resolva. Nesta retomada foi solicitada autorização para Playwright direto em navegador de teste isolado, apenas com dados fictícios. Tamanhos temporários dos navegadores foram restaurados; aba do ensaio preservada.
 
-As demais verificações desta rodada estão registradas no runbook. Nenhum P0/P1/P2 conhecido permanece sem correção nos estados examinados, mas a matriz visual ainda não está integralmente concluída. Por isso, manter `blocked`, não entregar como 100% e não publicar. Após o ajuste manual, verificar controles, tabela, menu, detalhes e intervalo em zoom real; registrar resultado e então revisar o gate.
+As demais verificações desta rodada estão registradas no runbook. Nenhum P0/P1/P2 conhecido permanece sem correção nos estados examinados, mas a matriz visual ainda não está integralmente concluída. Por isso, manter `blocked`, não entregar como 100% e não publicar. Quando houver um mecanismo autorizado para aplicar zoom real, verificar controles, tabela, menu, detalhes e intervalo; registrar resultado e então revisar o gate. Preparação local da publicação: `docs/runbooks/2026-09-06-month-overview-release.md`.
 
 ## Registro da rodada anterior (05/09/2026)
 

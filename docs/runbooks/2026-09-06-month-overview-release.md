@@ -1,0 +1,44 @@
+# Painel mensal — preparação de publicação
+
+Estado: **preparação local; PR novo e deploy não realizados**.
+
+## Base conferida em 06/09/2026
+
+- GitHub `main`: `d0d56b6b22ab188960e026168d4025bddeed58f8`, consultado pela API do GitHub, igual à referência local `origin/main`.
+- Candidato funcional: `e9d756220316915d5129f520b2e3d177eba62108`, branch `feature/reports-redesign-design`.
+- PRs anteriores #2, #3, #4 e #5 já incorporados. O PR #1 antigo não faz parte desta entrega.
+- Comparação cumulativa do candidato: 34 arquivos, 10 deles no aplicativo; demais são testes e documentação. Esta documentação de preparação é posterior a essa contagem.
+- Diferença vazia nos caminhos protegidos: `db`, `app/api`, `supabase`, dependências/lockfile, `vercel.json`, `app/closing-model.ts`, `app/closing-client.ts`, `app/page.tsx`, `app/dashboard-types.ts` e `app/reports`.
+- Nenhuma configuração de ambiente alterada. Nenhum acesso ao Supabase nesta rodada.
+
+## Verificação desta retomada
+
+- Cópia isolada reutilizada: `C:/Users/danyel/AppData/Local/Temp/horus-workflow-check-pFhQnz`.
+- Comparados por hash 131 arquivos rastreados de aplicativo, testes, scripts e configurações selecionadas: zero diferenças; raiz da cópia sem `.env*` e sem `.git`.
+- Suíte completa repetida com `buildSafeEnv`: 226 testes passaram, zero falhas, cancelamentos ou testes pulados. Duração reportada: 30.834 ms.
+- Mensagens de erro emitidas pelos cenários negativos são esperadas; não são consultas ao serviço real.
+- Lint global e TypeScript independente: saída 0. Vinext e Next de produção: saída 0; TypeScript independente repetido após os builds, também saída 0. Processos com ambiente filtrado; nenhuma inicialização do servidor real. Vinext emitiu aviso informativo de tempo gasto em plugins, sem falha de compilação.
+- Ensaio local 4178 acessível, banner de dados fictícios confirmado; aba preservada para continuidade.
+- Evidências visuais/interativas anteriores permanecem no runbook de 05/09 e em `design-qa.md`; não foram integralmente repetidas nesta rodada.
+
+## Descrição preparada para o futuro PR
+
+**Título:** Melhora o Painel mensal e a navegação da conferência do RH
+
+O Painel passa a organizar a conferência pelo mês escolhido, com filtros por pessoa e setor, seis situações mensais e acesso direto ao fechamento, lançamentos por pessoa, conferência por dia e extrato. Os destinos recebem o contexto explicitamente, mantendo a seleção independente de mês em cada área.
+
+O fechamento continua exigindo revisão e confirmação. Pessoas ocultadas por mudança de filtro não permanecem selecionadas. Consulta por intervalo não permite fechamento mensal. O banco de horas é identificado como posição atual, sem apresentá-lo como saldo histórico do mês consultado.
+
+O acesso DEV continua oferecendo a visão RH e a simulação de colaborador somente leitura. Não há ampliação das permissões, alteração do backend nem migração. Lançamentos e históricos existentes não são regravados.
+
+Este texto está **apenas preparado localmente**. Não afirmar no PR que a validação visual foi concluída enquanto `design-qa.md` estiver bloqueado.
+
+## Pendências para liberar
+
+1. Validar zoom real de 200%. Os atalhos anteriores não o aplicaram; viewport reduzido não substitui esse teste. Não transferir novamente a tarefa de ajuste manual ao usuário. Foi solicitada autorização para Playwright direto em navegador de teste isolado, exclusivamente no ensaio fictício.
+2. Registrar o resultado, resolver qualquer defeito encontrado e revisar os itens compostos restantes do plano. Só marcar QA como aprovado com evidência suficiente.
+3. Atualizar a comparação contra `main` antes de publicar; se a base avançar, revisar a diferença nova e repetir as verificações afetadas.
+4. Criar o novo PR, verificar sua revisão e verificações do GitHub e seguir a autorização de release. A branch atual tem publicação automática desabilitada em `vercel.json`; enviar a branch não equivale a deploy.
+5. Confirmar a versão entregue pela Vercel. Qualquer verificação autenticada de produção precisa respeitar a restrição vigente de não acessar o Supabase; não testar gravações em dados reais.
+
+Reversão, se necessária: somente a versão do aplicativo. Nunca restaurar, limpar, recalcular ou substituir o banco de produção como parte deste pacote.
