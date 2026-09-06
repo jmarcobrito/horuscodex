@@ -354,6 +354,20 @@ Checkpoint anterior: 68 testes selecionados e 39 testes PostgreSQL em cluster fi
 - [x] Comparar referência e captura nítida no Chrome, com recortes de fechamento/tabela; conferir 390 px, reflow reduzido, contraste direcionado e console.
 - [x] Confirmar zoom real de 200%. Autorização para Playwright direto recebida; zoom nativo aplicado no perfil temporário. Janela inalterada, DPR 1→2, viewport 1469×962→734×481. Fluxos e preservação fictícia verificados. Rótulo quebrado da ação corrigido por largura mínima da coluna; regressão falhou antes e passou depois em zoom, desktop e celular.
 - [x] Liberar `design-qa.md` após comparação posterior à correção: `final result: passed`. Não significa aprovação automática de release.
-- [ ] Consolidar os itens compostos restantes com o runbook na revisão final do PR. Nenhuma publicação automática.
+- [x] Consolidar os itens compostos restantes com o runbook na revisão final do PR. Ver encerramento abaixo; publicação somente após autorização recebida.
 
 Preservação: zero conexão ao Supabase; APIs, SQL, contratos transacionais, dependências e arquivos de ambiente intactos. Detalhes e limites da rodada no runbook, seção de 06/09/2026.
+
+### Encerramento da revisão para PR — 06/09/2026
+
+O usuário autorizou seguir para o próximo passo de PR/publicação após a conclusão do zoom real. Os checkboxes compostos das tarefas originais são mantidos como histórico do método proposto; a aceitação consolidada abaixo substitui sua leitura como lista de bloqueios atuais. Não se afirma que cada cenário visual foi convertido em teste SSR individual.
+
+- [x] Projeção e navegação: `overview-model`, `overview-navigation`, `overview-scope` e `workspace-state` cobrem estados distintos, metadados ausentes/duplicados, dias distintos, interseção de filtros, banco sem efeito do status e respostas atrasadas. Snapshots integrais do ensaio cobrem preservação além da projeção unitária.
+- [x] Apresentação: testes renderizados cobrem ações, ausência de metadados, intervalo parcial, inativos, filtro vazio, busy e estimativas. Os seis estados, consulta vazia/zero e 40 pessoas foram conferidos no navegador, conforme runbook; isso é evidência interativa, não cobertura SSR de todos esses casos.
+- [x] Integração: meses independentes, destino contextual, foco, seleção/reconhecimento zerados ao mudar escopo, pessoa ausente, concorrência e DEV/PJ constam nas tabelas de evidências de 05 e 06/09. Conferência diária e extrato foram verificados com filtros e somente leituras.
+- [x] Fechamento: individual, coletivo, reconhecimento explícito, parcial e incerto executados somente em fixtures separadas. Função de comando, cliente transacional, API e SQL não mudaram neste pacote. Os 39 testes PostgreSQL são evidência histórica desta implementação, não foram repetidos na revisão de publicação.
+- [x] QA: referência preservada, fontes do produto, desktop, 390 px, teclado e zoom nativo 200%; correção do rótulo Conferir com regressão vermelho/verde. Resultado e limites em `design-qa.md`: passed.
+- [x] Verificação final do candidato funcional `51162d6`: 132 arquivos comparados por hash com a cópia isolada, sem diferença; Vinext, 226 testes (zero falhas/pulados), lint, Next e TypeScript passaram em sequência com ambiente filtrado. Suíte: 12.709 ms. Cópia existente reutilizada; não houve nova execução do criador de cópia.
+- [x] Preservação: diferença vazia em caminhos protegidos contra `main` remoto `d0d56b6`; nenhum acesso ao Supabase. Worktree e preview preservados.
+
+Aceitação local concluída nos cenários documentados. Não equivale a certificação de ausência de qualquer bug, auditoria WCAG completa ou teste autenticado de produção. A publicação e a identificação do deploy ficam no runbook `2026-09-06-month-overview-release.md`.

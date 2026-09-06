@@ -1,6 +1,6 @@
 # Painel mensal — preparação de publicação
 
-Estado: **preparação local; PR novo e deploy não realizados**.
+Estado: **revisão local concluída; envio de PR/publicação autorizados pelo usuário e em execução**. As seções anteriores abaixo registram checkpoints históricos; o fechamento desta revisão está na seção final.
 
 ## Atualização após autorização de Playwright — 06/09/2026
 
@@ -52,3 +52,17 @@ Este texto está **apenas preparado localmente**. Não afirmar no PR que a valid
 5. Confirmar a versão entregue pela Vercel. Qualquer verificação autenticada de produção precisa respeitar a restrição vigente de não acessar o Supabase; não testar gravações em dados reais.
 
 Reversão, se necessária: somente a versão do aplicativo. Nunca restaurar, limpar, recalcular ou substituir o banco de produção como parte deste pacote.
+
+## Revisão final para publicação — 06/09/2026
+
+- Candidato funcional: `51162d6`. Documentação de encerramento posterior não altera o aplicativo.
+- Base remota reconfirmada: `d0d56b6b22ab188960e026168d4025bddeed58f8`. Branch remota `feature/reports-redesign-design`: `a606dbce021a0b90b5886a14d9126e9344d38c40`, ancestral do candidato; envio será fast-forward, sem force push.
+- Produção anterior confirmada na Vercel: `dpl_8yF1qeUaDMMQcYSqJEDWKHuZff5r`, READY, main `d0d56b6`, domínio `horuscodex.vercel.app`.
+- Revisão do escopo: 36 arquivos antes desta consolidação, 10 do aplicativo; caminhos protegidos sem diferença e `git diff --check` aprovado. Nenhuma alteração em ambiente, dependências ou configuração de deploy.
+- Paridade: 132 arquivos rastreados de app/testes/scripts/configurações comparados por hash com `horus-workflow-check-pFhQnz`, zero diferenças; sem `.env*`/`.git` na raiz da cópia.
+- Verificação fresca: Vinext, 226 testes (226 passaram, zero falhas, cancelamentos ou pulados; 12.709 ms), lint global, Next e TypeScript independente, todos saída 0. Ambiente filtrado por `buildSafeEnv`; nenhuma conexão ao Supabase.
+- Itens compostos do plano consolidados por evidência unitária/renderizada/interativa. QA nativo 200% já aprovado após a correção; não foi repetido nesta rodada documental.
+- Não há workflow GitHub Actions versionado neste repositório. Verificações locais não serão apresentadas como CI remoto. A publicação automática da feature está desabilitada; merge na main será acompanhado na Vercel antes de afirmar produção atualizada.
+- Limite: não executar sessão autenticada nem gravações em produção. Sem afirmar que o funcionamento de dados reais foi auditado nesta publicação.
+
+PR antigo #1 preservado, sem mudança. Worktree, branch e previews permanecem disponíveis para retomada. Resultado remoto de PR/merge/deploy será registrado após confirmação das plataformas.

@@ -4,6 +4,8 @@ Data: 05/09/2026. Branch: `feature/reports-redesign-design`, no worktree `safer-
 
 ## Situação
 
+**Atualização de 06/09/2026:** este documento conserva os checkpoints e bloqueios históricos. O zoom nativo foi concluído, QA está passed e a revisão local foi encerrada. Estado atual de PR/publicação em `2026-09-06-month-overview-release.md`; não interpretar os bloqueios abaixo como pendências atuais.
+
 Implementação local das tarefas 1–5 realizada; tarefa 6 iniciada e **não concluída**. Não publicar esta revisão como validada. Nenhum push, PR, merge ou deploy executado nesta entrega. Continuação sem subagentes, conforme usuário.
 
 ## Código implementado
