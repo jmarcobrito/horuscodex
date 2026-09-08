@@ -1,9 +1,13 @@
-/* global document, innerWidth, getComputedStyle */
+/* global document, innerWidth, innerHeight, getComputedStyle */
 
 // Read-only DOM inspection. Run only against the isolated, fictitious preview.
 export default function inspectHorusLayout() {
   if (!document.body.innerText.includes("TESTE LOCAL — dados fictícios; sem Supabase")) throw Error("Verificação restrita à prévia fictícia");
   if (document.documentElement.scrollWidth > innerWidth + 1) throw Error("Página transborda horizontalmente");
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar && sidebar.scrollHeight > sidebar.clientHeight + 1 && !["auto", "scroll"].includes(getComputedStyle(sidebar).overflowY)) {
+    throw Error("Menu lateral excede a altura disponível sem permitir rolagem");
+  }
   const periods = [];
   for (const controls of document.querySelectorAll(".month-selector-controls")) {
     if (!controls.getClientRects().length) continue;
@@ -21,6 +25,10 @@ export default function inspectHorusLayout() {
     const a = box.getBoundingClientRect(), b = svg.getBoundingClientRect();
     if (Math.abs(a.x + a.width / 2 - b.x - b.width / 2) > 1 || Math.abs(a.y + a.height / 2 - b.y - b.height / 2) > 1) throw Error("Seta descentralizada");
     arrows++;
+  }
+  for (const menu of document.querySelectorAll(".select-menu-popover")) {
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < 7 || rect.bottom > innerHeight - 7) throw Error("Lista de opções ultrapassa a altura disponível");
   }
   for (const option of document.querySelectorAll(".select-menu-popover button")) {
     // SelectMenu positions its list using 48 px per option. Typography must retain that size.

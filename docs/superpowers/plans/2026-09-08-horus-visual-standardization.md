@@ -25,7 +25,7 @@
 
 ## Estado e limites desta entrega
 
-Plano aprovado e implementação visual local executada em 08/09/2026. Resultados e pendências em `../verification/2026-09-08-horus-ui.md`. A validação de zoom real 200% e a aprovação visual ainda não estão concluídas. Sem PR, push, merge ou deploy. As caixas não marcadas incluem verificações ainda parciais e etapas de publicação condicionais.
+Plano aprovado e implementação visual local executada em 08/09/2026. Resultados e pendências em `../verification/2026-09-08-horus-ui.md`. Após o usuário ajustar o zoom para 200%, a conferência encontrou e corrigiu localmente a falta de rolagem do menu lateral e o corte da lista de filtros. Verificações de regressão e builds repetidos com sucesso; a aprovação visual ainda está pendente. Sem PR, push, merge ou deploy. As caixas não marcadas incluem verificações ainda parciais e etapas de publicação condicionais.
 
 Checkout inspecionado: `C:/Users/danyel/Documents/Codex/2026-09-01/recordo-do-projeto-que-a-gente/work/horuscodex/.worktrees/safer-month-closing`, HEAD `fcad09c814131b60af46699e3f0c2694c8ec6d0d`. O estado estava limpo antes de adicionar estes documentos. O mapa Graphify não existe neste checkout; o plano foi fundamentado em leitura direta dos componentes e testes, sem criar grafo ou memória.
 
