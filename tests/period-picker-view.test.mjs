@@ -11,7 +11,7 @@ test("only compact period picker collapses range controls and retains month boun
   assert.doesNotMatch(normal, /<details/);
   assert.match(normal, /Aplicar intervalo/);
   const compact = renderToStaticMarkup(createElement(PeriodPicker, { ...props, variant: "compact", busy: true }));
-  assert.match(compact, /<details[^>]*><summary>Outro intervalo/);
+  assert.match(compact, /<details[^>]*><summary><svg[^>]*aria-hidden="true"[\s\S]*?<\/svg>Outro intervalo/);
   assert.match(compact, /type="month"[^>]*disabled=""/);
   assert.match(compact, /min="2000-01" max="2200-12"/);
 });

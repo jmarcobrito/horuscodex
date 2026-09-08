@@ -1,5 +1,7 @@
 "use client";
 
+import { UiIcon } from "./UiIcon";
+
 import { createPortal } from "react-dom";
 import { KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -15,12 +17,12 @@ type Props = {
   variant?: "light" | "dark";
 };
 
-type MenuPosition = { top: number; left: number; width: number };
+type MenuPosition = { top: number; left: number; width: number; maxHeight: number };
 
 export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = "Selecione", disabled = false, variant = "light" }: Props) {
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<MenuPosition>({ top: 0, left: 0, width: 0 });
+  const [position, setPosition] = useState<MenuPosition>({ top: 0, left: 0, width: 0, maxHeight: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
@@ -33,10 +35,13 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
     const menuHeight = Math.min(options.length * 48 + 12, 280);
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUp = spaceBelow < menuHeight + 16 && rect.top > spaceBelow;
+    const availableHeight = Math.max(0, (openUp ? rect.top : spaceBelow) - 15);
+    const visibleHeight = Math.min(menuHeight, availableHeight);
     setPosition({
-      top: openUp ? Math.max(8, rect.top - menuHeight - 7) : rect.bottom + 7,
+      top: openUp ? Math.max(8, rect.top - visibleHeight - 7) : rect.bottom + 7,
       left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
       width: rect.width,
+      maxHeight: visibleHeight,
     });
   }, [options.length]);
 
@@ -98,13 +103,13 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
       }}
     >
       <span className={!selected ? "placeholder" : ""}>{selected?.label ?? placeholder}</span>
-      <span className="select-menu-chevron" aria-hidden="true">⌄</span>
+      <span className="select-menu-chevron" aria-hidden="true"><UiIcon name="down" /></span>
     </button>
     {open && typeof document !== "undefined" && createPortal(
       <div ref={menuRef} id={listboxId} className={`select-menu-popover ${variant}`} role="listbox" aria-label={ariaLabel} style={position} onKeyDown={handleMenuKeyDown}>
         {options.map((option) => <button key={option.value} type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); close(true); }}>
           <span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>
-          {option.value === value && <b aria-hidden="true">✓</b>}
+          {option.value === value && <b aria-hidden="true"><UiIcon name="check" size={16} /></b>}
         </button>)}
       </div>,
       portalRoot ?? document.body,

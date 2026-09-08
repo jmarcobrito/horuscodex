@@ -1,5 +1,7 @@
 "use client";
 
+import { UiIcon, type UiIconName } from "./UiIcon";
+
 import { FormEvent, useCallback, useMemo, useReducer, useRef, useState } from "react";
 import { entryEditBlockReason, saveThenRefresh, type EntriesDisplayMode } from "./entries-model";
 import { Overview } from "./Overview";
@@ -31,19 +33,19 @@ type AccountRole = "dev" | Role;
 type ModalKind = "closing" | "entry" | "history" | "occurrence" | "leave" | "authorization" | "contractor" | "contractorEdit" | "contractorPassword" | "policy" | null;
 type Confirmation = { title: string; description: string; confirmLabel: string; reasonRequired: boolean; danger?: boolean; onConfirm: (reason: string) => Promise<void> } | null;
 
-const rhNavItems: Array<{ id: Section; label: string; icon: string; devOnly?: boolean }> = [
-  { id: "overview", label: "Painel", icon: "⌂" },
-  { id: "entries", label: "Lançamentos", icon: "▷" },
-  { id: "requests", label: "Aprovações", icon: "◇" },
-  { id: "closing", label: "Fechamento do mês", icon: "◫" },
-  { id: "team", label: "Pessoas", icon: "◎" },
-  { id: "reports", label: "Relatórios", icon: "↗" },
-  { id: "admin", label: "Administração", icon: "⚙" },
+const rhNavItems: Array<{ id: Section; label: string; icon: UiIconName; devOnly?: boolean }> = [
+  { id: "overview", label: "Painel", icon: "home" },
+  { id: "entries", label: "Lançamentos", icon: "entries" },
+  { id: "requests", label: "Aprovações", icon: "requests" },
+  { id: "closing", label: "Fechamento do mês", icon: "closing" },
+  { id: "team", label: "Pessoas", icon: "people" },
+  { id: "reports", label: "Relatórios", icon: "reports" },
+  { id: "admin", label: "Administração", icon: "admin" },
 ];
-const collaboratorNavItems: Array<{ id: Section; label: string; icon: string }> = [
-  { id: "entries", label: "Meu mês", icon: "▷" },
-  { id: "balance", label: "Banco de horas", icon: "◫" },
-  { id: "requests", label: "Solicitações", icon: "◇" },
+const collaboratorNavItems: Array<{ id: Section; label: string; icon: UiIconName }> = [
+  { id: "entries", label: "Meu mês", icon: "entries" },
+  { id: "balance", label: "Banco de horas", icon: "balance" },
+  { id: "requests", label: "Solicitações", icon: "requests" },
 ];
 const sectionNames: Record<Section, string> = { overview: "Painel", entries: "Lançamentos", balance: "Banco de horas", requests: "Solicitações", closing: "Fechamento do mês", team: "Pessoas", reports: "Relatórios", admin: "Administração" };
 
@@ -457,7 +459,7 @@ export function HorusApp({ user, accountRole, organizationName, initialDashboard
 
   return <div className="app-shell">
     <button className="mobile-menu" onClick={() => setSidebarOpen((open) => !open)} aria-label="Abrir menu" aria-expanded={sidebarOpen} aria-controls="main-sidebar"><span /><span /></button>
-    <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon">{item.icon}</span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count" aria-label={(dashboard.approvalsScope === "all" ? "Pendências de todas as datas: " : "Pendências deste período: ") + pendingCount} title={dashboard.approvalsScope === "all" ? "Pendências de todas as datas" : "Pendências deste período"}>{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
+    <aside id="main-sidebar" className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")}><button className="brand" onClick={() => openSection(role === "rh" ? "overview" : "entries")}><span className="brand-mark">H</span><span><strong>horus</strong><small>HORAS TÉCNICAS</small></span></button>{isDev ? <div className="dev-mode-panel"><span>MODO DEV</span><div className="dev-mode-buttons"><button disabled={loading} className={viewMode === "rh" ? "active" : ""} onClick={() => void switchToRh()}>Visão RH</button><button disabled={loading} className={viewMode === "pj" ? "active" : ""} onClick={() => void switchToContractor()}>Visualizar como colaborador</button></div>{viewMode === "pj" && <div className="dev-view-selector"><span>Visualizar como</span><SelectMenu variant="dark" ariaLabel="Colaborador visualizado" disabled={loading} value={viewedContractorId} onChange={(value) => void switchToContractor(value)} options={rhDashboard.contractors.map((person) => ({ value: person.id, label: person.name, description: person.status === "INACTIVE" ? "Cadastro inativo" : "Colaborador ativo" }))} /></div>}</div> : <div className="role-switch actual-role" aria-label="Perfil autorizado"><button className="active" disabled>{role === "rh" ? "RH" : "Colaborador"}</button></div>}<nav aria-label="Navegação principal"><p className="nav-caption">ESPAÇO DE TRABALHO</p>{visibleNav.map((item) => <button key={item.id} className={section === item.id ? "nav-active" : ""} onClick={() => openSection(item.id)}><span className="nav-icon"><UiIcon name={item.icon} size={20} /></span>{item.label}{item.id === "requests" && pendingCount > 0 && <span className="nav-count" aria-label={(dashboard.approvalsScope === "all" ? "Pendências de todas as datas: " : "Pendências deste período: ") + pendingCount} title={dashboard.approvalsScope === "all" ? "Pendências de todas as datas" : "Pendências deste período"}>{pendingCount}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="profile-card"><div className="avatar">{initials}</div><div><strong>{user.name}</strong><span>{isDev ? "Desenvolvedor" : role === "rh" ? "Recursos Humanos" : "Colaborador"}</span></div><form action="/api/auth/sign-out" method="post"><button type="submit" aria-label="Sair da conta">Sair</button></form></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
     <main className="main-content"><header className="topbar"><div className="breadcrumb"><span>Horus</span><b>/</b>{sectionNames[section]}</div><div className="topbar-actions"><div className="organization-button"><span className="org-monogram">{organizationName.slice(0, 1).toUpperCase()}</span><span>{organizationName}</span></div></div></header>{notice && <div className="toast" role="status" aria-live="polite">{notice}{refreshNotice && <button type="button" onClick={() => void refreshDashboard()}>Atualizar consulta</button>}</div>}{(loading || activeSlot?.loading) && <div className="loading-line" role="status" aria-label="Atualizando dados">Atualizando dados…</div>}<div ref={contentRef} className="content-wrap">{isDev && viewMode === "pj" && <DeveloperViewBanner collaboratorName={rhDashboard.contractors.find(person => person.id === viewedContractorId)?.name ?? "colaborador selecionado"} onBack={() => void switchToRh()} />}
       {contextNotice && <div className="toast" role="status" aria-live="polite">{contextNotice}</div>}
