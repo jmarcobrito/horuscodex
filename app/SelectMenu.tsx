@@ -1,5 +1,7 @@
 "use client";
 
+import { UiIcon } from "./UiIcon";
+
 import { createPortal } from "react-dom";
 import { KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -98,13 +100,13 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
       }}
     >
       <span className={!selected ? "placeholder" : ""}>{selected?.label ?? placeholder}</span>
-      <span className="select-menu-chevron" aria-hidden="true">⌄</span>
+      <span className="select-menu-chevron" aria-hidden="true"><UiIcon name="down" /></span>
     </button>
     {open && typeof document !== "undefined" && createPortal(
       <div ref={menuRef} id={listboxId} className={`select-menu-popover ${variant}`} role="listbox" aria-label={ariaLabel} style={position} onKeyDown={handleMenuKeyDown}>
         {options.map((option) => <button key={option.value} type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); close(true); }}>
           <span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>
-          {option.value === value && <b aria-hidden="true">✓</b>}
+          {option.value === value && <b aria-hidden="true"><UiIcon name="check" size={16} /></b>}
         </button>)}
       </div>,
       portalRoot ?? document.body,

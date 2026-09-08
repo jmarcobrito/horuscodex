@@ -54,8 +54,8 @@ export function ReportTable({ report, isDev, onPageChange }: { report: ReportRes
   return <>
     <ReportSummary report={report} />
     {report.rows.length > 0 && <section className="panel ledger-panel" aria-label="Resultados do relatório">
-      <div className="table-scroll"><table><thead><tr>{columns.map(column => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
-        <tbody>{report.rows.map(row => <tr key={row.id}>{columns.map(column => <td key={column.key}>{cellValue(row, column.key, report.timezone)}{isDev && report.kind === "history" && column.key === columns.at(-1)?.key && <TechnicalDetails row={row as HistoryReportRow} />}</td>)}</tr>)}</tbody>
+      <div className="table-scroll"><table><thead><tr>{columns.map(column => <th key={column.key} scope="col" data-numeric={column.key.toLowerCase().includes("minutes") || undefined}>{column.label}</th>)}</tr></thead>
+        <tbody>{report.rows.map(row => <tr key={row.id}>{columns.map(column => <td key={column.key} data-numeric={column.key.toLowerCase().includes("minutes") || undefined}>{cellValue(row, column.key, report.timezone)}{isDev && report.kind === "history" && column.key === columns.at(-1)?.key && <TechnicalDetails row={row as HistoryReportRow} />}</td>)}</tr>)}</tbody>
       </table></div>
     </section>}
     <nav className="panel entries-toolbar report-pagination" aria-label="Paginação do relatório">

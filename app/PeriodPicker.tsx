@@ -1,5 +1,7 @@
 "use client";
 
+import { UiIcon } from "./UiIcon";
+
 import { useState, type FormEvent } from "react";
 import type { DashboardPeriod } from "./dashboard-types";
 import { asFullMonth, parseMonthValue, shiftMonth, validPeriodDate } from "./period";
@@ -20,13 +22,13 @@ export function PeriodPicker({ value, busy, allowRange, onChange, variant = "def
     <div className="month-selector">
       <span className="period-section-label">MÊS DE CONSULTA</span>
       <div className="month-selector-controls">
-        <button type="button" aria-label="Voltar para o mês anterior" disabled={busy || !previous} onClick={() => previous && onChange(previous)}>←</button>
+        <button type="button" aria-label="Voltar para o mês anterior" disabled={busy || !previous} onClick={() => previous && onChange(previous)}><UiIcon name="previous" /></button>
         <input aria-label="Mês de consulta" type="month" min="2000-01" max="2200-12" disabled={busy} value={month?.from.slice(0, 7) ?? ""} onChange={event => { const selected = parseMonthValue(event.target.value); if (selected) onChange(selected); }} />
-        <button type="button" aria-label="Avançar para o próximo mês" disabled={busy || !next} onClick={() => next && onChange(next)}>→</button>
+        <button type="button" aria-label="Avançar para o próximo mês" disabled={busy || !next} onClick={() => next && onChange(next)}><UiIcon name="next" /></button>
       </div>
       <span className="period-caption" aria-live="polite">{value ? monthLabel(value) : "Escolha o mês"}</span>
     </div>
-    {allowRange && (variant === "compact" ? <details className="overview-range"><summary>Outro intervalo</summary><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></details> : <><div className="period-divider" aria-hidden="true" /><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></>)}
+    {allowRange && (variant === "compact" ? <details className="overview-range"><summary><UiIcon name="down" />Outro intervalo</summary><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></details> : <><div className="period-divider" aria-hidden="true" /><RangePicker key={value?.from + ":" + value?.to} value={value} busy={busy} onChange={onChange} /></>)}
   </section>;
 }
 function RangePicker({ value, busy, onChange }: Omit<PeriodPickerProps, "allowRange">) {
